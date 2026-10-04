@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 import { EmptyState, SectionTitle, Segmented } from '../components/Ui';
 import { hrefMaker } from '../lib/route';
 import { matcher } from '../lib/search';
@@ -81,19 +81,27 @@ export const Makers: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ 
             </thead>
             <tbody>
               {shown.map((mk, i) => (
-                <tr key={mk.name} className="border-t border-slate-100 hover:bg-blue-50">
+                <tr
+                  key={mk.name}
+                  onClick={() => (window.location.hash = hrefMaker(mk.name).slice(1))}
+                  className="group cursor-pointer border-t border-slate-100 hover:bg-blue-50"
+                >
                   <td className={`px-4 py-2.5 tabular-nums font-extrabold ${i < 3 ? 'text-blue-700' : 'text-slate-400'}`}>{i + 1}</td>
                   <td className="px-4 py-2.5">
-                    <a href={hrefMaker(mk.name)} className="font-bold text-slate-900 hover:text-blue-700 hover:underline underline-offset-2">
-                      {mk.person}
-                    </a>
-                    <span className="block text-xs text-slate-500">{mk.org}</span>
+                    
+                        <a href={hrefMaker(mk.name)} className="block text-base font-bold text-slate-900 group-hover:text-blue-700">
+                          {mk.person}
+                        </a>
+                        <span className="block text-xs text-slate-500">{mk.org}</span>
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{mk.tools.length}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums font-bold text-slate-900">{n(mk.views)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">+{n(mk.recent7)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{n(mk.comments)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{shortDay(mk.latest)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
+                    {shortDay(mk.latest)}
+                    <ChevronRight className="ml-1 inline w-4 h-4 text-slate-300 group-hover:text-blue-700" aria-hidden="true" />
+                  </td>
                 </tr>
               ))}
             </tbody>

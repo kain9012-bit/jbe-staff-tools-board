@@ -81,9 +81,13 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
             </thead>
             <tbody>
               {mk.tools.map((t) => (
-                <tr key={t.sid} className="border-t border-slate-100 hover:bg-blue-50">
+                <tr
+                  key={t.sid}
+                  onClick={() => (window.location.hash = hrefTool(t.sid).slice(1))}
+                  className="group cursor-pointer border-t border-slate-100 hover:bg-blue-50"
+                >
                   <td className="px-4 py-2.5">
-                    <a href={hrefTool(t.sid)} className="font-bold text-slate-900 hover:text-blue-700 hover:underline underline-offset-2">
+                    <a href={hrefTool(t.sid)} className="font-bold text-slate-900 group-hover:text-blue-700">
                       {t.title}
                     </a>
                     <span className="block text-xs text-slate-500">{t.purpose} · {t.target}</span>

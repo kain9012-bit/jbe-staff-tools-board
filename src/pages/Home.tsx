@@ -154,7 +154,7 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {fresh.map((t) => (
-            <ToolCard key={t.sid} t={t} />
+            <ToolCard key={t.sid} t={t} today={m.dates[m.dates.length - 1]} />
           ))}
         </div>
       </section>

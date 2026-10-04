@@ -115,7 +115,7 @@ export const Tools: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }
       {shown.length ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((t) => (
-            <ToolCard key={t.sid} t={t} />
+            <ToolCard key={t.sid} t={t} today={m.dates[m.dates.length - 1]} />
           ))}
         </div>
       ) : (
