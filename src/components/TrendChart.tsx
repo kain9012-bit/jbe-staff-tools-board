@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BarChart3, Table2 } from 'lucide-react';
-import { bucketize, mondayOf, n, type Bucket, type Model } from '../lib/stats';
+import { addDays, bucketize, n, type Bucket, type Model } from '../lib/stats';
 import type { Grain } from '../types';
 import { Segmented } from './Ui';
 
@@ -11,7 +11,16 @@ const GRAINS: { value: Grain; label: string }[] = [
   { value: 'month', label: '월별' },
 ];
 
-const MAX_DAYS = 60; // 일별은 최근 60일만
+type Preset = '7' | '30' | '90' | 'all' | 'custom';
+const PRESETS: { value: Preset; label: string }[] = [
+  { value: '7', label: '7일' },
+  { value: '30', label: '30일' },
+  { value: '90', label: '90일' },
+  { value: 'all', label: '전체' },
+];
+
+/** 기간을 직접 고르기 전 기본값 — 일별은 막대가 읽히는 30일, 주·월별은 흐름을 보는 전체 */
+const defaultPreset = (g: Grain): Preset => (g === 'day' ? '30' : 'all');
 
 const BAR = 'var(--color-blue-600)';
 const BAR_PARTIAL = 'var(--color-blue-200)';
@@ -29,14 +38,19 @@ const Tip: React.FC<{ active?: boolean; payload?: { payload: Bucket }[]; grain: 
         {grain === 'day' ? b.key : grain === 'week' ? `${b.key} 주 (월~일)` : b.key.slice(0, 7)}
       </div>
       <div className="font-bold tabular-nums text-slate-900">{n(b.value)}회</div>
-      {b.partial && <div className="text-xs text-slate-500">수집 기간이 덜 찬 구간</div>}
+      {b.partial && <div className="text-xs text-slate-500">기간 일부만 포함되거나 진행 중인 구간</div>}
       {b.missingDays > 0 && <div className="text-xs text-amber-800">수집 누락 {b.missingDays}일 (0으로 계산)</div>}
     </div>
   );
 };
 
-/** 조회수 추이 — 막대 하나짜리 계열이라 범례 없이 제목이 이름을 대신함 */
-/** from: 이 날짜가 든 구간부터 그림 (최근 게시 도구의 앞쪽 빈 구간을 잘라냄) */
+const dateInput =
+  'rounded-lg border border-slate-300 px-2 py-1 text-sm tabular-nums text-slate-700 bg-white hover:border-blue-600 focus:border-blue-600';
+
+/**
+ * 조회수 추이 — 막대 하나짜리 계열이라 범례 없이 제목이 이름을 대신함.
+ * from: 그릴 수 있는 가장 이른 날 (도구의 첫 수집일 등). 그 앞의 빈 구간은 잘라냄.
+ */
 export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string; desc?: string; from?: string }> = ({
   model,
   daily,
@@ -45,16 +59,40 @@ export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string
   from,
 }) => {
   const [grain, setGrain] = useState<Grain>('day');
+  const [picked, setPicked] = useState<Preset | null>(null); // null = 아직 직접 고르지 않음
+  const [custom, setCustom] = useState<{ from: string; to: string } | null>(null);
   const [asTable, setAsTable] = useState(false);
-  const data = useMemo(() => {
-    let b = bucketize(model, daily, grain);
-    if (from) {
-      const k = grain === 'day' ? from : grain === 'week' ? mondayOf(from) : `${from.slice(0, 7)}-01`;
-      b = b.filter((x) => x.key >= k);
-    }
-    return grain === 'day' ? b.slice(-MAX_DAYS) : b;
-  }, [model, daily, grain, from]);
+
+  const minDate = from && from > model.start ? from : model.start;
+  const maxDate = model.dates[model.dates.length - 1] ?? model.start;
+  const preset = picked ?? defaultPreset(grain);
+
+  const range = useMemo(() => {
+    if (preset === 'custom' && custom) return custom;
+    const start = preset === 'all' ? minDate : addDays(maxDate, -(Number(preset) - 1));
+    return { from: start < minDate ? minDate : start, to: maxDate };
+  }, [preset, custom, minDate, maxDate]);
+
+  const data = useMemo(
+    () => bucketize(model, daily, grain, range.from, range.to),
+    [model, daily, grain, range],
+  );
   const total = data.reduce((s, b) => s + b.value, 0);
+
+  const pickPreset = (p: Preset) => {
+    setPicked(p);
+    setCustom(null);
+  };
+  const setEdge = (edge: 'from' | 'to', v: string) => {
+    if (!v) return;
+    const next = { ...range, [edge]: v };
+    if (next.from > next.to) {
+      if (edge === 'from') next.to = next.from;
+      else next.from = next.to;
+    }
+    setCustom(next);
+    setPicked('custom');
+  };
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-4">
@@ -62,8 +100,7 @@ export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string
         <div>
           <h3 className="text-base font-bold text-slate-900">{title}</h3>
           <p className="text-xs text-slate-500">
-            {desc ?? '조회수 증가량'} · 표시 구간 합계 <b className="tabular-nums text-slate-700">{n(total)}회</b>
-            {grain === 'day' && model.dates.length > MAX_DAYS && ` · 최근 ${MAX_DAYS}일`}
+            {desc ?? '조회수 증가량'} · 선택 기간 합계 <b className="tabular-nums text-slate-700">{n(total)}회</b>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -78,6 +115,30 @@ export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string
             {asTable ? '그래프' : '표'}
           </button>
         </div>
+      </div>
+
+      {/* 기간 — 단추로 빠르게, 날짜 칸으로 직접 */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 pt-3">
+        <Segmented
+          label="기간"
+          value={preset === 'custom' ? ('' as Preset) : preset}
+          options={PRESETS}
+          onChange={pickPreset}
+        />
+        <div className="flex items-center gap-1.5 text-sm text-slate-500">
+          <label>
+            <span className="sr-only">시작일</span>
+            <input type="date" className={dateInput} value={range.from} min={minDate} max={maxDate} onChange={(e) => setEdge('from', e.target.value)} />
+          </label>
+          <span aria-hidden="true">~</span>
+          <label>
+            <span className="sr-only">종료일</span>
+            <input type="date" className={dateInput} value={range.to} min={minDate} max={maxDate} onChange={(e) => setEdge('to', e.target.value)} />
+          </label>
+        </div>
+        {picked === null && (
+          <span className="text-xs text-slate-400">{grain === 'day' ? '일별 기본: 최근 30일' : '주·월별 기본: 전체 기간'}</span>
+        )}
       </div>
 
       {asTable ? (
@@ -104,10 +165,10 @@ export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string
           </table>
         </div>
       ) : (
-        <div className="mt-3 h-56" role="img" aria-label={`${title} 막대그래프, 표로 보기 단추로 수치 확인`}>
+        <div className="mt-3 h-56" role="img" aria-label={`${title} 막대그래프, 표 단추로 수치 확인`}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -12 }} barCategoryGap={grain === 'day' ? 2 : '25%'}>
-              <CartesianGrid vertical={false} stroke="var(--color-slate-200)" strokeDasharray="0" />
+            <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -12 }} barCategoryGap={data.length > 40 ? 1 : '20%'}>
+              <CartesianGrid vertical={false} stroke="var(--color-slate-200)" />
               <XAxis
                 dataKey="label"
                 tickLine={false}
@@ -135,8 +196,8 @@ export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string
         </div>
       )}
       <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-        <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: BAR_PARTIAL }} aria-hidden="true" />
-        옅은 막대: 아직 끝나지 않았거나 수집 시작 전이 섞인 구간
+        <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: BAR_PARTIAL }} aria-hidden="true" />
+        옅은 막대: 선택 기간에 일부만 들어가거나 아직 끝나지 않은 구간
       </p>
     </div>
   );

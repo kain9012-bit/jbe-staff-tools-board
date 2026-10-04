@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { ToolCard } from '../components/Lists';
 import { Chip, EmptyState, SectionTitle } from '../components/Ui';
+import { matcher } from '../lib/search';
 import type { Model, ToolStat } from '../lib/stats';
 
 type SortKey = 'views' | 'recent7' | 'comments' | 'created';
@@ -21,10 +22,10 @@ const sorter = (k: SortKey) => (a: ToolStat, b: ToolStat) =>
 const targetsOf = (t: string) => t.split(/[,·\s]+/).map((x) => x.trim()).filter(Boolean);
 const TARGET_ORDER = ['전체', '유', '초', '중', '고', '특수', '기관'];
 
-export const Tools: React.FC<{ m: Model }> = ({ m }) => {
+export const Tools: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }) => {
   const [purpose, setPurpose] = useState('');
   const [target, setTarget] = useState('');
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(initialQ ?? '');
   const [sort, setSort] = useState<SortKey>('views');
 
   const purposes = useMemo(() => {
@@ -40,9 +41,9 @@ export const Tools: React.FC<{ m: Model }> = ({ m }) => {
   }, [m]);
 
   /** 사용목적 칩의 건수는 다른 조건을 먼저 적용한 결과 */
+  const hit = matcher(q);
   const base = m.tools.filter((t) => {
-    const qq = q.trim();
-    if (qq && !`${t.title} ${t.author}`.includes(qq)) return false;
+    if (!hit(t.title, t.author, t.purpose)) return false;
     // '전체' 대상 도구는 어느 학교급을 골라도 포함
     if (target && !targetsOf(t.target).some((x) => x === target || x === '전체')) return false;
     return true;

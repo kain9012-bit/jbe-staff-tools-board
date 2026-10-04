@@ -33,8 +33,8 @@ export type Grain = 'day' | 'week' | 'month';
 
 export type Route =
   | { page: 'home' }
-  | { page: 'tools' }
-  | { page: 'makers' }
+  | { page: 'tools'; q?: string }
+  | { page: 'makers'; q?: string }
   | { page: 'about' }
   | { page: 'tool'; sid: string }
   | { page: 'maker'; name: string };

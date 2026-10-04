@@ -164,12 +164,16 @@ export interface Bucket {
   missingDays: number;
 }
 
-/** 일별 배열을 일·주·월 구간으로 묶음 */
-export function bucketize(m: Model, daily: number[], grain: Grain): Bucket[] {
+/**
+ * 일별 배열을 [from, to] 기간 안에서 일·주·월 구간으로 묶음.
+ * 기간 경계에 걸려 일부 날짜만 들어간 구간, 아직 끝나지 않은 구간은 partial.
+ */
+export function bucketize(m: Model, daily: number[], grain: Grain, from = m.start, to = m.dates[m.dates.length - 1]): Bucket[] {
   const out: Bucket[] = [];
   const keyOf = (d: string) =>
     grain === 'day' ? d : grain === 'week' ? mondayOf(d) : `${d.slice(0, 7)}-01`;
   m.dates.forEach((d, i) => {
+    if (d < from || d > to) return;
     const k = keyOf(d);
     let b = out[out.length - 1];
     if (!b || b.key !== k) {
@@ -179,16 +183,13 @@ export function bucketize(m: Model, daily: number[], grain: Grain): Bucket[] {
     b.value += daily[i];
     if (m.missing.has(d)) b.missingDays++;
   });
-  // 처음·마지막 구간이 수집 기간에 잘렸는지
-  if (grain !== 'day' && out.length) {
-    const first = out[0];
-    const last = out[out.length - 1];
-    if (first.key < m.start) first.partial = true;
-    const lastEnd = grain === 'week' ? addDays(last.key, 6) : endOfMonth(last.key);
-    if (m.dates[m.dates.length - 1] < lastEnd) last.partial = true;
-  } else if (grain === 'day' && out.length) {
-    out[out.length - 1].partial = true; // 오늘은 수집 중
-  }
+  if (!out.length) return out;
+  const lastData = m.dates[m.dates.length - 1];
+  const endOf = (k: string) => (grain === 'day' ? k : grain === 'week' ? addDays(k, 6) : endOfMonth(k));
+  const first = out[0];
+  const last = out[out.length - 1];
+  if (first.key < from) first.partial = true;
+  if (endOf(last.key) > to || endOf(last.key) >= lastData) last.partial = true;
   return out;
 }
 

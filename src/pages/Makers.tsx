@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import { Search } from 'lucide-react';
 import { EmptyState, SectionTitle, Segmented } from '../components/Ui';
 import { hrefMaker } from '../lib/route';
+import { matcher } from '../lib/search';
 import { n, shortDay, type MakerStat, type Model } from '../lib/stats';
 
 type SortKey = 'views' | 'recent7' | 'comments' | 'tools';
 
 const val = (mk: MakerStat, k: SortKey) => (k === 'tools' ? mk.tools.length : mk[k]);
 
-export const Makers: React.FC<{ m: Model }> = ({ m }) => {
-  const [q, setQ] = useState('');
+export const Makers: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }) => {
+  const [q, setQ] = useState(initialQ ?? '');
   const [sort, setSort] = useState<SortKey>('views');
+  const hit = matcher(q);
   const shown = m.makers
-    .filter((mk) => !q.trim() || `${mk.name} ${mk.tools.map((t) => t.title).join(' ')}`.includes(q.trim()))
+    .filter((mk) => hit(mk.name, ...mk.tools.map((t) => t.title)))
     .sort((a, b) => val(b, sort) - val(a, sort) || b.views - a.views);
 
   return (

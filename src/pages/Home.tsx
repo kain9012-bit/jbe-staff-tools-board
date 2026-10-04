@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarDays, Eye, MessageCircle, Sparkles, Users, Wrench } from 'lucide-react';
+import { GlobalSearch } from '../components/GlobalSearch';
 import { CommentItem, RankRow, ToolCard } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
 import { Card, Segmented, Stat } from '../components/Ui';
@@ -51,15 +52,18 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
 
   return (
     <>
-      <div className="relative left-1/2 w-screen -translate-x-1/2 -mt-6 bg-blue-50 border-b border-blue-100">
+      <div className="relative z-10 left-1/2 w-screen -translate-x-1/2 -mt-6 bg-blue-50 border-b border-blue-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="jbe-display text-3xl sm:text-[2.75rem] font-extrabold text-slate-900 leading-tight tracking-tight">
-            교직원이 만든 업무도구, <br className="hidden sm:block" />
-            <span className="text-blue-700">누가 만들고 얼마나 쓰이는지</span>
+            교직원이 만든 업무도구,
+            <span className="block text-blue-700">누가 만들고 얼마나 쓰이는지</span>
           </h1>
           <p className="mt-2 max-w-3xl text-slate-600">
             데이터 도구실 「교직원 제작 도구」 게시판의 조회수와 댓글을 매시간 모아 제작자별·도구별로 정리한 현황.
           </p>
+          <div className="mt-5">
+            <GlobalSearch m={m} />
+          </div>
           <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5">
             <Stat icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />} label="제작자" value={n(m.makers.length)} desc="게시판 작성자 기준" />
             <Stat icon={<Wrench className="w-3.5 h-3.5" aria-hidden="true" />} label="등록 도구" value={n(m.tools.length)} desc="게시중 글, 공지 제외" />

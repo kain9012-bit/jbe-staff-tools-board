@@ -77,8 +77,8 @@ export default function App() {
     );
   else if (m) {
     body =
-      route.page === 'tools' ? <Tools m={m} />
-      : route.page === 'makers' ? <Makers m={m} />
+      route.page === 'tools' ? <Tools key={route.q} m={m} initialQ={route.q} />
+      : route.page === 'makers' ? <Makers key={route.q} m={m} initialQ={route.q} />
       : route.page === 'tool' ? <ToolDetail m={m} sid={route.sid} />
       : route.page === 'maker' ? <MakerDetail m={m} name={route.name} />
       : <Home m={m} />;
