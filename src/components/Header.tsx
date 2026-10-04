@@ -1,5 +1,6 @@
 import React from 'react';
-import { Info, Wrench } from 'lucide-react';
+import { ArrowUpRight, Info, Wrench } from 'lucide-react';
+import { BOARD_URL } from '../lib/board';
 import type { Route } from '../types';
 
 const TABS: { key: 'home' | 'tools' | 'makers' | 'about'; label: string; href: string }[] = [
@@ -25,7 +26,12 @@ export const Header: React.FC<{ route: Route; asOf?: string }> = ({ route, asOf 
               정보를 매시간 수집
             </span>
           </span>
-          <span className="shrink-0 tabular-nums">{asOf ? `${asOf} 수집 기준` : '수집 시점 확인 중'}</span>
+          <span className="flex shrink-0 items-center gap-3">
+            <span className="tabular-nums">{asOf ? `${asOf} 수집 기준` : '수집 시점 확인 중'}</span>
+            <a href={BOARD_URL} target="_blank" rel="noreferrer" className="md:hidden inline-flex items-center gap-0.5 font-bold text-blue-700">
+              게시판 바로가기 <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
+            </a>
+          </span>
         </div>
       </div>
       <div className="border-b border-slate-200">
@@ -59,6 +65,16 @@ export const Header: React.FC<{ route: Route; asOf?: string }> = ({ route, asOf 
               </li>
             ))}
           </ul>
+          <a
+            href={BOARD_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="hidden md:inline-flex items-center gap-1 rounded-lg border border-blue-600 px-3 py-1.5 text-sm font-bold text-blue-700 hover:bg-blue-50"
+          >
+            게시판 바로가기
+            <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
+            <span className="sr-only">(새 창)</span>
+          </a>
         </div>
       </div>
     </header>

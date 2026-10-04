@@ -130,15 +130,19 @@ export const CommentGap: React.FC<{ t: ToolStat; withTitle?: boolean }> = ({ t, 
     </p>
   ) : null;
 
-export const BoardLink: React.FC<{ url: string; children?: React.ReactNode }> = ({ url, children }) => (
+/** 도구 상세의 주 단추 — 게시판 원글로 가서 내려받기·사용 */
+export const UseToolLink: React.FC<{ url: string }> = ({ url }) => (
   <a
     href={url}
     target="_blank"
     rel="noreferrer"
-    className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-bold text-white hover:bg-slate-800"
+    className="group inline-flex w-full sm:w-auto items-center justify-between gap-4 rounded-xl bg-blue-600 px-6 py-3.5 text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 hover:shadow-lg"
   >
-    {children ?? '게시글 열기'}
-    <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
+    <span className="text-left">
+      <span className="block text-lg font-extrabold leading-tight">이 도구 사용하러 가기</span>
+      <span className="block text-xs text-blue-100">게시판 원글에서 내려받기 · 사용방법 확인</span>
+    </span>
+    <ArrowUpRight className="w-6 h-6 shrink-0 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
     <span className="sr-only">(새 창)</span>
   </a>
 );

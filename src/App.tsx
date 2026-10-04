@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
 import { Header } from './components/Header';
 import { EmptyState } from './components/Ui';
+import { BOARD_URL } from './lib/board';
 import { useRoute } from './lib/route';
 import { useData } from './lib/useData';
 import { About } from './pages/About';
@@ -11,8 +12,6 @@ import { Makers } from './pages/Makers';
 import { ToolDetail } from './pages/ToolDetail';
 import { Tools } from './pages/Tools';
 
-const BOARD_URL =
-  'https://www.jbe.go.kr/board/list.jbe?boardId=BBS_0000683&menuCd=DOM_000000106011002002&contentsSid=3257&cpath=';
 
 /** 자료가 오기 전 빈 껍데기 — 숫자 자리를 회색 막대로만 둠 */
 const Skeleton = () => (

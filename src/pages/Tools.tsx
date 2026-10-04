@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowUpRight, Search, SlidersHorizontal } from 'lucide-react';
+import { BOARD_URL } from '../lib/board';
 import { ToolCard } from '../components/Lists';
 import { Chip, EmptyState, SectionTitle } from '../components/Ui';
 import { matcher } from '../lib/search';
@@ -52,9 +53,21 @@ export const Tools: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }
 
   return (
     <>
-      <SectionTitle count={shown.length} desc="게시판에 올라온 교직원 제작 도구 전체">
-        도구
-      </SectionTitle>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <SectionTitle count={shown.length} desc="게시판에 올라온 교직원 제작 도구 전체">
+          도구
+        </SectionTitle>
+        <a
+          href={BOARD_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-sm font-bold text-blue-700 hover:underline underline-offset-2"
+        >
+          게시판에서 보기 · 내 도구 올리기
+          <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
+          <span className="sr-only">(새 창)</span>
+        </a>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Chip on={purpose === ''} onClick={() => setPurpose('')} count={base.length}>

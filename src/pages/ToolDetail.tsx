@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, CalendarDays, Eye, History, MessageCircle, TrendingUp, Wrench } from 'lucide-react';
-import { BoardLink, CommentGap, CommentItem, MakerLink } from '../components/Lists';
+import { UseToolLink, CommentGap, CommentItem, MakerLink } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
 import { Badge, Card, EmptyState, Stat } from '../components/Ui';
 import { dayLabel, n, type Model } from '../lib/stats';
@@ -38,7 +38,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
             <MakerLink name={t.author} /> · {dayLabel(t.created)} 게시
           </p>
         </div>
-        <BoardLink url={t.url} />
+        <UseToolLink url={t.url} />
       </div>
 
       <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5">

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, Eye, MessageCircle, Sparkles, Users, Wrench } from 'lucide-react';
+import { ArrowUpRight, CalendarDays, Eye, MessageCircle, PencilLine, Sparkles, Users, Wrench } from 'lucide-react';
+import { BOARD_URL } from '../lib/board';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { CommentItem, RankRow, ToolCard } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
@@ -63,6 +64,29 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
           </p>
           <div className="mt-5">
             <GlobalSearch m={m} />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <a
+              href={BOARD_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white hover:bg-blue-700"
+            >
+              교직원 제작 도구 게시판 바로가기
+              <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
+              <span className="sr-only">(새 창)</span>
+            </a>
+            <a
+              href={BOARD_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-bold text-slate-700 hover:border-blue-600 hover:text-blue-700"
+            >
+              <PencilLine className="w-4 h-4" aria-hidden="true" />
+              내가 만든 도구 올리기
+              <span className="sr-only">(새 창, 게시판 로그인 후 글쓰기)</span>
+            </a>
+            <span className="text-xs text-slate-500">게시판에서 로그인 후 글쓰기</span>
           </div>
           <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5">
             <Stat icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />} label="제작자" value={n(m.makers.length)} desc="게시판 작성자 기준" />
