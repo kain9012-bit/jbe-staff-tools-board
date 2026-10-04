@@ -55,39 +55,54 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
     <>
       <div className="relative z-10 left-1/2 w-screen -translate-x-1/2 -mt-6 bg-blue-50 border-b border-blue-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="jbe-display text-3xl sm:text-[2.75rem] font-extrabold text-slate-900 leading-tight tracking-tight">
-            교직원이 만든 업무도구,
-            <span className="block text-blue-700">누가 만들고 얼마나 쓰이는지</span>
-          </h1>
-          <p className="mt-2 max-w-3xl text-slate-600">
-            데이터 도구실 「교직원 제작 도구」 게시판의 조회수와 댓글을 매시간 모아 제작자별·도구별로 정리한 현황.
-          </p>
-          <div className="mt-5">
-            <GlobalSearch m={m} />
+          {/* 제목 왼쪽, 바로가기 상자 오른쪽 빈자리 */}
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 flex-1">
+            <h1 className="jbe-display text-3xl sm:text-[2.75rem] font-extrabold text-slate-900 leading-tight tracking-tight">
+              교직원이 만든 업무도구,
+              <span className="block text-blue-700">누가 만들고 얼마나 쓰이는지</span>
+            </h1>
+            <p className="mt-2 max-w-3xl text-slate-600">
+              데이터 도구실 「교직원 제작 도구」 게시판의 조회수와 댓글을 매시간 모아 제작자별·도구별로 정리한 현황.
+            </p>
+              <div className="mt-5 max-w-2xl">
+                <GlobalSearch m={m} />
+              </div>
+            </div>
+
+            <aside aria-label="바로가기" className="w-full shrink-0 rounded-xl border border-blue-100 bg-white/80 p-4 lg:w-80">
+              <p className="text-xs font-bold text-slate-500">바로가기</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                <a
+                  href={BOARD_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group flex items-center justify-between gap-3 rounded-lg bg-blue-600 px-4 py-3 text-white hover:bg-blue-700"
+                >
+                  <span>
+                    <span className="block font-bold">교직원 제작 도구 게시판</span>
+                    <span className="block text-xs text-blue-100">도구 내려받기 · 사용방법 · 댓글</span>
+                  </span>
+                  <ArrowUpRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span className="sr-only">(새 창)</span>
+                </a>
+                <a
+                  href={BOARD_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group flex items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 hover:border-blue-600 hover:text-blue-700"
+                >
+                  <span>
+                    <span className="block font-bold">내 도구 올리기</span>
+                    <span className="block text-xs text-slate-500">게시판 로그인 후 글쓰기</span>
+                  </span>
+                  <PencilLine className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span className="sr-only">(새 창)</span>
+                </a>
+              </div>
+            </aside>
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <a
-              href={BOARD_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white hover:bg-blue-700"
-            >
-              교직원 제작 도구 게시판 바로가기
-              <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
-              <span className="sr-only">(새 창)</span>
-            </a>
-            <a
-              href={BOARD_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-bold text-slate-700 hover:border-blue-600 hover:text-blue-700"
-            >
-              <PencilLine className="w-4 h-4" aria-hidden="true" />
-              내가 만든 도구 올리기
-              <span className="sr-only">(새 창, 게시판 로그인 후 글쓰기)</span>
-            </a>
-            <span className="text-xs text-slate-500">게시판에서 로그인 후 글쓰기</span>
-          </div>
+
           <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5">
             <Stat icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />} label="제작자" value={n(m.makers.length)} desc="게시판 작성자 기준" />
             <Stat icon={<Wrench className="w-3.5 h-3.5" aria-hidden="true" />} label="등록 도구" value={n(m.tools.length)} desc="게시중 글, 공지 제외" />
