@@ -22,8 +22,7 @@ export const Header: React.FC<{ route: Route; asOf?: string }> = ({ route, asOf 
           <span className="flex items-start gap-1.5 min-w-0">
             <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
             <span className="min-w-0">
-              <strong className="font-bold text-slate-900">비공식</strong> 현황 자료 · 게시판 공개
-              정보를 매시간 수집
+              교직원 제작 도구 게시판의 조회수·댓글을 매시간 모아 정리
             </span>
           </span>
           <span className="flex shrink-0 items-center gap-3">

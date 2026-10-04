@@ -98,7 +98,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap justify-between gap-4 text-sm text-slate-300">
           <div>
             <b className="block text-white">교직원 제작 도구 현황</b>
-            데이터 도구실 교직원 제작 도구 게시판의 조회수·댓글 현황 (비공식)
+            데이터 도구실 교직원 제작 도구 게시판의 조회수·댓글 현황
           </div>
           <div className="text-slate-400">
             출처 —{' '}
