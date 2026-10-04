@@ -1,17 +1,29 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 import { EmptyState, SectionTitle, Segmented } from '../components/Ui';
 import { hrefMaker } from '../lib/route';
 import { matcher } from '../lib/search';
-import { n, shortDay, type MakerStat, type Model } from '../lib/stats';
+import { n, periodStats, rangeLabel, shortDay, sum, type MakerStat, type Model } from '../lib/stats';
 
-type SortKey = 'views' | 'recent7' | 'comments' | 'tools';
+type SortKey = 'period' | 'views' | 'recent7' | 'comments' | 'tools';
 
-const val = (mk: MakerStat, k: SortKey) => (k === 'tools' ? mk.tools.length : mk[k]);
-
-export const Makers: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }) => {
+export const Makers: React.FC<{ m: Model; initialQ?: string; initialSort?: string; from?: string; to?: string }> = ({
+  m,
+  initialQ,
+  initialSort,
+  from,
+  to,
+}) => {
   const [q, setQ] = useState(initialQ ?? '');
-  const [sort, setSort] = useState<SortKey>('views');
+  /** 첫 화면 카드에서 넘어온 기간 */
+  const ps = useMemo(() => (from && to ? periodStats(m, from, to) : null), [m, from, to]);
+  const [sort, setSort] = useState<SortKey>(() => {
+    const k = initialSort as SortKey;
+    if (k === 'period') return ps ? 'period' : 'views';
+    return ['views', 'recent7', 'comments', 'tools'].includes(k) ? k : 'views';
+  });
+  const pv = (mk: MakerStat) => sum(mk.tools.map((t) => ps?.views.get(t.sid) ?? 0));
+  const val = (mk: MakerStat, k: SortKey) => (k === 'tools' ? mk.tools.length : k === 'period' ? pv(mk) : mk[k]);
   const hit = matcher(q);
   const shown = m.makers
     .filter((mk) => hit(mk.name, ...mk.tools.map((t) => t.title)))
@@ -39,6 +51,7 @@ export const Makers: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ 
           value={sort}
           onChange={setSort}
           options={[
+            ...(ps ? [{ value: 'period' as SortKey, label: ps.all ? '전체 기간' : rangeLabel(from!, to!) }] : []),
             { value: 'views', label: '누적' },
             { value: 'recent7', label: '최근 7일' },
             { value: 'comments', label: '댓글' },
@@ -60,7 +73,7 @@ export const Makers: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ 
                 </span>
                 <span className="shrink-0 text-right tabular-nums">
                   <span className="block font-bold text-slate-900">{n(mk.views)}회</span>
-                  <span className="block text-xs text-slate-500">7일 +{n(mk.recent7)} · 댓글 {n(mk.comments)}</span>
+                  <span className="block text-xs text-slate-500">{ps ? '기간' : '7일'} +{n(ps ? pv(mk) : mk.recent7)} · 댓글 {n(mk.comments)}</span>
                 </span>
               </a>
             </li>
@@ -74,7 +87,7 @@ export const Makers: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ 
                 <th className="px-4 py-2.5 text-left font-bold">제작자</th>
                 <th className="px-3 py-2.5 text-right font-bold">도구</th>
                 <th className="px-3 py-2.5 text-right font-bold">누적 조회수</th>
-                <th className="px-3 py-2.5 text-right font-bold">최근 7일</th>
+                <th className="px-3 py-2.5 text-right font-bold">{ps ? `기간 ${ps.all ? '전체' : rangeLabel(from!, to!)}` : '최근 7일'}</th>
                 <th className="px-3 py-2.5 text-right font-bold">댓글</th>
                 <th className="px-4 py-2.5 text-right font-bold">최근 게시</th>
               </tr>
@@ -96,7 +109,7 @@ export const Makers: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ 
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{mk.tools.length}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums font-bold text-slate-900">{n(mk.views)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">+{n(mk.recent7)}</td>
+                  <td className={`px-3 py-2.5 text-right tabular-nums ${ps ? 'font-bold text-blue-700' : ''}`}>+{n(ps ? pv(mk) : mk.recent7)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{n(mk.comments)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
                     {shortDay(mk.latest)}

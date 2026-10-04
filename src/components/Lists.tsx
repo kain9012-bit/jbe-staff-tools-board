@@ -47,7 +47,13 @@ const Pill: React.FC<{ icon: React.ReactNode; label: string; children: React.Rea
 );
 
 /** 도구 카드 — 분류·NEW / 제목(게시판 그대로) / 적용기관 / 제작자 / 게시일·지표 */
-export const ToolCard: React.FC<{ t: ToolStat; today: string; showAuthor?: boolean }> = ({ t, today, showAuthor = true }) => {
+export const ToolCard: React.FC<{
+  t: ToolStat;
+  today: string;
+  showAuthor?: boolean;
+  /** 기간 정렬로 열었을 때 맨 앞에 보이는 기간 지표 */
+  extra?: { label: string; value: string };
+}> = ({ t, today, showAuthor = true, extra }) => {
   const isNew = t.created >= addDays(today, -13);
   const { org, person } = splitAuthor(t.author);
   return (
@@ -73,7 +79,12 @@ export const ToolCard: React.FC<{ t: ToolStat; today: string; showAuthor?: boole
         )}
         <div className={`flex flex-wrap items-center gap-1.5 ${showAuthor ? 'mt-3' : 'border-t border-slate-100 pt-3'}`}>
           <span className="mr-auto text-xs tabular-nums text-slate-500">{shortDay(t.created)} 게시</span>
-          {t.recent7 > 0 && (
+          {extra && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1 text-xs font-bold tabular-nums text-white">
+              {extra.label} {extra.value}
+            </span>
+          )}
+          {!extra && t.recent7 > 0 && (
             <Pill icon={<TrendingUp className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />} label="최근 7일 조회">
               +{n(t.recent7)}
             </Pill>

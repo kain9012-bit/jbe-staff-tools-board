@@ -217,3 +217,24 @@ export const shortDay = (s: string) => {
   return `${mo}. ${da}.`;
 };
 export const n = (v: number) => v.toLocaleString('ko-KR');
+
+/** 기간 [from, to] 안의 도구별 조회수 증가·댓글 수 */
+export function periodStats(m: Model, from: string, to: string) {
+  const last = m.dates[m.dates.length - 1] ?? m.start;
+  const all = from <= m.start && to >= last;
+  const idx = m.dates.map((d, i) => (d >= from && d <= to ? i : -1)).filter((i) => i >= 0);
+  const views = new Map<string, number>();
+  for (const t of m.tools) views.set(t.sid, idx.reduce((s2, i) => s2 + t.daily[i], 0));
+  const comments = new Map<string, number>();
+  if (all) {
+    // 전체 기간은 게시판 목록의 댓글 수(수집 못 한 예전 댓글 포함)
+    for (const t of m.tools) comments.set(t.sid, t.comments);
+  } else {
+    for (const c of m.comments) {
+      if (c.date >= from && c.date <= to) comments.set(c.sid, (comments.get(c.sid) ?? 0) + 1);
+    }
+  }
+  return { all, views, comments };
+}
+
+export const rangeLabel = (from: string, to: string) => `${shortDay(from)} ~ ${shortDay(to)}`;

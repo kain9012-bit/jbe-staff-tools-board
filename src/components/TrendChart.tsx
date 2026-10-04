@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BarChart3, Table2 } from 'lucide-react';
-import { addDays, bucketize, n, type Bucket, type Model } from '../lib/stats';
-import type { Grain } from '../types';
+import { addDays, bucketize, n, rangeLabel, type Bucket, type Model } from '../lib/stats';
+import type { Grain, Period } from '../types';
 import { Segmented } from './Ui';
 
 const GRAINS: { value: Grain; label: string }[] = [
@@ -51,13 +51,15 @@ const dateInput =
  * 조회수 추이 — 막대 하나짜리 계열이라 범례 없이 제목이 이름을 대신함.
  * from: 그릴 수 있는 가장 이른 날 (도구의 첫 수집일 등). 그 앞의 빈 구간은 잘라냄.
  */
-export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string; desc?: string; from?: string }> = ({
-  model,
-  daily,
-  title,
-  desc,
-  from,
-}) => {
+export const TrendChart: React.FC<{
+  model: Model;
+  daily: number[];
+  title: string;
+  desc?: string;
+  from?: string;
+  /** 고른 기간을 바깥(첫 화면 카드 등)에 알림 */
+  onPeriod?: (p: Period) => void;
+}> = ({ model, daily, title, desc, from, onPeriod }) => {
   const [grain, setGrain] = useState<Grain>('day');
   const [picked, setPicked] = useState<Preset | null>(null); // null = 아직 직접 고르지 않음
   const [custom, setCustom] = useState<{ from: string; to: string } | null>(null);
@@ -72,6 +74,40 @@ export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string
     const start = preset === 'all' ? minDate : addDays(maxDate, -(Number(preset) - 1));
     return { from: start < minDate ? minDate : start, to: maxDate };
   }, [preset, custom, minDate, maxDate]);
+
+  /** 수집 기간에 걸친 달 목록 — 고르면 그 달 1일~말일(수집 범위로 자름) */
+  const months = useMemo(() => {
+    const out: { key: string; label: string; from: string; to: string }[] = [];
+    for (let k = `${minDate.slice(0, 7)}-01`; k <= maxDate; ) {
+      const d = new Date(`${k}T00:00:00Z`);
+      d.setUTCMonth(d.getUTCMonth() + 1, 0);
+      const end = d.toISOString().slice(0, 10);
+      const [y, mo] = k.split('-').map(Number);
+      out.push({ key: k.slice(0, 7), label: `${y}년 ${mo}월`, from: k < minDate ? minDate : k, to: end > maxDate ? maxDate : end });
+      d.setUTCDate(d.getUTCDate() + 1);
+      k = d.toISOString().slice(0, 10);
+    }
+    return out;
+  }, [minDate, maxDate]);
+  const monthKey = months.find((x) => x.from === range.from && x.to === range.to)?.key ?? '';
+
+  const periodLabel =
+    preset === 'all'
+      ? '전체 기간'
+      : monthKey
+        ? months.find((x) => x.key === monthKey)!.label
+        : preset === 'custom'
+          ? rangeLabel(range.from, range.to)
+          : `최근 ${preset}일`;
+
+  useEffect(() => {
+    onPeriod?.({
+      from: range.from,
+      to: range.to,
+      label: periodLabel,
+      all: range.from <= model.start && range.to >= maxDate,
+    });
+  }, [onPeriod, range.from, range.to, periodLabel, model.start, maxDate]);
 
   const data = useMemo(
     () => bucketize(model, daily, grain, range.from, range.to),
@@ -136,6 +172,30 @@ export const TrendChart: React.FC<{ model: Model; daily: number[]; title: string
             <input type="date" className={dateInput} value={range.to} min={minDate} max={maxDate} onChange={(e) => setEdge('to', e.target.value)} />
           </label>
         </div>
+        <label className="text-sm">
+          <span className="sr-only">월 선택</span>
+          <select
+            value={monthKey}
+            onChange={(e) => {
+              const mo = months.find((x) => x.key === e.target.value);
+              if (!mo) return;
+              setCustom({ from: mo.from, to: mo.to });
+              setPicked('custom');
+            }}
+            className={`rounded-lg border px-2.5 py-1 text-sm font-bold bg-white hover:border-blue-600 ${
+              monthKey ? 'border-slate-900 text-slate-900' : 'border-slate-300 text-slate-600'
+            }`}
+          >
+            <option value="" disabled>
+              월 선택
+            </option>
+            {months.map((mo) => (
+              <option key={mo.key} value={mo.key}>
+                {mo.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {picked === null && (
           <span className="text-xs text-slate-400">{grain === 'day' ? '일별 기본: 최근 30일' : '주·월별 기본: 전체 기간'}</span>
         )}

@@ -33,8 +33,16 @@ export type Grain = 'day' | 'week' | 'month';
 
 export type Route =
   | { page: 'home' }
-  | { page: 'tools'; q?: string }
-  | { page: 'makers'; q?: string }
+  | { page: 'tools'; q?: string; sort?: string; from?: string; to?: string }
+  | { page: 'makers'; q?: string; sort?: string; from?: string; to?: string }
   | { page: 'about' }
   | { page: 'tool'; sid: string }
   | { page: 'maker'; name: string };
+
+/** 그래프에서 고른 기간 — 첫 화면 카드와 목록 정렬이 함께 씀 */
+export interface Period {
+  from: string;
+  to: string;
+  label: string;
+  all: boolean; // 수집 전체 기간
+}

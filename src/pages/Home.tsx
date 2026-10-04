@@ -1,14 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowUpRight, CalendarDays, Eye, MessageCircle, PencilLine, Sparkles, Users, Wrench } from 'lucide-react';
 import { BOARD_URL, WRITE_URL } from '../lib/board';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { CommentItem, RankRow, ToolCard } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
-import { Card, Segmented, Stat } from '../components/Ui';
-import { hrefMaker, hrefTool } from '../lib/route';
-import { dayLabel, n, sum, type Model } from '../lib/stats';
+import { Card, Stat } from '../components/Ui';
+import { hrefList, hrefMaker, hrefTool } from '../lib/route';
+import { dayLabel, n, periodStats, rangeLabel, sum, type Model } from '../lib/stats';
+import type { Period } from '../types';
 
-type PopKey = 'views' | 'recent7';
 
 const Panel: React.FC<{ title: string; desc: string; action?: React.ReactNode; children: React.ReactNode; more?: string }> = ({
   title,
@@ -35,18 +35,34 @@ const Panel: React.FC<{ title: string; desc: string; action?: React.ReactNode; c
 );
 
 export const Home: React.FC<{ m: Model }> = ({ m }) => {
-  const [pop, setPop] = useState<PopKey>('views');
+  const last = m.dates[m.dates.length - 1] ?? m.start;
+  const [period, setPeriodState] = useState<Period>({ from: m.start, to: last, label: '전체 기간', all: true });
+  const setPeriod = useCallback((p: Period) => setPeriodState(p), []);
+
   const total = sum(m.tools.map((t) => t.views));
   const week = sum(m.tools.map((t) => t.thisWeek));
   const commentTotal = sum(m.tools.map((t) => t.comments));
   const allDaily = useMemo(() => m.dates.map((_, i) => sum(m.tools.map((t) => t.daily[i]))), [m]);
 
-  const popular = [...m.tools].sort((a, b) => b[pop] - a[pop] || b.views - a.views).slice(0, 10);
-  const talk = m.tools
-    .filter((t) => t.comments > 0)
-    .sort((a, b) => b.comments - a.comments || b.views - a.views)
+  /** 그래프에서 고른 기간 기준 집계 — 세 카드가 함께 따라감 */
+  const ps = useMemo(() => periodStats(m, period.from, period.to), [m, period.from, period.to]);
+  const pv = (sid: string) => ps.views.get(sid) ?? 0;
+  const pc = (sid: string) => ps.comments.get(sid) ?? 0;
+  const periodText = period.all ? '전체 기간' : `${period.label} (${rangeLabel(period.from, period.to)})`;
+
+  const popular = [...m.tools]
+    .filter((t) => pv(t.sid) > 0)
+    .sort((a, b) => pv(b.sid) - pv(a.sid) || b.views - a.views)
     .slice(0, 10);
-  const makers = m.makers.slice(0, 10);
+  const talk = m.tools
+    .filter((t) => pc(t.sid) > 0)
+    .sort((a, b) => pc(b.sid) - pc(a.sid) || b.views - a.views)
+    .slice(0, 10);
+  const makers = m.makers
+    .map((mk) => ({ mk, v: sum(mk.tools.map((t) => pv(t.sid))) }))
+    .filter((x) => x.v > 0)
+    .sort((a, b) => b.v - a.v || b.mk.views - a.mk.views)
+    .slice(0, 10);
   const fresh = [...m.tools].sort((a, b) => (a.created < b.created ? 1 : a.created > b.created ? -1 : b.sid.localeCompare(a.sid))).slice(0, 6);
   const toolBySid = new Map(m.tools.map((t) => [t.sid, t]));
   const recentComments = m.comments.slice(0, 6);
@@ -119,40 +135,42 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
       </div>
 
       <section className="mt-6">
-        <TrendChart model={m} daily={allDaily} title="전체 도구 조회수 추이" desc="모든 도구의 조회수 증가량 합계" />
+        <TrendChart model={m} daily={allDaily} title="전체 도구 조회수 추이" desc="모든 도구의 조회수 증가량 합계" onPeriod={setPeriod} />
       </section>
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-3">
+      <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+        <CalendarDays className="w-4 h-4 text-blue-700" aria-hidden="true" />
+        아래 순위는 그래프에서 고른 기간 기준
+        <b className="rounded-md bg-blue-50 px-2 py-0.5 text-blue-800">{periodText}</b>
+      </p>
+      <section className="mt-3 grid gap-4 lg:grid-cols-3">
         <Panel
           title="인기 도구"
-          desc={pop === 'views' ? '누적 조회수 순' : '최근 7일 조회수 증가 순'}
-          more="#/tools"
-          action={
-            <Segmented
-              label="인기 기준"
-              value={pop}
-              onChange={setPop}
-              options={[
-                { value: 'views', label: '누적' },
-                { value: 'recent7', label: '최근 7일' },
-              ]}
-            />
-          }
+          desc="선택 기간 조회수 순"
+          more={hrefList('tools', 'period', period)}
         >
-          {popular.map((t, i) => (
-            <RankRow
-              key={t.sid}
-              rank={i + 1}
-              href={hrefTool(t.sid)}
-              title={t.title}
-              sub={t.author}
-              value={pop === 'views' ? `${n(t.views)}회` : `+${n(t.recent7)}회`}
-              valueSub={pop === 'views' ? `7일 +${n(t.recent7)}` : `누적 ${n(t.views)}`}
-            />
-          ))}
+          {popular.length ? (
+            popular.map((t, i) => (
+              <RankRow
+                key={t.sid}
+                rank={i + 1}
+                href={hrefTool(t.sid)}
+                title={t.title}
+                sub={t.author}
+                value={`+${n(pv(t.sid))}회`}
+                valueSub={`누적 ${n(t.views)}`}
+              />
+            ))
+          ) : (
+            <li className="px-4 py-6 text-sm text-slate-500">이 기간에 늘어난 조회수 없음</li>
+          )}
         </Panel>
 
-        <Panel title="소통이 활발한 도구" desc="댓글 수 순 · 제작자 답글 포함 · 댓글 0개 제외" more="#/tools">
+        <Panel
+          title="소통이 활발한 도구"
+          desc="선택 기간 댓글 수 순 · 제작자 답글 포함"
+          more={hrefList('tools', 'periodComments', period)}
+        >
           {talk.length ? (
             talk.map((t, i) => (
               <RankRow
@@ -161,27 +179,31 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
                 href={hrefTool(t.sid)}
                 title={t.title}
                 sub={t.author}
-                value={`댓글 ${n(t.comments)}`}
-                valueSub={t.makerReplies ? `제작자 답글 ${t.makerReplies}` : undefined}
+                value={`댓글 ${n(pc(t.sid))}`}
+                valueSub={ps.all ? (t.makerReplies ? `제작자 답글 ${t.makerReplies}` : undefined) : `전체 ${n(t.comments)}`}
               />
             ))
           ) : (
-            <li className="px-4 py-6 text-sm text-slate-500">아직 댓글이 달린 도구가 없음</li>
+            <li className="px-4 py-6 text-sm text-slate-500">이 기간에 달린 댓글 없음</li>
           )}
         </Panel>
 
-        <Panel title="인기 제작자" desc="만든 도구의 누적 조회수 합계 순" more="#/makers">
-          {makers.map((mk, i) => (
-            <RankRow
-              key={mk.name}
-              rank={i + 1}
-              href={hrefMaker(mk.name)}
-              title={mk.person}
-              sub={`${mk.org} · 도구 ${mk.tools.length}개`}
-              value={`${n(mk.views)}회`}
-              valueSub={`7일 +${n(mk.recent7)}`}
-            />
-          ))}
+        <Panel title="인기 제작자" desc="만든 도구의 선택 기간 조회수 합계 순" more={hrefList('makers', 'period', period)}>
+          {makers.length ? (
+            makers.map(({ mk, v }, i) => (
+              <RankRow
+                key={mk.name}
+                rank={i + 1}
+                href={hrefMaker(mk.name)}
+                title={mk.person}
+                sub={`${mk.org} · 도구 ${mk.tools.length}개`}
+                value={`+${n(v)}회`}
+                valueSub={`누적 ${n(mk.views)}`}
+              />
+            ))
+          ) : (
+            <li className="px-4 py-6 text-sm text-slate-500">이 기간에 늘어난 조회수 없음</li>
+          )}
         </Panel>
       </section>
 

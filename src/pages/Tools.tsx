@@ -4,9 +4,9 @@ import { BOARD_URL, WRITE_URL } from '../lib/board';
 import { ToolCard } from '../components/Lists';
 import { Chip, EmptyState, SectionTitle } from '../components/Ui';
 import { matcher } from '../lib/search';
-import type { Model, ToolStat } from '../lib/stats';
+import { n, periodStats, rangeLabel, type Model, type ToolStat } from '../lib/stats';
 
-type SortKey = 'views' | 'recent7' | 'comments' | 'created';
+type SortKey = 'views' | 'recent7' | 'comments' | 'created' | 'period' | 'periodComments';
 const SORTS: { value: SortKey; label: string }[] = [
   { value: 'views', label: '누적 조회수 순' },
   { value: 'recent7', label: '최근 7일 조회수 순' },
@@ -14,20 +14,53 @@ const SORTS: { value: SortKey; label: string }[] = [
   { value: 'created', label: '최근 게시 순' },
 ];
 
-const sorter = (k: SortKey) => (a: ToolStat, b: ToolStat) =>
-  k === 'created'
-    ? b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)
-    : b[k] - a[k] || b.views - a.views;
+const SORT_KEYS = ['views', 'recent7', 'comments', 'created', 'period', 'periodComments'];
 
 /** "유,초,중,고,특수" → ["유","초","중","고","특수"], "전체"는 그대로 */
 const targetsOf = (t: string) => t.split(/[,·\s]+/).map((x) => x.trim()).filter(Boolean);
 const TARGET_ORDER = ['전체', '유', '초', '중', '고', '특수', '기관'];
 
-export const Tools: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }) => {
+export const Tools: React.FC<{ m: Model; initialQ?: string; initialSort?: string; from?: string; to?: string }> = ({
+  m,
+  initialQ,
+  initialSort,
+  from,
+  to,
+}) => {
   const [purpose, setPurpose] = useState('');
   const [target, setTarget] = useState('');
   const [q, setQ] = useState(initialQ ?? '');
-  const [sort, setSort] = useState<SortKey>('views');
+  const hasPeriod = Boolean(from && to);
+  const [sort, setSort] = useState<SortKey>(() => {
+    const k = (initialSort ?? 'views') as SortKey;
+    if (!SORT_KEYS.includes(k)) return 'views';
+    if ((k === 'period' || k === 'periodComments') && !hasPeriod) return k === 'period' ? 'views' : 'comments';
+    return k;
+  });
+
+  /** 첫 화면 카드에서 넘어온 기간 — 그 기간 조회수·댓글로 정렬 */
+  const ps = useMemo(() => (from && to ? periodStats(m, from, to) : null), [m, from, to]);
+  const pText = from && to ? (ps?.all ? '전체 기간' : rangeLabel(from, to)) : '';
+  const sortOptions = ps
+    ? [
+        { value: 'period' as SortKey, label: `선택 기간 조회수 순 (${pText})` },
+        { value: 'periodComments' as SortKey, label: `선택 기간 댓글 순 (${pText})` },
+        ...SORTS,
+      ]
+    : SORTS;
+  const keyOf = (t: ToolStat) =>
+    sort === 'period' ? ps?.views.get(t.sid) ?? 0
+    : sort === 'periodComments' ? ps?.comments.get(t.sid) ?? 0
+    : sort === 'created' ? 0
+    : t[sort];
+  const sorter = (a: ToolStat, b: ToolStat) =>
+    sort === 'created'
+      ? b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)
+      : keyOf(b) - keyOf(a) || b.views - a.views;
+  const extraOf = (t: ToolStat) =>
+    sort === 'period' ? { label: '기간', value: `+${n(ps?.views.get(t.sid) ?? 0)}` }
+    : sort === 'periodComments' ? { label: '기간 댓글', value: n(ps?.comments.get(t.sid) ?? 0) }
+    : undefined;
 
   const purposes = useMemo(() => {
     const c = new Map<string, number>();
@@ -49,7 +82,7 @@ export const Tools: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }
     if (target && !targetsOf(t.target).some((x) => x === target || x === '전체')) return false;
     return true;
   });
-  const shown = base.filter((t) => !purpose || t.purpose === purpose).sort(sorter(sort));
+  const shown = base.filter((t) => !purpose || t.purpose === purpose).sort(sorter);
 
   return (
     <>
@@ -115,7 +148,7 @@ export const Tools: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }
             onChange={(e) => setSort(e.target.value as SortKey)}
             className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-700 bg-white hover:border-blue-600"
           >
-            {SORTS.map((s) => (
+            {sortOptions.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
@@ -128,7 +161,7 @@ export const Tools: React.FC<{ m: Model; initialQ?: string }> = ({ m, initialQ }
       {shown.length ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((t) => (
-            <ToolCard key={t.sid} t={t} today={m.dates[m.dates.length - 1]} />
+            <ToolCard key={t.sid} t={t} today={m.dates[m.dates.length - 1]} extra={extraOf(t)} />
           ))}
         </div>
       ) : (
