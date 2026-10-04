@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowUpRight, CalendarDays, Eye, MessageCircle, PencilLine, Sparkles, Users, Wrench } from 'lucide-react';
-import { BOARD_URL } from '../lib/board';
+import { BOARD_URL, WRITE_URL } from '../lib/board';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { CommentItem, RankRow, ToolCard } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
@@ -87,14 +87,14 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
                   <span className="sr-only">(새 창)</span>
                 </a>
                 <a
-                  href={BOARD_URL}
+                  href={WRITE_URL}
                   target="_blank"
                   rel="noreferrer"
                   className="group flex items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 hover:border-blue-600 hover:text-blue-700"
                 >
                   <span>
-                    <span className="block font-bold">내 도구 올리기</span>
-                    <span className="block text-xs text-slate-500">게시판 로그인 후 글쓰기</span>
+                    <span className="block font-bold">내 도구 등록하기</span>
+                    <span className="block text-xs text-slate-500">게시판 글쓰기 화면으로 이동</span>
                   </span>
                   <PencilLine className="w-5 h-5 shrink-0" aria-hidden="true" />
                   <span className="sr-only">(새 창)</span>
