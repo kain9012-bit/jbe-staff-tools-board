@@ -59,7 +59,9 @@ export const TrendChart: React.FC<{
   from?: string;
   /** 고른 기간을 바깥(첫 화면 카드 등)에 알림 */
   onPeriod?: (p: Period) => void;
-}> = ({ model, daily, title, desc, from, onPeriod }) => {
+  /** 날짜를 나눌 수 없는 수집 전 누적 — 기간이 수집 시작일을 포함할 때 안내 */
+  pre?: number;
+}> = ({ model, daily, title, desc, from, onPeriod, pre = 0 }) => {
   const [grain, setGrain] = useState<Grain>('day');
   const [picked, setPicked] = useState<Preset | null>(null); // null = 아직 직접 고르지 않음
   const [custom, setCustom] = useState<{ from: string; to: string } | null>(null);
@@ -137,6 +139,9 @@ export const TrendChart: React.FC<{
           <h3 className="text-base font-bold text-slate-900">{title}</h3>
           <p className="text-xs text-slate-500">
             {desc ?? '조회수 증가량'} · 선택 기간 합계 <b className="tabular-nums text-slate-700">{n(total)}회</b>
+            {pre > 0 && range.from <= model.start && (
+              <> · 수집 시작 전 누적 {n(pre)}회는 날짜를 나눌 수 없어 그래프에 미포함</>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">

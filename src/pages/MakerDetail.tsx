@@ -4,7 +4,7 @@ import { CommentGap, CommentItem, unansweredIds } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
 import { Badge, Card, EmptyState, Stat } from '../components/Ui';
 import { hrefTool } from '../lib/route';
-import { dayLabel, n, shortDay } from '../lib/stats';
+import { dayLabel, n, shortDay, sum } from '../lib/stats';
 import type { Model } from '../lib/stats';
 
 export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) => {
@@ -46,7 +46,7 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
       </div>
 
       <section className="mt-6">
-        <TrendChart model={m} daily={mk.daily} title="내 도구 전체 조회수 추이" desc="만든 도구 조회수 증가량 합계" from={mk.firstDate} />
+        <TrendChart model={m} daily={mk.daily} title="내 도구 전체 조회수 추이" desc="만든 도구 조회수 증가량 합계" from={mk.firstDate} pre={sum(mk.tools.map((t) => t.pre))} />
       </section>
 
       <section className="mt-6">

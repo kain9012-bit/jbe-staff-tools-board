@@ -6,7 +6,7 @@ import { CommentItem, RankRow, ToolCard } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
 import { Card, Stat } from '../components/Ui';
 import { hrefList, hrefMaker, hrefTool } from '../lib/route';
-import { dayLabel, n, periodStats, rangeLabel, sum, type Model } from '../lib/stats';
+import { dayLabel, n, periodStats, rangeLabel, shortDay, sum, type Model } from '../lib/stats';
 import type { Period } from '../types';
 
 
@@ -135,13 +135,18 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
       </div>
 
       <section className="mt-6">
-        <TrendChart model={m} daily={allDaily} title="전체 도구 조회수 추이" desc="모든 도구의 조회수 증가량 합계" onPeriod={setPeriod} />
+        <TrendChart model={m} daily={allDaily} title="전체 도구 조회수 추이" desc="모든 도구의 조회수 증가량 합계" onPeriod={setPeriod} pre={sum(m.tools.map((t) => t.pre))} />
       </section>
 
       <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-slate-600">
         <CalendarDays className="w-4 h-4 text-blue-700" aria-hidden="true" />
         아래 순위는 그래프에서 고른 기간 기준
         <b className="rounded-md bg-blue-50 px-2 py-0.5 text-blue-800">{periodText}</b>
+        {ps.includesPre && ps.pre > 0 && (
+          <span className="text-xs text-slate-500">
+            · 수집 시작({shortDay(m.start)}) 전 조회수 {n(ps.pre)}회 포함
+          </span>
+        )}
       </p>
       <section className="mt-3 grid gap-4 lg:grid-cols-3">
         <Panel

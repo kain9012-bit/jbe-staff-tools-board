@@ -55,7 +55,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       </div>
 
       <section className="mt-6">
-        <TrendChart model={m} daily={t.daily} title="조회수 추이" from={t.firstDate} />
+        <TrendChart model={m} daily={t.daily} title="조회수 추이" from={t.firstDate} pre={t.pre} />
       </section>
 
       <section className="mt-6">
