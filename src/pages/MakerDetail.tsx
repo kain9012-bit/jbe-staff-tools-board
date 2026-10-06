@@ -31,7 +31,7 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
         <p className="mt-0.5 text-slate-600">{mk.org}</p>
       </div>
 
-      <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5">
+      <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
         <Stat icon={<Wrench className="w-3.5 h-3.5" aria-hidden="true" />} label="만든 도구" value={mk.tools.length} desc={`최근 게시 ${shortDay(mk.latest)}`} />
         <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(mk.views)} desc="도구 합계" />
         <Stat icon={<TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />} label="최근 7일" value={`+${n(mk.recent7)}`} desc="오늘 포함 7일" />

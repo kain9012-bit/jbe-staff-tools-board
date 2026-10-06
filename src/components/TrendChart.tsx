@@ -66,6 +66,7 @@ export const TrendChart: React.FC<{
   const [picked, setPicked] = useState<Preset | null>(null); // null = 아직 직접 고르지 않음
   const [custom, setCustom] = useState<{ from: string; to: string } | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
 
   const minDate = from && from > model.start ? from : model.start;
   const maxDate = model.dates[model.dates.length - 1] ?? model.start;
@@ -232,7 +233,7 @@ export const TrendChart: React.FC<{
       ) : (
         <div className="mt-3 h-56" role="img" aria-label={`${title} 막대그래프, 표 단추로 수치 확인`}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -12 }} barCategoryGap={data.length > 40 ? 1 : '20%'}>
+            <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: narrow ? -2 : -12 }} barCategoryGap={data.length > 40 ? 1 : '20%'}>
               <CartesianGrid vertical={false} stroke="var(--color-slate-200)" />
               <XAxis
                 dataKey="label"
@@ -246,7 +247,7 @@ export const TrendChart: React.FC<{
                 allowDecimals={false}
                 tickLine={false}
                 axisLine={false}
-                width={48}
+                width={narrow ? 44 : 48}
                 tick={{ fontSize: 12, fill: 'var(--color-slate-500)' }}
                 tickFormatter={(v: number) => n(v)}
               />

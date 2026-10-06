@@ -159,7 +159,7 @@ export const Tools: React.FC<{ m: Model; initialQ?: string; initialSort?: string
       {target && <p className="mt-2 text-xs text-slate-500">적용기관이 '전체'인 도구도 함께 표시</p>}
 
       {shown.length ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((t) => (
             <ToolCard key={t.sid} t={t} today={m.dates[m.dates.length - 1]} extra={extraOf(t)} />
           ))}

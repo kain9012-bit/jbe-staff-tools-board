@@ -27,7 +27,7 @@ export const RankRow: React.FC<{
         {rank}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-bold text-slate-900 group-hover:text-blue-700">{title}</span>
+        <span className="font-bold leading-snug text-slate-900 group-hover:text-blue-700 line-clamp-2 sm:line-clamp-1">{title}</span>
         {sub && <span className="block truncate text-xs text-slate-500">{sub}</span>}
       </span>
       <span className="shrink-0 text-right">

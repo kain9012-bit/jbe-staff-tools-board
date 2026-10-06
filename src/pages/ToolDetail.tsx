@@ -41,7 +41,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         <UseToolLink url={t.url} />
       </div>
 
-      <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5">
+      <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
         <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(t.views)} desc="게시판 표시값" />
         <Stat icon={<TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />} label="최근 7일" value={`+${n(t.recent7)}`} desc="오늘 포함 7일" />
         <Stat icon={<CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />} label="이번 주" value={`+${n(t.thisWeek)}`} desc={`${dayLabel(m.weekStart)}부터`} />
@@ -85,7 +85,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       {siblings.length > 0 && (
         <section className="mt-8">
           <h2 className="jbe-display text-xl font-extrabold text-slate-900">같은 제작자의 다른 도구</h2>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {siblings.map((s) => (
               <li key={s.sid}>
                 <a href={`#/tool/${s.sid}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 hover:border-blue-600">

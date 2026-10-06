@@ -16,6 +16,7 @@ export const GlobalSearch: React.FC<{ m: Model }> = ({ m }) => {
   const [cur, setCur] = useState(-1);
   const listId = useId();
   const box = useRef<HTMLDivElement>(null);
+  const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
 
   const { tools, makers, toolTotal } = useMemo(() => {
     if (!q.trim()) return { tools: [], makers: [], toolTotal: 0 };
@@ -79,7 +80,7 @@ export const GlobalSearch: React.FC<{ m: Model }> = ({ m }) => {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKey}
-          placeholder="도구명 · 제작자 · 학교명으로 찾기 (예: 에듀파인, 교복)"
+          placeholder={narrow ? '도구명 · 제작자 · 학교명' : '도구명 · 제작자 · 학교명으로 찾기 (예: 에듀파인, 교복)'}
           className="flex-1 min-w-0 text-base bg-transparent"
           style={{ outline: 'none' }} /* 바깥 상자가 포커스 테두리를 대신함 */
         />

@@ -17,7 +17,7 @@ const Panel: React.FC<{ title: string; desc: string; action?: React.ReactNode; c
   children,
   more,
 }) => (
-  <Card className="flex flex-col">
+  <Card className="flex min-w-0 flex-col">
     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-200 px-4 py-3">
       <div>
         <h2 className="jbe-display text-lg font-extrabold text-slate-900">{title}</h2>
@@ -70,15 +70,15 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
   return (
     <>
       <div className="relative z-10 left-1/2 w-screen -translate-x-1/2 -mt-6 bg-blue-50 border-b border-blue-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           {/* 제목 왼쪽, 바로가기 상자 오른쪽 빈자리 */}
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 flex-1">
-            <h1 className="jbe-display text-3xl sm:text-[2.75rem] font-extrabold text-slate-900 leading-tight tracking-tight">
+            <h1 className="jbe-display text-[1.625rem] sm:text-[2.75rem] font-extrabold text-slate-900 leading-tight tracking-tight">
               교직원이 만든 업무도구,
               <span className="block text-blue-700">누가 만들고 얼마나 쓰이는지</span>
             </h1>
-            <p className="mt-2 max-w-3xl text-slate-600">
+            <p className="mt-2 max-w-3xl text-sm sm:text-base text-slate-600">
               데이터 도구실 「교직원 제작 도구」 게시판의 조회수와 댓글을 매시간 모아 제작자별·도구별로 정리한 현황.
             </p>
               <div className="mt-5 max-w-2xl">
@@ -88,7 +88,7 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
 
             <aside aria-label="바로가기" className="w-full shrink-0 rounded-xl border border-blue-100 bg-white/80 p-4 lg:w-80">
               <p className="text-xs font-bold text-slate-500">바로가기</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
                 <a
                   href={BOARD_URL}
                   target="_blank"
@@ -119,7 +119,7 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
             </aside>
           </div>
 
-          <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5">
+          <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
             <Stat icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />} label="제작자" value={n(m.makers.length)} desc="게시판 작성자 기준" />
             <Stat icon={<Wrench className="w-3.5 h-3.5" aria-hidden="true" />} label="등록 도구" value={n(m.tools.length)} desc="게시중 글, 공지 제외" />
             <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(total)} desc="전체 도구 합계" />
@@ -148,7 +148,7 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
           </span>
         )}
       </p>
-      <section className="mt-3 grid gap-4 lg:grid-cols-3">
+      <section className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel
           title="인기 도구"
           desc="선택 기간 조회수 순"
@@ -218,7 +218,7 @@ export const Home: React.FC<{ m: Model }> = ({ m }) => {
           <h2 className="jbe-display text-xl font-extrabold text-slate-900">새로 올라온 도구</h2>
           <span className="text-xs text-slate-500">게시일 순</span>
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {fresh.map((t) => (
             <ToolCard key={t.sid} t={t} today={m.dates[m.dates.length - 1]} />
           ))}
