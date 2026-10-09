@@ -125,7 +125,9 @@ export const ToolTable: React.FC<{
   today: string;
   startNo: number;
   extra?: (t: ToolStat) => { label: string; value: string } | undefined;
-}> = ({ rows, today, startNo, extra }) => (
+  /** 댓글을 모으지 않는 목록(교육청 배포 도구)에서 댓글 칸 숨김 */
+  noComments?: boolean;
+}> = ({ rows, today, startNo, extra, noComments }) => (
   <div className="overflow-x-auto">
     <table className="w-full min-w-[720px] table-fixed border-t-2 border-[var(--nr-dark)] text-[15px]">
       <caption className="sr-only">도구 목록</caption>
@@ -136,7 +138,7 @@ export const ToolTable: React.FC<{
           <th scope="col" className="w-[88px] py-3.5 font-bold">적용기관</th>
           <th scope="col" className="w-[84px] py-3.5 font-bold">{extra ? '기간' : '최근 30일'}</th>
           <th scope="col" className="w-16 py-3.5 font-bold">누적</th>
-          <th scope="col" className="w-12 py-3.5 font-bold">댓글</th>
+          {!noComments && <th scope="col" className="w-12 py-3.5 font-bold">댓글</th>}
           <th scope="col" className="w-[78px] py-3.5 font-bold">게시일</th>
           <th scope="col" className="w-[92px] py-3.5 font-bold"><span className="sr-only">바로가기</span></th>
         </tr>
@@ -163,7 +165,7 @@ export const ToolTable: React.FC<{
               <td className="py-3.5 text-[14px] text-slate-600">{t.target}</td>
               <td className="py-3.5 tabular-nums font-bold text-[var(--nr-p3)]">{ex ? ex.value : `+${n(t.recent30)}`}</td>
               <td className="py-3.5 tabular-nums">{n(t.views)}</td>
-              <td className="py-3.5 tabular-nums">{t.board === 'official' ? '–' : n(t.comments)}</td>
+              {!noComments && <td className="py-3.5 tabular-nums">{t.board === 'official' ? '–' : n(t.comments)}</td>}
               <td className="py-3.5 tabular-nums text-[14px] text-slate-600">{t.created.slice(2).replace(/-/g, '.')}</td>
               <td className="py-3.5">
                 <a
