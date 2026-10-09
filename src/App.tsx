@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
 import { Lnb, menuOf, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
 import { EmptyState } from './components/Ui';
-import { hrefPurpose, useRoute } from './lib/route';
+import { hrefSource, useRoute } from './lib/route';
+import { allTools } from './lib/stats';
 import { useData } from './lib/useData';
 import { About } from './pages/About';
 import { Find } from './pages/Find';
@@ -39,9 +40,9 @@ export default function App() {
 
   const m = state.status === 'ready' ? state.model : undefined;
   const active: MenuKey = menuOf(route);
-  const purposeNow = route.page === 'home' || route.page === 'tools' ? route.p ?? '' : '';
+  const srcNow = route.page === 'home' || route.page === 'tools' ? route.src ?? '' : '';
 
-  const toolTitle = route.page === 'tool' ? m?.tools.find((x) => x.sid === route.sid)?.title : undefined;
+  const toolTitle = route.page === 'tool' && m ? allTools(m).find((x) => x.sid === route.sid)?.title : undefined;
   const makerName = route.page === 'maker' ? route.name : undefined;
 
   useEffect(() => {
@@ -49,20 +50,19 @@ export default function App() {
     document.title = t ? `${t} · ${SERVICE}` : `${SERVICE} · 전북특별자치도교육청`;
   }, [toolTitle, makerName, active]);
 
-  /** 왼쪽 메뉴 '도구 찾기' 아래 사용목적 바로가기 */
+  /** 왼쪽 메뉴 '도구 찾기' 아래 출처 게시판 바로가기 — 게시판마다 분류가 달라 출처로만 나눔 */
   const subs = useMemo<Partial<Record<MenuKey, LnbSub[]>>>(() => {
     if (!m) return {};
-    const c = new Map<string, number>();
-    for (const t of m.tools) c.set(t.purpose, (c.get(t.purpose) ?? 0) + 1);
+    const home = active === 'find' && route.page !== 'tool';
+    const off = m.official?.tools.length ?? 0;
     return {
       find: [
-        { label: '전체', href: hrefPurpose(''), on: active === 'find' && route.page !== 'tool' && !purposeNow, count: m.tools.length },
-        ...[...c.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .map(([p, k]) => ({ label: p, href: hrefPurpose(p), on: purposeNow === p, count: k })),
+        { label: '전체', href: hrefSource(''), on: home && !srcNow, count: m.tools.length + off },
+        { label: '교직원 제작', href: hrefSource('staff'), on: home && srcNow === 'staff', count: m.tools.length },
+        ...(off ? [{ label: '교육청 배포', href: hrefSource('official'), on: home && srcNow === 'official', count: off }] : []),
       ],
     };
-  }, [m, active, route.page, purposeNow]);
+  }, [m, active, route.page, srcNow]);
 
   const label = MENU.find((x) => x.key === active)?.label ?? '';
   const trail: { label: string; href?: string }[] = [
@@ -99,7 +99,7 @@ export default function App() {
   else if (m) {
     if (route.page === 'home' || route.page === 'tools')
       body = (
-        <Find key={window.location.hash} m={m} initialQ={route.q} initialSort={route.sort} initialPurpose={route.p} from={route.from} to={route.to} />
+        <Find key={window.location.hash} m={m} initialQ={route.q} initialSort={route.sort} initialPurpose={route.p} initialSrc={route.src} from={route.from} to={route.to} />
       );
     else if (route.page === 'makers')
       body = (

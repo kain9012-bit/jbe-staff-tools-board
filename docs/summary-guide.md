@@ -1,6 +1,7 @@
 # 게시글 요약 작성 지침
 
 「교직원 제작 도구 현황」 도구 상세 화면의 **한눈에 보기**에 들어가는 요약을 쓰는 기준.
+교직원 제작 도구(BBS_0000683)와 교육청 배포 도구(BBS_0000649) 두 게시판 모두 같은 기준으로 작성.
 새 게시글이 올라올 때마다 이 지침 그대로 작성해 구조와 말투를 맞춤.
 
 ## 1. 원칙
@@ -96,7 +97,8 @@
 ## 4. 새 게시글 요약 절차
 
 1. **새 글 모으기:** 사용자 PC에서 `python tools/fetch_new_posts.py` 실행
-   - 도구목록 시트의 '게시중' 글 가운데 `src/data/summaries.json`에 없는 글만 대상
+   - 두 게시판 수집 시트의 '게시중' 글 가운데 `src/data/summaries.json`에 없는 글만 대상
+   - 한 게시판만: `--board staff` 또는 `--board official`
    - 글: `_probe/sum/new_posts.json` (본문·첨부파일 이름·링크·그림 목록)
    - 그림: `_probe/sum/img/<dataSid>/` (본문 그림과 그림 첨부파일, 줄인 사본)
    - 특정 글만 다시 모으기: `python tools/fetch_new_posts.py 1186819`

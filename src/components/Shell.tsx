@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ChevronRight, Home, Link2, Check } from 'lucide-react';
-import { BOARD_URL, WRITE_URL } from '../lib/board';
+import { BOARD_URL, OFFICIAL_BOARD_URL, WRITE_URL } from '../lib/board';
 import type { Route } from '../types';
 
 /**
@@ -216,6 +216,8 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
       <p className="font-bold text-slate-800">게시판 바로가기</p>
       <Ext href={BOARD_URL} className="text-[var(--nr-p3)] font-bold">교직원 제작 도구 게시판</Ext>
       <br />
+      <Ext href={OFFICIAL_BOARD_URL} className="text-[var(--nr-p3)] font-bold">교육청 배포 도구 게시판</Ext>
+      <br />
       <Ext href={WRITE_URL} className="text-[var(--nr-p3)] font-bold">내 도구 등록하기(글쓰기)</Ext>
     </div>
   </aside>
@@ -309,6 +311,10 @@ export const SiteFooter: React.FC = () => (
         자료 출처 —{' '}
         <a href={BOARD_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[var(--nr-p3)]">
           전북특별자치도교육청 누리집 교직원 제작 도구 게시판
+        </a>
+        ,{' '}
+        <a href={OFFICIAL_BOARD_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[var(--nr-p3)]">
+          교육청 배포 도구 게시판
         </a>
       </p>
     </div>

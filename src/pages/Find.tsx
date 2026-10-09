@@ -8,7 +8,8 @@ import { chipFields, chipMatcher, KEYWORD_CHIPS } from '../lib/keywords';
 import { summaryText } from '../lib/summaries';
 import { hrefTool } from '../lib/route';
 import { matcher } from '../lib/search';
-import { n, periodStats, rangeLabel, shortDay, splitAuthor, type Model, type ToolStat } from '../lib/stats';
+import { allTools, n, periodStats, rangeLabel, shortDay, splitAuthor, type Model, type ToolStat } from '../lib/stats';
+import { BOARD_LABEL, type Board } from '../types';
 
 /**
  * 도구 찾기 — 찾는 사람 중심 첫 화면
@@ -16,6 +17,7 @@ import { n, periodStats, rangeLabel, shortDay, splitAuthor, type Model, type Too
  *  2. 업무별로 둘러보기 타일        → 모르는 사람은 업무로 고르고
  *  3. 요즘 많이 찾는 도구 · 새 도구 → 무엇이 쓸 만한지 보고
  *  4. 전체 도구(조건·정렬·보기 전환)
+ * 교직원 제작 도구와 교육청 배포 도구를 한 번에 검색. 사용목적·학교급은 교직원 제작 도구에만 있는 분류
  * 검색어나 조건을 고르면 2·3을 접고 결과를 검색창 바로 아래에 올림
  */
 
@@ -50,9 +52,10 @@ export const Find: React.FC<{
   initialQ?: string;
   initialSort?: string;
   initialPurpose?: string;
+  initialSrc?: string;
   from?: string;
   to?: string;
-}> = ({ m, initialQ, initialSort, initialPurpose, from, to }) => {
+}> = ({ m, initialQ, initialSort, initialPurpose, initialSrc, from, to }) => {
   const today = m.dates[m.dates.length - 1] ?? m.start;
   /** q = 실제 적용된 검색어, draft = 입력 중인 글자(엔터·검색 버튼을 눌러야 q에 반영) */
   const [q, setQApplied] = useState(initialQ ?? '');
@@ -64,6 +67,7 @@ export const Find: React.FC<{
   const [chip, setChip] = useState('');
   const [target, setTarget] = useState('');
   const [purpose, setPurpose] = useState(initialPurpose ?? '');
+  const [src, setSrc] = useState<'' | Board>(initialSrc === 'staff' || initialSrc === 'official' ? initialSrc : '');
   const [view, setView] = useState<'card' | 'list'>('card');
   const [page, setPage] = useState(1);
   const resultTop = useRef<HTMLDivElement>(null);
@@ -87,12 +91,18 @@ export const Find: React.FC<{
       ]
     : SORTS;
 
-  useEffect(() => setPage(1), [q, chip, target, purpose, sort, view]);
+  useEffect(() => setPage(1), [q, chip, target, purpose, src, sort, view]);
 
   const hit = matcher(q);
   const chipHit = chipMatcher(KEYWORD_CHIPS.find((c) => c.label === chip));
   const okTarget = (t: ToolStat, tg: string) => !tg || targetsOf(t.target).some((x) => x === tg || x === '전체');
-  const base = m.tools.filter((t) => hit(t.title, t.author, t.purpose, summaryText(t.sid)) && chipHit(...chipFields(t)) && okTarget(t, target));
+  /** 기간 정렬(제작자 현황에서 넘어옴)은 교직원 제작 도구만 셈 */
+  const everything = useMemo(() => allTools(m), [m]);
+  const pool = ps ? m.tools : everything;
+  const offCount = m.official?.tools.length ?? 0;
+  const matched = pool.filter((t) => hit(t.title, t.author, t.purpose, summaryText(t.sid)) && chipHit(...chipFields(t)) && okTarget(t, target));
+  const srcCount = (b: Board) => matched.filter((t) => (t.board ?? 'staff') === b).length;
+  const base = matched.filter((t) => !src || (t.board ?? 'staff') === src);
 
   const purposes = useMemo(() => {
     const c = new Map<string, number>();
@@ -124,19 +134,20 @@ export const Find: React.FC<{
     toResults();
   };
 
-  const filtered = Boolean(q.trim() || chip || target || purpose || ps);
+  const filtered = Boolean(q.trim() || chip || target || purpose || src || ps);
   const clearAll = () => {
     setQ('');
     setChip('');
     setTarget('');
     setPurpose('');
+    setSrc('');
   };
 
-  const byRecent = useMemo(() => [...m.tools].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views), [m]);
+  const byRecent = useMemo(() => [...everything].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views), [m]);
   const popular = byRecent.slice(0, 4);
   const fresh = useMemo(
-    () => [...m.tools].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 4),
-    [m],
+    () => [...everything].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 4),
+    [everything],
   );
   const tiles = useMemo(
     () =>
@@ -149,6 +160,7 @@ export const Find: React.FC<{
 
   const activeTags = [
     q.trim() && { k: 'q', label: `"${q.trim()}"`, clear: () => setQ('') },
+    src && { k: 'src', label: BOARD_LABEL[src], clear: () => setSrc('') },
     chip && { k: 'chip', label: chip, clear: () => setChip('') },
     purpose && { k: 'p', label: purpose, clear: () => setPurpose('') },
     target && { k: 't', label: TARGET_LABEL[target], clear: () => setTarget('') },
@@ -161,9 +173,14 @@ export const Find: React.FC<{
       {/* 1. 검색 — 남색 바탕 큰 검색창(누리집 통합검색 상자 색) */}
       <section aria-label="도구 검색" className="mt-6 rounded-[20px] bg-[var(--nr-p2)] px-5 py-7 sm:px-10 sm:py-9 text-white">
         <p className="nr-title text-[22px] sm:text-[28px] leading-snug">
-          동료 교직원이 만든 업무도구 <span className="text-[#ffd85c]">{m.tools.length}개</span>,
+          업무도구 <span className="text-[#ffd85c]">{m.tools.length + offCount}개</span>,
           <br className="sm:hidden" /> 필요한 걸 찾아보세요
         </p>
+        {offCount > 0 && (
+          <p className="mt-1.5 text-[14px] text-white/75">
+            교직원 제작 {m.tools.length}개 · 교육청 배포 {offCount}개를 한 번에 찾습니다
+          </p>
+        )}
         <form
           className="mt-5 flex gap-2"
           onSubmit={(e) => {
@@ -260,7 +277,7 @@ export const Find: React.FC<{
                     <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
                       <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
                       <span className="mt-0.5 block truncate text-[13px] text-slate-500">
-                        {splitAuthor(t.author).person} · {splitAuthor(t.author).org}
+                        {t.board === 'official' ? '교육청 배포' : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`}
                       </span>
                     </a>
                     <span className="hidden sm:inline-flex shrink-0 items-center gap-1 text-[14px] font-bold tabular-nums text-[var(--nr-p3)]">
@@ -282,7 +299,7 @@ export const Find: React.FC<{
                     <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
                       <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
                       <span className="mt-0.5 block truncate text-[13px] text-slate-500">
-                        {splitAuthor(t.author).person} · {shortDay(t.created)} 게시
+                        {t.board === 'official' ? '교육청 배포' : splitAuthor(t.author).person} · {shortDay(t.created)} 게시
                       </span>
                     </a>
                     {isNewTool(t, today) && <span className="shrink-0 rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>}
@@ -302,6 +319,38 @@ export const Find: React.FC<{
         <SectionHead id="all-h" title={filtered ? '찾은 도구' : '전체 도구'} />
 
         <div className="mt-4 rounded-[14px] bg-[var(--nr-bg)] p-4 sm:p-5 space-y-3">
+          {offCount > 0 && !ps && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-16 shrink-0 text-[14px] font-bold text-slate-700">출처</span>
+              {(
+                [
+                  ['', '전체', matched.length],
+                  ['staff', BOARD_LABEL.staff, srcCount('staff')],
+                  ['official', BOARD_LABEL.official, srcCount('official')],
+                ] as const
+              ).map(([v, label, c]) => (
+                <button
+                  key={v || 'all'}
+                  type="button"
+                  aria-pressed={src === v}
+                  onClick={() => {
+                    setSrc(v);
+                    if (v === 'official') {
+                      setPurpose('');
+                      setTarget('');
+                    }
+                  }}
+                  className={`rounded-full px-3.5 py-1.5 text-[14px] transition-colors ${
+                    src === v ? 'bg-[var(--nr-p3)] text-white font-bold' : 'bg-white text-slate-700 hover:text-[var(--nr-p3)]'
+                  }`}
+                >
+                  {label} <span className="tabular-nums opacity-70">{c}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {src !== 'official' && (
+          <>
           <div className="flex flex-wrap items-center gap-2">
             <span className="w-16 shrink-0 text-[14px] font-bold text-slate-700">사용목적</span>
             {[{ v: '', label: '전체', c: base.length }, ...purposes.map((p) => ({ v: p, label: p, c: base.filter((t) => t.purpose === p).length }))].map((o) => (
@@ -334,6 +383,11 @@ export const Find: React.FC<{
               </button>
             ))}
           </div>
+          </>
+          )}
+          {src !== 'official' && offCount > 0 && (purpose || target) && (
+            <p className="text-[13px] text-slate-500">사용목적·학교급은 교직원 제작 도구에만 있는 분류라, 고르면 교직원 제작 도구만 보입니다.</p>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <span className="w-16 shrink-0 text-[14px] font-bold text-slate-700">업무</span>
             <select

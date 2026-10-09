@@ -4,7 +4,7 @@ import { UseToolLink, CommentGap, CommentItem, MakerLink } from '../components/L
 import { TrendChart } from '../components/TrendChart';
 import { Badge, Card, EmptyState, Stat } from '../components/Ui';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
-import { dayLabel, n, type Model, type ToolStat } from '../lib/stats';
+import { allTools, dayLabel, modelOf, n, type Model, type ToolStat } from '../lib/stats';
 import { summaryOf, type ToolSummary } from '../lib/summaries';
 
 /** 한눈에 보기 — 원 게시글을 정해진 항목으로 짧게 정리한 요약. 본문 자체는 싣지 않음 */
@@ -136,7 +136,10 @@ const ToolLinkList: React.FC<{ tools: ToolStat[] }> = ({ tools }) => (
 );
 
 export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
-  const t = m.tools.find((x) => x.sid === sid);
+  const t = allTools(m).find((x) => x.sid === sid);
+  /** 이 도구가 속한 게시판의 모델 — 교육청 배포 도구는 수집 시작일이 달라 따로 계산 */
+  const bm = modelOf(m, sid) ?? m;
+  const official = t?.board === 'official';
   if (!t) {
     return (
       <EmptyState
@@ -147,11 +150,12 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
     );
   }
   const comments = m.comments.filter((c) => c.sid === sid);
-  const siblings = m.makers.find((x) => x.name === t.author)?.tools.filter((x) => x.sid !== sid) ?? [];
+  /** 교육청 배포 도구는 작성자가 모두 같아 제작자별 묶음을 보이지 않음 */
+  const siblings = official ? [] : m.makers.find((x) => x.name === t.author)?.tools.filter((x) => x.sid !== sid) ?? [];
   const chips = KEYWORD_CHIPS.filter((c) => chipMatcher(c)(...chipFields(t)));
   const similar = chips.length
-    ? m.tools
-        .filter((x) => x.sid !== sid && x.author !== t.author && chips.some((c) => chipMatcher(c)(...chipFields(x))))
+    ? allTools(m)
+        .filter((x) => x.sid !== sid && (official || x.author !== t.author) && chips.some((c) => chipMatcher(c)(...chipFields(x))))
         .sort((a, b) => b.recent30 - a.recent30 || b.views - a.views)
         .slice(0, 4)
     : [];
@@ -166,15 +170,22 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-4xl">
           <div className="flex flex-wrap gap-1.5">
-            <Badge tone="blue">{t.purpose || '분류 없음'}</Badge>
-            <Badge>적용기관 {t.target || '미기재'}</Badge>
+            {official ? (
+              <Badge tone="blue">교육청 배포</Badge>
+            ) : (
+              <>
+                <Badge tone="blue">{t.purpose || '분류 없음'}</Badge>
+                <Badge>적용기관 {t.target || '미기재'}</Badge>
+              </>
+            )}
             {chips.map((c) => (
               <Badge key={c.label}>{c.label}</Badge>
             ))}
           </div>
           <h1 className="nr-title mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-snug">{t.title}</h1>
           <p className="mt-1 text-slate-600">
-            <MakerLink name={t.author} /> · {dayLabel(t.created)} 게시 · 조회 {n(t.views)}회 · 댓글 {n(t.comments)}개
+            {official ? <b className="text-slate-800">{t.author}</b> : <MakerLink name={t.author} />} · {dayLabel(t.created)} 게시 · 조회 {n(t.views)}회
+            {!official && <> · 댓글 {n(t.comments)}개</>}
           </p>
         </div>
         <UseToolLink url={t.url} />
@@ -183,7 +194,20 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       {/* 2. 한눈에 보기 */}
       <SummaryBox s={summaryOf(sid)} url={t.url} />
 
-      {/* 3. 질문과 답변 */}
+      {/* 3. 질문과 답변 — 교육청 배포 도구는 댓글을 모으지 않아 게시판으로 안내 */}
+      {official ? (
+        <section className="mt-10">
+          <h2 className="nr-title text-[22px] text-black">질문과 답변</h2>
+          <Card className="mt-3">
+            <p className="px-4 py-6 text-sm text-slate-600">
+              교육청 배포 도구의 질문과 답변은 게시판 원글 댓글에서 확인할 수 있습니다 ·{' '}
+              <a href={t.url} target="_blank" rel="noreferrer" className="font-bold text-[var(--nr-p3)] underline underline-offset-2">
+                게시판 원글 보기
+              </a>
+            </p>
+          </Card>
+        </section>
+      ) : (
       <section className="mt-10">
         <h2 className="nr-title text-[22px] text-black">
           질문과 답변 <span className="jbe-count text-sm font-bold tabular-nums">댓글 {n(t.comments)}개</span>
@@ -207,6 +231,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         </Card>
         {!m.commentsOk && <p className="mt-2 text-xs text-amber-800">댓글 시트를 읽지 못해 댓글 내용이 비어 있을 수 있음</p>}
       </section>
+      )}
 
       {/* 4. 함께 볼 도구 */}
       {siblings.length > 0 && (
@@ -225,20 +250,22 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       {/* 5. 조회 현황 — 제작자용 통계는 맨 아래 */}
       <section className="mt-12 border-t border-[var(--nr-line)] pt-8">
         <h2 className="nr-title text-[22px] text-black">조회 현황</h2>
-        <div className="mt-3 grid gap-3 grid-cols-2 lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
+        <div className={`mt-3 grid gap-3 grid-cols-2 ${official ? 'lg:grid-cols-4' : 'lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1'}`}>
           <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(t.views)} desc="게시판 표시값" />
           <Stat icon={<TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />} label="최근 7일" value={`+${n(t.recent7)}`} desc="오늘 포함 7일" />
-          <Stat icon={<CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />} label="이번 주" value={`+${n(t.thisWeek)}`} desc={`${dayLabel(m.weekStart)}부터`} />
-          <Stat icon={<MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />} label="댓글" value={n(t.comments)} desc={t.makerReplies ? `제작자 답글 ${t.makerReplies}개 포함` : '제작자 답글 없음'} />
+          <Stat icon={<CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />} label="이번 주" value={`+${n(t.thisWeek)}`} desc={`${dayLabel(bm.weekStart)}부터`} />
+          {!official && (
+            <Stat icon={<MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />} label="댓글" value={n(t.comments)} desc={t.makerReplies ? `제작자 답글 ${t.makerReplies}개 포함` : '제작자 답글 없음'} />
+          )}
           <Stat
             icon={<History className="w-3.5 h-3.5" aria-hidden="true" />}
             label="수집 전 누적"
             value={n(t.pre)}
-            desc={t.pre ? `${dayLabel(m.start)} 수집 시작 전` : '수집 시작 후 게시'}
+            desc={t.pre ? `${dayLabel(bm.start)} 수집 시작 전` : '수집 시작 후 게시'}
           />
         </div>
         <div className="mt-4">
-          <TrendChart model={m} daily={t.daily} title="조회수 추이" from={t.firstDate} pre={t.pre} />
+          <TrendChart model={bm} daily={t.daily} title="조회수 추이" from={t.firstDate} pre={t.pre} />
         </div>
       </section>
     </>

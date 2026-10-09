@@ -1,5 +1,7 @@
 /**
- * 구글 시트(수집기가 쓰는 시트) 3종을 CSV로 읽어 화면용 JSON으로 묶는다.
+ * 구글 시트(수집기가 쓰는 시트)를 CSV로 읽어 화면용 JSON으로 묶는다.
+ *  - 교직원 제작 도구: 도구목록·조회이력·댓글목록
+ *  - 교육청 배포 도구: 도구목록·조회이력 (별도 수집기·별도 시트, 댓글 수집 없음)
  *
  * gviz(시트 이름) 대신 export(gid)로 읽는다.
  * gviz는 열 형식을 다수결로 추정해서 소수 형식 값을 빈칸으로 버린다.
@@ -13,8 +15,16 @@ export const GIDS = {
   comments: process.env.GID_COMMENTS || '2087929200',
 };
 
-const csvUrl = (gid) =>
-  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
+/** 교육청 배포 도구 게시판(BBS_0000649) 수집 시트 */
+export const OFFICIAL_SHEET_ID =
+  process.env.OFFICIAL_SHEET_ID || '1bEKHnr9wnqXZSyWRuz18mz76SGDaCuvyQf39er0OWbQ';
+export const OFFICIAL_GIDS = {
+  tools: process.env.OFFICIAL_GID_TOOLS || '1397113268',
+  history: process.env.OFFICIAL_GID_HISTORY || '1132088271',
+};
+
+const csvUrl = (gid, sheet = SHEET_ID) =>
+  `https://docs.google.com/spreadsheets/d/${sheet}/export?format=csv&gid=${gid}`;
 
 /** 따옴표·줄바꿈을 지원하는 CSV 파서 */
 export function parseCsv(text) {
@@ -57,8 +67,8 @@ const byHeader = (rows) => {
     .map((r) => (key) => (idx[key] === undefined ? '' : (r[idx[key]] ?? '').trim()));
 };
 
-async function fetchCsv(gid) {
-  const res = await fetch(csvUrl(gid), { redirect: 'follow' });
+async function fetchCsv(gid, sheet) {
+  const res = await fetch(csvUrl(gid, sheet), { redirect: 'follow' });
   if (!res.ok) throw new Error(`시트 읽기 실패 (gid ${gid}, HTTP ${res.status})`);
   const text = await res.text();
   if (/^\s*<!doctype html|<html/i.test(text)) {
@@ -67,7 +77,7 @@ async function fetchCsv(gid) {
   return parseCsv(text);
 }
 
-export function buildPayload(toolsRows, historyRows, commentRows) {
+export function buildPayload(toolsRows, historyRows, commentRows, board = 'staff') {
   const tools = byHeader(toolsRows)
     .filter((g) => g('게시상태') === '게시중' && g('dataSid'))
     .map((g) => ({
@@ -81,6 +91,7 @@ export function buildPayload(toolsRows, historyRows, commentRows) {
       purpose: g('사용목적'),
       target: g('적용기관'),
       firstSeen: day(g('최초수집일')),
+      board,
     }));
 
   const live = new Set(tools.map((t) => t.sid));
@@ -117,12 +128,19 @@ export function buildPayload(toolsRows, historyRows, commentRows) {
 }
 
 export async function loadPayload() {
-  const [t, h, c] = await Promise.all([
+  const [t, h, c, ot, oh] = await Promise.all([
     fetchCsv(GIDS.tools),
     fetchCsv(GIDS.history),
     fetchCsv(GIDS.comments).catch(() => null), // 댓글을 못 읽어도 조회수 화면은 띄운다
+    // 교육청 배포 도구를 못 읽어도 교직원 제작 도구 화면은 띄운다
+    fetchCsv(OFFICIAL_GIDS.tools, OFFICIAL_SHEET_ID).catch(() => null),
+    fetchCsv(OFFICIAL_GIDS.history, OFFICIAL_SHEET_ID).catch(() => null),
   ]);
   const payload = buildPayload(t, h, c);
   payload.commentsOk = c !== null;
+  if (ot && oh) {
+    const o = buildPayload(ot, oh, null, 'official');
+    payload.official = { asOf: o.asOf, tools: o.tools, history: o.history };
+  }
   return payload;
 }

@@ -9,7 +9,12 @@ export interface Tool {
   purpose: string;
   target: string;
   firstSeen: string;
+  /** 출처 게시판 — staff: 교직원 제작 도구, official: 교육청 배포 도구 */
+  board?: Board;
 }
+
+export type Board = 'staff' | 'official';
+export const BOARD_LABEL: Record<Board, string> = { staff: '교직원 제작', official: '교육청 배포' };
 
 export interface Comment {
   sid: string;
@@ -27,13 +32,15 @@ export interface Payload {
   history: Record<string, [string, number][]>;
   comments: Comment[];
   commentsOk?: boolean;
+  /** 교육청 배포 도구 — 별도 수집 시트. 못 읽으면 빠짐 */
+  official?: { asOf: string; tools: Tool[]; history: Record<string, [string, number][]> };
 }
 
 export type Grain = 'day' | 'week' | 'month';
 
 export type Route =
-  | { page: 'home'; q?: string; sort?: string; from?: string; to?: string; p?: string }
-  | { page: 'tools'; q?: string; sort?: string; from?: string; to?: string; p?: string }
+  | { page: 'home'; q?: string; sort?: string; from?: string; to?: string; p?: string; src?: string }
+  | { page: 'tools'; q?: string; sort?: string; from?: string; to?: string; p?: string; src?: string }
   | { page: 'register' }
   | { page: 'makers'; q?: string; sort?: string; from?: string; to?: string }
   | { page: 'about' }

@@ -3,7 +3,7 @@ import type { Route } from '../types';
 
 /**
  * 해시 주소
- *  #/            도구 찾기(?q=검색어&p=사용목적&sort=정렬&from=&to=)
+ *  #/            도구 찾기(?q=검색어&src=출처&p=사용목적&sort=정렬&from=&to=)
  *  #/tools       예전 주소 — 도구 찾기와 같음
  *  #/tool/<번호> #/makers #/maker/<작성자> #/register #/about
  */
@@ -18,6 +18,7 @@ export function parseHash(h: string): Route {
     from: sp.get('from') || undefined,
     to: sp.get('to') || undefined,
     p: sp.get('p') || undefined,
+    src: sp.get('src') || undefined,
   };
   if (p === 'tools') return { page: 'tools', ...opt };
   if (p === 'makers') return { page: 'makers', q: opt.q, sort: opt.sort, from: opt.from, to: opt.to };
@@ -35,6 +36,8 @@ export const hrefTool = (sid: string) => `#/tool/${sid}`;
 export const hrefSearch = (page: 'tools' | 'makers', q: string) =>
   `${base(page)}?q=${encodeURIComponent(q)}`;
 export const hrefPurpose = (p: string) => (p ? `#/?p=${encodeURIComponent(p)}` : '#/');
+/** 출처 게시판으로 거른 도구 찾기 — staff·official, 빈 값은 전체 */
+export const hrefSource = (src: string) => (src ? `#/?src=${src}` : '#/');
 /** 목록 탭을 정렬·기간을 정해서 열기 */
 export const hrefList = (page: 'tools' | 'makers', sort: string, period?: { from: string; to: string; all: boolean }) => {
   const sp = new URLSearchParams({ sort });

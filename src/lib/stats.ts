@@ -45,6 +45,8 @@ export interface Model {
   comments: Comment[];
   commentsOk: boolean;
   weekStart: string; // 이번 주 월요일
+  /** 교육청 배포 도구 — 수집 시작일이 달라 따로 계산한 모델. 제작자 현황·기간 통계에는 넣지 않음 */
+  official?: Model;
 }
 
 const toDate = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -67,6 +69,28 @@ export const splitAuthor = (a: string) => {
 };
 
 export function buildModel(p: Payload): Model {
+  const main = buildOne(p);
+  if (p.official?.tools.length) {
+    main.official = buildOne({
+      asOf: p.official.asOf,
+      fetchedAt: p.fetchedAt,
+      tools: p.official.tools,
+      history: p.official.history,
+      comments: [],
+      commentsOk: true,
+    });
+  }
+  return main;
+}
+
+/** 도구 찾기·상세에서 쓰는 전체 도구(교직원 제작 + 교육청 배포) */
+export const allTools = (m: Model): ToolStat[] => [...m.tools, ...(m.official?.tools ?? [])];
+
+/** 이 도구가 속한 모델 — 조회수 추이의 날짜축이 게시판마다 다름 */
+export const modelOf = (m: Model, sid: string): Model | undefined =>
+  m.tools.some((t) => t.sid === sid) ? m : m.official?.tools.some((t) => t.sid === sid) ? m.official : undefined;
+
+function buildOne(p: Payload): Model {
   const allDates = Object.values(p.history).flat().map((x) => x[0]).sort();
   const start = allDates[0] ?? p.asOf.slice(0, 10);
   const end = allDates[allDates.length - 1] ?? start;
