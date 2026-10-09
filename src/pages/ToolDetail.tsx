@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowUpRight, CalendarDays, Eye, FileText, History, Info, Me
 import { UseToolLink, CommentGap, CommentItem, MakerLink } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
 import { Badge, Card, EmptyState, Stat } from '../components/Ui';
-import { KEYWORD_CHIPS, chipMatcher } from '../lib/keywords';
+import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { dayLabel, n, type Model, type ToolStat } from '../lib/stats';
 import { summaryOf, type ToolSummary } from '../lib/summaries';
 
@@ -148,10 +148,10 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
   }
   const comments = m.comments.filter((c) => c.sid === sid);
   const siblings = m.makers.find((x) => x.name === t.author)?.tools.filter((x) => x.sid !== sid) ?? [];
-  const chips = KEYWORD_CHIPS.filter((c) => chipMatcher(c)(t.title, t.author));
+  const chips = KEYWORD_CHIPS.filter((c) => chipMatcher(c)(...chipFields(t)));
   const similar = chips.length
     ? m.tools
-        .filter((x) => x.sid !== sid && x.author !== t.author && chips.some((c) => chipMatcher(c)(x.title, x.author)))
+        .filter((x) => x.sid !== sid && x.author !== t.author && chips.some((c) => chipMatcher(c)(...chipFields(x))))
         .sort((a, b) => b.recent30 - a.recent30 || b.views - a.views)
         .slice(0, 4)
     : [];

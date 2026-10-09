@@ -44,3 +44,9 @@ export interface ToolSummary {
 const items = (data as { items: Record<string, ToolSummary> }).items;
 
 export const summaryOf = (sid: string): ToolSummary | undefined => items[sid];
+
+/** 검색에 쓰는 요약 글 — 한 줄 소개·만든 이유·주요 기능 (사용 순서·유의사항은 제외) */
+export const summaryText = (sid: string): string => {
+  const s = items[sid];
+  return s ? [s.what ?? '', s.why ?? '', ...(s.features ?? [])].join(' ') : '';
+};

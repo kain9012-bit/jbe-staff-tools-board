@@ -4,7 +4,8 @@ import { isNewTool, ToolCard, ToolTable } from '../components/Lists';
 import { PageTitle, Pager } from '../components/Shell';
 import { EmptyState } from '../components/Ui';
 import { BOARD_URL } from '../lib/board';
-import { chipMatcher, KEYWORD_CHIPS } from '../lib/keywords';
+import { chipFields, chipMatcher, KEYWORD_CHIPS } from '../lib/keywords';
+import { summaryText } from '../lib/summaries';
 import { hrefTool } from '../lib/route';
 import { matcher } from '../lib/search';
 import { n, periodStats, rangeLabel, shortDay, splitAuthor, type Model, type ToolStat } from '../lib/stats';
@@ -91,7 +92,7 @@ export const Find: React.FC<{
   const hit = matcher(q);
   const chipHit = chipMatcher(KEYWORD_CHIPS.find((c) => c.label === chip));
   const okTarget = (t: ToolStat, tg: string) => !tg || targetsOf(t.target).some((x) => x === tg || x === '전체');
-  const base = m.tools.filter((t) => hit(t.title, t.author, t.purpose) && chipHit(t.title, t.author) && okTarget(t, target));
+  const base = m.tools.filter((t) => hit(t.title, t.author, t.purpose, summaryText(t.sid)) && chipHit(...chipFields(t)) && okTarget(t, target));
 
   const purposes = useMemo(() => {
     const c = new Map<string, number>();
@@ -140,7 +141,7 @@ export const Find: React.FC<{
   const tiles = useMemo(
     () =>
       KEYWORD_CHIPS.map((c) => {
-        const ts = byRecent.filter((t) => chipMatcher(c)(t.title, t.author));
+        const ts = byRecent.filter((t) => chipMatcher(c)(...chipFields(t)));
         return { ...c, count: ts.length, top: ts.slice(0, 2) };
       }).filter((x) => x.count > 0),
     [byRecent],
@@ -216,7 +217,7 @@ export const Find: React.FC<{
         <>
           {/* 2. 업무별로 둘러보기 */}
           <section aria-labelledby="by-work" className="mt-12">
-            <SectionHead id="by-work" title="업무별로 둘러보기" note="도구 이름에 든 낱말로 묶음" />
+            <SectionHead id="by-work" title="업무별로 둘러보기" note="도구 이름과 요약에 든 낱말로 묶음" />
             <ul className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
               {tiles.map((c) => (
                 <li key={c.label}>
