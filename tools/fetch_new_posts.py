@@ -1,8 +1,12 @@
-"""요약이 아직 없는 게시글만 본문을 읽어 모음 — docs/summary-guide.md 4장 1단계.
+"""요약이 아직 없는 게시글의 글과 그림을 모음 — docs/summary-guide.md 4장 1단계.
 
-사용: 저장소 맨 위 폴더에서  python tools/fetch_new_posts.py   (전체 다시 읽기: --all)
-결과: _probe/sum/new_posts.json  (요약 작성용 자료. 화면에는 쓰이지 않음)
+사용: 저장소 맨 위 폴더에서  python tools/fetch_new_posts.py        (요약 없는 글만)
+                              python tools/fetch_new_posts.py 1186819  (지정한 글만 다시)
+결과: _probe/sum/new_posts.json  — 글별 본문·첨부파일 이름·링크·그림 파일 목록
+      _probe/sum/img/<dataSid>/  — 본문 그림과 그림 첨부파일 (가로 1000px로 줄이고 긴 그림은 1600px씩 나눔)
+요약 작성용 자료이며 화면에는 쓰이지 않음. 그림은 Pillow가 있으면 줄이고, 없으면 원본 그대로 둠.
 """
+import base64
 import csv
 import html
 import io
@@ -13,17 +17,25 @@ import sys
 import time
 import urllib.request
 
+BASE = 'https://www.jbe.go.kr'
 SHEET = 'https://docs.google.com/spreadsheets/d/1Kq9WboOQO-UsxEX24qXruSg_qbS9bfDGk5txXi9Bfs8/export?format=csv&gid=794330143'
-VIEW = 'https://www.jbe.go.kr/board/view.jbe?boardId=BBS_0000683&menuCd=DOM_000000106011002002&dataSid={}'
+VIEW = BASE + '/board/view.jbe?boardId=BBS_0000683&menuCd=DOM_000000106011002002&dataSid={}'
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SUMMARIES = os.path.join(ROOT, 'src', 'data', 'summaries.json')
-OUT = os.path.join(ROOT, '_probe', 'sum', 'new_posts.json')
+OUTDIR = os.path.join(ROOT, '_probe', 'sum')
+IMG_EXT = ('png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp')
+
+try:
+    from PIL import Image
+except ImportError:  # 그림 줄이기만 건너뜀
+    Image = None
 
 
-def get(url):
+def get(url, binary=False):
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read().decode('utf-8', 'ignore')
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = r.read()
+    return data if binary else data.decode('utf-8', 'ignore')
 
 
 def text(seg):
@@ -35,29 +47,82 @@ def text(seg):
     return re.sub(r'\n\s*\n+', '\n', seg).strip()
 
 
+def save_image(data, path_noext):
+    """그림 한 장 저장. 반환: 저장한 파일 경로 목록 (긴 그림은 여러 조각)"""
+    if Image is None:
+        p = path_noext + '.img'
+        open(p, 'wb').write(data)
+        return [p]
+    try:
+        im = Image.open(io.BytesIO(data))
+        im.seek(0)
+        im = im.convert('RGB')
+    except Exception:
+        return []  # 그림이 아닌 응답(오류 페이지 등)
+    w, h = im.size
+    if w < 120 or h < 60:
+        return []  # 아이콘
+    sc = min(1.0, 1000 / w)
+    im = im.resize((max(1, int(w * sc)), max(1, int(h * sc))))
+    W, H = im.size
+    out = []
+    for k, y in enumerate(range(0, H, 1600), 1):
+        p = f'{path_noext}_{k}.jpg'
+        im.crop((0, y, W, min(H, y + 1600))).save(p, quality=70)
+        out.append(p)
+    return out
+
+
 def main():
+    only = [a for a in sys.argv[1:] if a.isdigit()]
     done = set()
-    if '--all' not in sys.argv and os.path.exists(SUMMARIES):
+    if not only and os.path.exists(SUMMARIES):
         done = set(json.load(open(SUMMARIES, encoding='utf-8'))['items'])
-    rows = [r for r in csv.DictReader(io.StringIO(get(SHEET))) if r['게시상태'] == '게시중' and r['dataSid'] not in done]
+    rows = [r for r in csv.DictReader(io.StringIO(get(SHEET))) if r['게시상태'] == '게시중']
+    rows = [r for r in rows if (r['dataSid'] in only if only else r['dataSid'] not in done)]
     out = []
     for r in rows:
-        s = get(VIEW.format(r['dataSid']))
+        sid = r['dataSid']
+        s = get(VIEW.format(sid))
         i = s.find('class="bbs_con"')
         j = s.find('class="bbs_filedown"')
-        body = s[i:j if j > i else i + 60000] if i >= 0 else ''
-        body = text(body.split('이전글')[0])
-        files = re.findall(r'([^\s<>]+\.[A-Za-z0-9]{2,5})\s*\(\s*[\d.,]+\s*[kKmM]?[bB]\s*\)', text(s[j:j + 4000])) if j >= 0 else []
-        links = sorted(set(re.findall(r'href="(https?://(?!www\.jbe\.go\.kr)[^"]+)"', s[i:i + 60000] if i >= 0 else '')))
+        seg = s[i:j if j > i else i + 80000] if i >= 0 else ''
+        seg = seg.split('class="pagelist"')[0]
+        body = text(re.sub(r'<img[^>]*>', ' ', seg))
+        fseg = s[j:j + 6000].split('class="pagelist"')[0] if j >= 0 else ''
+        files = [t for _, t in re.findall(r'<a href="(/board/download\.jbe[^"]+)" title="([^"]+)"', fseg)]
+        links = sorted(set(re.findall(r'href="(https?://(?!www\.jbe\.go\.kr)[^"]+)"', seg)))
         links = [x for x in links if 'kakao.com/_' not in x and 'kogl.or.kr' not in x]
-        out.append({'sid': r['dataSid'], 'title': r['도구명'], 'purpose': r['사용목적'], 'target': r['적용기관'],
-                    'created': r['작성일'], 'files': files, 'links': links[:8], 'body': body[:8000]})
+
+        d = os.path.join(OUTDIR, 'img', sid)
+        os.makedirs(d, exist_ok=True)
+        imgs = []
+        for n, src in enumerate(re.findall(r'<img[^>]+src="([^"]+)"', seg), 1):
+            src = html.unescape(src)
+            try:
+                if src.startswith('data:image'):
+                    data = base64.b64decode(src.split(',', 1)[1])
+                else:
+                    data = get(src if src.startswith('http') else BASE + src, binary=True)
+            except Exception:
+                continue
+            imgs += save_image(data, os.path.join(d, f'b{n:02d}'))
+        for k, (href, title) in enumerate(re.findall(r'<a href="(/board/download\.jbe[^"]+)" title="([^"]+)"', fseg), 1):
+            if title.lower().endswith(IMG_EXT):
+                try:
+                    imgs += save_image(get(BASE + html.unescape(href), binary=True), os.path.join(d, f'a{k:02d}'))
+                except Exception:
+                    pass
+
+        out.append({'sid': sid, 'title': r['도구명'], 'purpose': r['사용목적'], 'target': r['적용기관'],
+                    'created': r['작성일'], 'files': files, 'links': links[:8], 'body': body[:12000],
+                    'images': [os.path.relpath(p, OUTDIR) for p in imgs]})
         time.sleep(0.3)
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    json.dump(out, open(OUT, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-    print(f'요약 필요 {len(out)}건 → {OUT}')
+    os.makedirs(OUTDIR, exist_ok=True)
+    json.dump(out, open(os.path.join(OUTDIR, 'new_posts.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    print(f'요약 필요 {len(out)}건 → _probe/sum/new_posts.json')
     for o in out:
-        print(' ', o['sid'], o['title'])
+        print(' ', o['sid'], f"그림 {len(o['images'])}장", o['title'])
 
 
 if __name__ == '__main__':

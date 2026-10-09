@@ -26,50 +26,93 @@ const SummaryBox: React.FC<{ s?: ToolSummary; url: string }> = ({ s, url }) => {
       <section className="mt-8">
         {head}
         <div className="mt-3 rounded-[10px] border border-dashed border-[var(--nr-line)] bg-[#fafafa] px-5 py-6 text-[15px] text-slate-600">
-          <p>{s?.empty ? '원 게시글에 설명이 없어 요약할 내용이 없습니다.' : '아직 게시글 요약이 없습니다.'}</p>
+          <p>{s?.empty ? '원 게시글에 글도 그림 설명도 없어 요약할 내용이 없습니다.' : '아직 게시글 요약이 없습니다.'}</p>
           <p className="mt-2">{goPost}</p>
         </div>
       </section>
     );
   }
 
-  const rows = [
-    s.run && { k: '실행 방식', v: s.run },
-    s.needs && { k: '필요한 것', v: s.needs },
-    s.caution && { k: '유의사항', v: s.caution },
-  ].filter(Boolean) as { k: string; v: string }[];
+  const basisText = s.basis === '글·그림' ? '게시글의 글과 그림' : s.basis === '그림' ? '게시글의 그림' : '게시글';
+  const sub = (t: string) => <h3 className="text-[15px] font-bold text-[var(--nr-p2)]">{t}</h3>;
 
   return (
     <section className="mt-8">
       {head}
       <div className="mt-3 overflow-hidden rounded-[10px] border border-[var(--nr-line)] bg-white">
-        <div className="px-5 py-5 sm:px-6">
-          <p className="text-[18px] font-bold leading-snug text-black">{s.what}</p>
+        {/* 무엇·왜 */}
+        <div className="border-b border-[var(--nr-line)] px-5 py-5 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {s.run && (
+              <span className="rounded-full bg-[var(--nr-p2)] px-2.5 py-0.5 text-[12px] font-bold text-white">{s.run}</span>
+            )}
+          </div>
+          <p className="mt-2 text-[19px] font-bold leading-snug text-black">{s.what}</p>
+          {s.why && <p className="mt-1.5 text-[15px] text-slate-600">{s.why}</p>}
+        </div>
+
+        {/* 기능·사용 순서 */}
+        <div className="grid grid-cols-1 gap-6 px-5 py-5 sm:px-6 lg:grid-cols-2 lg:gap-10">
           {s.features && s.features.length > 0 && (
-            <ul className="mt-3 space-y-1.5">
-              {s.features.map((f) => (
-                <li key={f} className="flex gap-2 text-[15px] text-slate-800">
-                  <span aria-hidden="true" className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--nr-p1)]" />
-                  {f}
-                </li>
-              ))}
-            </ul>
+            <div>
+              {sub('주요 기능')}
+              <ul className="mt-2 space-y-1.5">
+                {s.features.map((f) => (
+                  <li key={f} className="flex gap-2 text-[15px] leading-relaxed text-slate-800">
+                    <span aria-hidden="true" className="mt-[10px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--nr-p1)]" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {s.steps && s.steps.length > 0 && (
+            <div>
+              {sub('사용 순서')}
+              <ol className="mt-2 space-y-1.5">
+                {s.steps.map((st, i) => (
+                  <li key={st} className="flex gap-2.5 text-[15px] leading-relaxed text-slate-800">
+                    <span aria-hidden="true" className="mt-[3px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--nr-bg)] text-[12px] font-bold text-[var(--nr-p3)] ring-1 ring-[var(--nr-p1)]/40">
+                      {i + 1}
+                    </span>
+                    {st}
+                  </li>
+                ))}
+              </ol>
+            </div>
           )}
         </div>
-        {rows.length > 0 && (
-          <dl className="grid grid-cols-1 border-t border-[var(--nr-line)] bg-[var(--nr-bg)] text-[14px] sm:grid-cols-[120px_1fr]">
-            {rows.map((r) => (
-              <React.Fragment key={r.k}>
-                <dt className="px-5 pt-3 font-bold text-slate-700 sm:px-6 sm:py-3">{r.k}</dt>
-                <dd className="px-5 pb-3 pt-0.5 text-slate-800 sm:px-0 sm:py-3 sm:pr-6">{r.v}</dd>
-              </React.Fragment>
-            ))}
+
+        {/* 필요한 것·유의사항 */}
+        {((s.needs && s.needs.length > 0) || (s.cautions && s.cautions.length > 0)) && (
+          <dl className="grid grid-cols-1 gap-x-6 border-t border-[var(--nr-line)] bg-[var(--nr-bg)] px-5 py-4 text-[14px] sm:grid-cols-[96px_1fr] sm:px-6">
+            {s.needs && s.needs.length > 0 && (
+              <>
+                <dt className="font-bold text-slate-700 sm:py-1">필요한 것</dt>
+                <dd className="mb-3 mt-0.5 text-slate-800 sm:mb-0 sm:mt-0 sm:py-1">{s.needs.join(' · ')}</dd>
+              </>
+            )}
+            {s.cautions && s.cautions.length > 0 && (
+              <>
+                <dt className="font-bold text-[#8a5300] sm:py-1">유의사항</dt>
+                <dd className="mt-0.5 sm:mt-0 sm:py-1">
+                  <ul className="space-y-1 text-slate-800">
+                    {s.cautions.map((c) => (
+                      <li key={c} className="flex gap-1.5">
+                        <span aria-hidden="true" className="text-[#c27b00]">!</span>
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </>
+            )}
           </dl>
         )}
       </div>
       <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-slate-500">
         <Info className="w-3.5 h-3.5" aria-hidden="true" />
-        {s.thin ? '게시글 설명이 짧아 확인된 내용만 정리했습니다.' : '게시글을 바탕으로 짧게 정리했습니다.'} 자세한 사용법은 {goPost}
+        {s.thin ? '게시글 설명이 짧아 확인된 내용만 정리했습니다.' : `${basisText}을 바탕으로 정리했습니다.`} 자세한 내용은 {goPost}
         <span className="tabular-nums">· {dayLabel(s.at)} 정리</span>
       </p>
     </section>
