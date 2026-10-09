@@ -6,6 +6,7 @@ import type { Route } from '../types';
  *  #/            도구 찾기(?q=검색어&src=출처&p=사용목적&sort=정렬&from=&to=)
  *  #/tools       예전 주소 — 도구 찾기와 같음
  *  #/tool/<번호> #/makers #/maker/<작성자> #/register #/about
+ *  #/official    제작자 현황 > 교육청 배포 도구
  */
 export function parseHash(h: string): Route {
   const [path, query = ''] = h.replace(/^#\/?/, '').split('?');
@@ -24,6 +25,7 @@ export function parseHash(h: string): Route {
   if (p === 'makers') return { page: 'makers', q: opt.q, sort: opt.sort, from: opt.from, to: opt.to };
   if (p === 'register') return { page: 'register' };
   if (p === 'about') return { page: 'about' };
+  if (p === 'official') return { page: 'official' };
   if (p === 'tool' && arg) return { page: 'tool', sid: arg };
   if (p === 'maker' && arg) return { page: 'maker', name: decodeURIComponent(arg) };
   return { page: 'home', ...opt };

@@ -44,6 +44,7 @@ export type Route =
   | { page: 'register' }
   | { page: 'makers'; q?: string; sort?: string; from?: string; to?: string }
   | { page: 'about' }
+  | { page: 'official' }
   | { page: 'tool'; sid: string }
   | { page: 'maker'; name: string };
 

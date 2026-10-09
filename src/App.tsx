@@ -9,6 +9,7 @@ import { About } from './pages/About';
 import { Find } from './pages/Find';
 import { StatsOverview } from './pages/Home';
 import { MakerDetail } from './pages/MakerDetail';
+import { OfficialStats } from './pages/OfficialStats';
 import { Makers } from './pages/Makers';
 import { Register } from './pages/Register';
 import { ToolDetail } from './pages/ToolDetail';
@@ -25,7 +26,7 @@ const Skeleton = () => (
   </div>
 );
 
-const SERVICE = '교직원 제작 도구 현황';
+const SERVICE = '업무경감 도구 모음';
 
 export default function App() {
   const route = useRoute();
@@ -63,16 +64,22 @@ export default function App() {
           .sort((a, b) => b[1] - a[1])
           .map(([p, k]) => ({ label: p, href: hrefPurpose(p), on: purposeNow === p, count: k })),
       ],
+      makers: [
+        { label: '교직원 제작 도구', href: '#/makers', on: route.page === 'makers' || route.page === 'maker', count: m.tools.length },
+        ...(m.official ? [{ label: '교육청 배포 도구', href: '#/official', on: route.page === 'official', count: m.official.tools.length }] : []),
+      ],
     };
   }, [m, active, route.page, purposeNow]);
 
   const label = MENU.find((x) => x.key === active)?.label ?? '';
   const trail: { label: string; href?: string }[] = [
     { label: '데이터 도구실' },
-    { label: '교직원 제작 도구', href: '#/' },
+    { label: SERVICE, href: '#/' },
     ...(toolTitle || makerName
       ? [{ label, href: MENU.find((x) => x.key === active)!.href }, { label: toolTitle ?? makerName ?? '' }]
-      : [{ label }]),
+      : route.page === 'makers' || route.page === 'official'
+        ? [{ label, href: '#/makers' }, { label: route.page === 'official' ? '교육청 배포 도구' : '교직원 제작 도구' }]
+        : [{ label }]),
   ];
 
   let body: React.ReactNode;
@@ -106,13 +113,14 @@ export default function App() {
     else if (route.page === 'makers')
       body = (
         <>
-          <PageTitle desc="도구를 만든 교직원별 조회수·댓글 현황. 기간을 골라 보면 아래 순위가 함께 바뀝니다.">제작자 현황</PageTitle>
+          <PageTitle desc="교직원이 만든 도구와 제작자별 조회수·댓글 현황. 기간을 골라 보면 아래 순위가 함께 바뀝니다.">교직원 제작 도구</PageTitle>
           <StatsOverview m={m} />
           <div className="mt-12" id="makers-table">
             <Makers key={window.location.hash} m={m} initialQ={route.q} initialSort={route.sort} from={route.from} to={route.to} />
           </div>
         </>
       );
+    else if (route.page === 'official') body = <OfficialStats m={m} />;
     else if (route.page === 'tool') body = <ToolDetail m={m} sid={route.sid} />;
     else if (route.page === 'maker') body = <MakerDetail m={m} name={route.name} />;
   }
