@@ -1,9 +1,96 @@
 import React from 'react';
-import { ArrowLeft, CalendarDays, Eye, History, MessageCircle, TrendingUp, Wrench } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, CalendarDays, Eye, FileText, History, Info, MessageCircle, TrendingUp, Wrench } from 'lucide-react';
 import { UseToolLink, CommentGap, CommentItem, MakerLink } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
 import { Badge, Card, EmptyState, Stat } from '../components/Ui';
-import { dayLabel, n, type Model } from '../lib/stats';
+import { KEYWORD_CHIPS, chipMatcher } from '../lib/keywords';
+import { dayLabel, n, type Model, type ToolStat } from '../lib/stats';
+import { summaryOf, type ToolSummary } from '../lib/summaries';
+
+/** 한눈에 보기 — 원 게시글을 정해진 항목으로 짧게 정리한 요약. 본문 자체는 싣지 않음 */
+const SummaryBox: React.FC<{ s?: ToolSummary; url: string }> = ({ s, url }) => {
+  const head = (
+    <h2 className="nr-title flex items-center gap-2 text-[22px] text-black">
+      <FileText className="w-5 h-5 text-[var(--nr-p1)]" aria-hidden="true" /> 한눈에 보기
+    </h2>
+  );
+  const goPost = (
+    <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-[var(--nr-p3)] underline underline-offset-2">
+      원 게시글 보기 <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
+      <span className="sr-only">(새 창)</span>
+    </a>
+  );
+
+  if (!s || s.empty) {
+    return (
+      <section className="mt-8">
+        {head}
+        <div className="mt-3 rounded-[10px] border border-dashed border-[var(--nr-line)] bg-[#fafafa] px-5 py-6 text-[15px] text-slate-600">
+          <p>{s?.empty ? '원 게시글에 설명이 없어 요약할 내용이 없습니다.' : '아직 게시글 요약이 없습니다.'}</p>
+          <p className="mt-2">{goPost}</p>
+        </div>
+      </section>
+    );
+  }
+
+  const rows = [
+    s.run && { k: '실행 방식', v: s.run },
+    s.needs && { k: '필요한 것', v: s.needs },
+    s.caution && { k: '유의사항', v: s.caution },
+  ].filter(Boolean) as { k: string; v: string }[];
+
+  return (
+    <section className="mt-8">
+      {head}
+      <div className="mt-3 overflow-hidden rounded-[10px] border border-[var(--nr-line)] bg-white">
+        <div className="px-5 py-5 sm:px-6">
+          <p className="text-[18px] font-bold leading-snug text-black">{s.what}</p>
+          {s.features && s.features.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {s.features.map((f) => (
+                <li key={f} className="flex gap-2 text-[15px] text-slate-800">
+                  <span aria-hidden="true" className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--nr-p1)]" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {rows.length > 0 && (
+          <dl className="grid grid-cols-1 border-t border-[var(--nr-line)] bg-[var(--nr-bg)] text-[14px] sm:grid-cols-[120px_1fr]">
+            {rows.map((r) => (
+              <React.Fragment key={r.k}>
+                <dt className="px-5 pt-3 font-bold text-slate-700 sm:px-6 sm:py-3">{r.k}</dt>
+                <dd className="px-5 pb-3 pt-0.5 text-slate-800 sm:px-0 sm:py-3 sm:pr-6">{r.v}</dd>
+              </React.Fragment>
+            ))}
+          </dl>
+        )}
+      </div>
+      <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-slate-500">
+        <Info className="w-3.5 h-3.5" aria-hidden="true" />
+        {s.thin ? '게시글 설명이 짧아 확인된 내용만 정리했습니다.' : '게시글을 바탕으로 짧게 정리했습니다.'} 자세한 사용법은 {goPost}
+        <span className="tabular-nums">· {dayLabel(s.at)} 정리</span>
+      </p>
+    </section>
+  );
+};
+
+const ToolLinkList: React.FC<{ tools: ToolStat[] }> = ({ tools }) => (
+  <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+    {tools.map((s) => (
+      <li key={s.sid}>
+        <a href={`#/tool/${s.sid}`} className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--nr-line)] bg-white px-4 py-2.5 hover:border-[var(--nr-p3)]">
+          <span className="min-w-0">
+            <span className="block truncate font-bold text-slate-900">{s.title}</span>
+            <span className="block truncate text-[13px] text-slate-500">{s.author}</span>
+          </span>
+          <span className="shrink-0 tabular-nums text-sm text-slate-500">{n(s.views)}회</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+);
 
 export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
   const t = m.tools.find((x) => x.sid === sid);
@@ -17,50 +104,46 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
     );
   }
   const comments = m.comments.filter((c) => c.sid === sid);
-  const rank = [...m.tools].sort((a, b) => b.views - a.views).findIndex((x) => x.sid === sid) + 1;
   const siblings = m.makers.find((x) => x.name === t.author)?.tools.filter((x) => x.sid !== sid) ?? [];
+  const chips = KEYWORD_CHIPS.filter((c) => chipMatcher(c)(t.title, t.author));
+  const similar = chips.length
+    ? m.tools
+        .filter((x) => x.sid !== sid && x.author !== t.author && chips.some((c) => chipMatcher(c)(x.title, x.author)))
+        .sort((a, b) => b.recent30 - a.recent30 || b.views - a.views)
+        .slice(0, 4)
+    : [];
 
   return (
     <>
-      <a href="#/tools" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[var(--nr-p3)]">
-        <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 도구 목록
+      <a href="#/" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[var(--nr-p3)]">
+        <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 도구 찾기
       </a>
 
+      {/* 1. 도구 머리 — 이름·제작자·분류와 바로 쓰러 가는 버튼 */}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-4xl">
           <div className="flex flex-wrap gap-1.5">
             <Badge tone="blue">{t.purpose || '분류 없음'}</Badge>
-            <Badge>{t.target || '적용기관 미기재'}</Badge>
-            <Badge>누적 {rank}위 / {m.tools.length}</Badge>
+            <Badge>적용기관 {t.target || '미기재'}</Badge>
+            {chips.map((c) => (
+              <Badge key={c.label}>{c.label}</Badge>
+            ))}
           </div>
           <h1 className="nr-title mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-snug">{t.title}</h1>
           <p className="mt-1 text-slate-600">
-            <MakerLink name={t.author} /> · {dayLabel(t.created)} 게시
+            <MakerLink name={t.author} /> · {dayLabel(t.created)} 게시 · 조회 {n(t.views)}회 · 댓글 {n(t.comments)}개
           </p>
         </div>
         <UseToolLink url={t.url} />
       </div>
 
-      <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
-        <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(t.views)} desc="게시판 표시값" />
-        <Stat icon={<TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />} label="최근 7일" value={`+${n(t.recent7)}`} desc="오늘 포함 7일" />
-        <Stat icon={<CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />} label="이번 주" value={`+${n(t.thisWeek)}`} desc={`${dayLabel(m.weekStart)}부터`} />
-        <Stat icon={<MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />} label="댓글" value={n(t.comments)} desc={t.makerReplies ? `제작자 답글 ${t.makerReplies}개 포함` : '제작자 답글 없음'} />
-        <Stat
-          icon={<History className="w-3.5 h-3.5" aria-hidden="true" />}
-          label="수집 전 누적"
-          value={n(t.pre)}
-          desc={t.pre ? `${dayLabel(m.start)} 수집 시작 전` : '수집 시작 후 게시'}
-        />
-      </div>
+      {/* 2. 한눈에 보기 */}
+      <SummaryBox s={summaryOf(sid)} url={t.url} />
 
-      <section className="mt-6">
-        <TrendChart model={m} daily={t.daily} title="조회수 추이" from={t.firstDate} pre={t.pre} />
-      </section>
-
-      <section className="mt-6">
+      {/* 3. 질문과 답변 */}
+      <section className="mt-10">
         <h2 className="nr-title text-[22px] text-black">
-          댓글 <span className="jbe-count text-sm font-bold tabular-nums">{n(t.comments)}개</span>
+          질문과 답변 <span className="jbe-count text-sm font-bold tabular-nums">댓글 {n(t.comments)}개</span>
         </h2>
         <Card className="mt-3">
           {comments.length ? (
@@ -73,7 +156,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
             <p className="px-4 py-6 text-sm text-slate-500">
               {t.comments ? '댓글 내용을 아직 모으지 못함' : '아직 댓글이 없음'} ·{' '}
               <a href={t.url} target="_blank" rel="noreferrer" className="font-bold text-[var(--nr-p3)] underline underline-offset-2">
-                게시판에서 첫 댓글 남기기
+                게시판에서 질문 남기기
               </a>
             </p>
           )}
@@ -82,21 +165,39 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         {!m.commentsOk && <p className="mt-2 text-xs text-amber-800">댓글 시트를 읽지 못해 댓글 내용이 비어 있을 수 있음</p>}
       </section>
 
+      {/* 4. 함께 볼 도구 */}
       {siblings.length > 0 && (
-        <section className="mt-8">
+        <section className="mt-10">
           <h2 className="nr-title text-[22px] text-black">같은 제작자의 다른 도구</h2>
-          <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {siblings.map((s) => (
-              <li key={s.sid}>
-                <a href={`#/tool/${s.sid}`} className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--nr-line)] bg-white px-4 py-2.5 hover:border-[var(--nr-p3)]">
-                  <span className="truncate font-bold text-slate-900">{s.title}</span>
-                  <span className="shrink-0 tabular-nums text-sm text-slate-500">{n(s.views)}회</span>
-                </a>
-              </li>
-            ))}
-          </ul>
+          <ToolLinkList tools={siblings} />
         </section>
       )}
+      {similar.length > 0 && (
+        <section className="mt-10">
+          <h2 className="nr-title text-[22px] text-black">비슷한 업무의 도구</h2>
+          <ToolLinkList tools={similar} />
+        </section>
+      )}
+
+      {/* 5. 조회 현황 — 제작자용 통계는 맨 아래 */}
+      <section className="mt-12 border-t border-[var(--nr-line)] pt-8">
+        <h2 className="nr-title text-[22px] text-black">조회 현황</h2>
+        <div className="mt-3 grid gap-3 grid-cols-2 lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
+          <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(t.views)} desc="게시판 표시값" />
+          <Stat icon={<TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />} label="최근 7일" value={`+${n(t.recent7)}`} desc="오늘 포함 7일" />
+          <Stat icon={<CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />} label="이번 주" value={`+${n(t.thisWeek)}`} desc={`${dayLabel(m.weekStart)}부터`} />
+          <Stat icon={<MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />} label="댓글" value={n(t.comments)} desc={t.makerReplies ? `제작자 답글 ${t.makerReplies}개 포함` : '제작자 답글 없음'} />
+          <Stat
+            icon={<History className="w-3.5 h-3.5" aria-hidden="true" />}
+            label="수집 전 누적"
+            value={n(t.pre)}
+            desc={t.pre ? `${dayLabel(m.start)} 수집 시작 전` : '수집 시작 후 게시'}
+          />
+        </div>
+        <div className="mt-4">
+          <TrendChart model={m} daily={t.daily} title="조회수 추이" from={t.firstDate} pre={t.pre} />
+        </div>
+      </section>
     </>
   );
 };
