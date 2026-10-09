@@ -212,7 +212,7 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
         );
       })}
     </ul>
-    {/* 게시판 바로가기 — 왼쪽 메뉴와 같은 크기의 큰 버튼. 글쓰기는 색을 채워 눈에 띄게 */}
+    {/* 게시판 바로가기 — 왼쪽 메뉴와 같은 크기의 큰 버튼. 글쓰기는 위 '도구 등록' 메뉴에서 */}
     <nav aria-label="게시판 바로가기" className="mt-6">
       <p className="mb-2 px-1 text-[15px] font-bold text-slate-600">게시판 바로가기</p>
       <ul className="space-y-2">
@@ -236,21 +236,6 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
             </a>
           </li>
         ))}
-        <li>
-          <a
-            href={WRITE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-between gap-3 rounded-[10px] bg-[var(--nr-p1)] px-5 py-4 text-white hover:bg-[var(--nr-p3)]"
-          >
-            <span>
-              <span className="block text-[17px] font-bold">내 도구 등록하기</span>
-              <span className="mt-0.5 block text-[13px] text-white/80">교직원 제작 도구 게시판 글쓰기</span>
-            </span>
-            <ArrowUpRight className="w-5 h-5 shrink-0" aria-hidden="true" />
-            <span className="sr-only">(새 창, 로그인 필요)</span>
-          </a>
-        </li>
       </ul>
     </nav>
   </aside>

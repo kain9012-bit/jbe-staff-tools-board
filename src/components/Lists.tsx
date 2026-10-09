@@ -60,10 +60,9 @@ export const ToolCard: React.FC<{
   return (
     <div className="group relative flex flex-col rounded-[10px] border border-[var(--nr-line)] bg-white p-5 transition hover:border-[var(--nr-p3)] hover:shadow-[0_4px_16px_rgba(28,100,172,0.12)]">
       <div className="flex flex-wrap items-center gap-1.5">
-        {t.board === 'official' ? (
+        <span className="rounded-md bg-[var(--nr-bg)] px-2 py-0.5 text-[12px] font-bold text-[var(--nr-p3)]">{t.purpose || '분류 없음'}</span>
+        {t.board === 'official' && (
           <span className="rounded-md bg-[var(--nr-p2)] px-2 py-0.5 text-[12px] font-bold text-white">교육청 배포</span>
-        ) : (
-          <span className="rounded-md bg-[var(--nr-bg)] px-2 py-0.5 text-[12px] font-bold text-[var(--nr-p3)]">{t.purpose || '분류 없음'}</span>
         )}
         {isNewTool(t, today) && <span className="rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>}
         <span className="ml-auto text-[12px] tabular-nums text-slate-500">{shortDay(t.created)}</span>
@@ -73,7 +72,7 @@ export const ToolCard: React.FC<{
           {t.title}
         </a>
       </h3>
-      <p className="mt-1.5 text-[13px] text-slate-500">{t.board === 'official' ? '교육청 배포 도구 게시판' : `적용기관 ${t.target || '미기재'}`}</p>
+      <p className="mt-1.5 text-[13px] text-slate-500">적용기관 {t.target || '미기재'}</p>
       {showAuthor && (
         <p className="mt-3 flex items-baseline gap-1.5 border-t border-slate-100 pt-3 min-w-0 text-[14px]">
           <b className="shrink-0 text-slate-900">{person}</b>
@@ -150,16 +149,11 @@ export const ToolTable: React.FC<{
                   {t.title}
                 </a>
                 <span className="mt-0.5 block truncate text-[13px] text-slate-500">
-                  {t.board === 'official' ? (
-                    <span className="font-bold text-[var(--nr-p2)]">교육청 배포</span>
-                  ) : (
-                    <>
-                      <span className="text-[var(--nr-p3)]">{t.purpose}</span> · {t.author}
-                    </>
-                  )}
+                  <span className="text-[var(--nr-p3)]">{t.purpose}</span> ·{' '}
+                  {t.board === 'official' ? <span className="font-bold text-[var(--nr-p2)]">교육청 배포</span> : t.author}
                 </span>
               </td>
-              <td className="py-3.5 text-[14px] text-slate-600">{t.board === 'official' ? '–' : t.target}</td>
+              <td className="py-3.5 text-[14px] text-slate-600">{t.target}</td>
               <td className="py-3.5 tabular-nums font-bold text-[var(--nr-p3)]">{ex ? ex.value : `+${n(t.recent30)}`}</td>
               <td className="py-3.5 tabular-nums">{n(t.views)}</td>
               <td className="py-3.5 tabular-nums">{t.board === 'official' ? '–' : n(t.comments)}</td>

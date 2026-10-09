@@ -170,14 +170,9 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-4xl">
           <div className="flex flex-wrap gap-1.5">
-            {official ? (
-              <Badge tone="blue">교육청 배포</Badge>
-            ) : (
-              <>
-                <Badge tone="blue">{t.purpose || '분류 없음'}</Badge>
-                <Badge>적용기관 {t.target || '미기재'}</Badge>
-              </>
-            )}
+            <Badge tone="blue">{t.purpose || '분류 없음'}</Badge>
+            <Badge>적용기관 {t.target || '미기재'}</Badge>
+            {official && <Badge tone="blue">교육청 배포</Badge>}
             {chips.map((c) => (
               <Badge key={c.label}>{c.label}</Badge>
             ))}

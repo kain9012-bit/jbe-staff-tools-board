@@ -1,4 +1,8 @@
 import type { Comment, Grain, Payload, Tool } from '../types';
+import officialMeta from '../data/official-meta.json';
+
+/** 교육청 배포 도구 분류(사용목적·적용기관) — 수집 시트에 없어 직접 정한 값 */
+const OFFICIAL_META = (officialMeta as { items: Record<string, { purpose: string; target: string; category: string }> }).items;
 
 /**
  * 집계 규칙 (기준 안내 탭과 같은 내용)
@@ -74,7 +78,10 @@ export function buildModel(p: Payload): Model {
     main.official = buildOne({
       asOf: p.official.asOf,
       fetchedAt: p.fetchedAt,
-      tools: p.official.tools,
+      tools: p.official.tools.map((t) => {
+        const meta = OFFICIAL_META[t.sid];
+        return meta ? { ...t, purpose: meta.purpose, target: meta.target } : t;
+      }),
       history: p.official.history,
       comments: [],
       commentsOk: true,

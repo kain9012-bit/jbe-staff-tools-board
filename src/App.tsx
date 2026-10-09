@@ -50,14 +50,15 @@ export default function App() {
     document.title = t ? `${t} · ${SERVICE}` : `${SERVICE} · 전북특별자치도교육청`;
   }, [toolTitle, makerName, active]);
 
-  /** 왼쪽 메뉴 '도구 찾기' 아래 사용목적 바로가기 — 평소 화면은 교직원 제작 도구만 */
+  /** 왼쪽 메뉴 '도구 찾기' 아래 사용목적 바로가기 — 교직원 제작 + 교육청 배포 함께 셈 */
   const subs = useMemo<Partial<Record<MenuKey, LnbSub[]>>>(() => {
     if (!m) return {};
+    const all = allTools(m);
     const c = new Map<string, number>();
-    for (const t of m.tools) c.set(t.purpose, (c.get(t.purpose) ?? 0) + 1);
+    for (const t of all) c.set(t.purpose, (c.get(t.purpose) ?? 0) + 1);
     return {
       find: [
-        { label: '전체', href: hrefPurpose(''), on: active === 'find' && route.page !== 'tool' && !purposeNow, count: m.tools.length },
+        { label: '전체', href: hrefPurpose(''), on: active === 'find' && route.page !== 'tool' && !purposeNow, count: all.length },
         ...[...c.entries()]
           .sort((a, b) => b[1] - a[1])
           .map(([p, k]) => ({ label: p, href: hrefPurpose(p), on: purposeNow === p, count: k })),
