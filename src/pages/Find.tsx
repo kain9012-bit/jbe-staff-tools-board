@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, LayoutGrid, List, PencilLine, Search, Sparkles, TrendingUp, X } from 'lucide-react';
-import { isNewTool, ToolCard, ToolTable } from '../components/Lists';
+import { isNewTool, SourceTag, ToolCard, ToolTable } from '../components/Lists';
 import { PageTitle, Pager } from '../components/Shell';
 import { EmptyState } from '../components/Ui';
 import { BOARD_URL } from '../lib/board';
@@ -278,8 +278,9 @@ export const Find: React.FC<{
                     <span className="nr-title w-6 shrink-0 text-center text-[24px] text-[var(--nr-p1)]">{i + 1}</span>
                     <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
                       <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
-                      <span className="mt-0.5 block truncate text-[13px] text-slate-500">
-                        {t.board === 'official' ? '교육청 배포' : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`}
+                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
+                        <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
+                        {t.board === 'official' ? '교육청 배포 게시판' : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`}
                       </span>
                     </a>
                     <span className="hidden sm:inline-flex shrink-0 items-center gap-1 text-[14px] font-bold tabular-nums text-[var(--nr-p3)]">
@@ -300,8 +301,10 @@ export const Find: React.FC<{
                     <Sparkles className="w-5 h-5 shrink-0 text-[#e0a800]" aria-hidden="true" />
                     <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
                       <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
-                      <span className="mt-0.5 block truncate text-[13px] text-slate-500">
-                        {t.board === 'official' ? '교육청 배포' : splitAuthor(t.author).person} · {shortDay(t.created)} 게시
+                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
+                        <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
+                        {t.board === 'official' ? '' : `${splitAuthor(t.author).person} · `}
+                        {shortDay(t.created)} 게시
                       </span>
                     </a>
                     {isNewTool(t, today) && <span className="shrink-0 rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>}

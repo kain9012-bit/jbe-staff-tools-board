@@ -49,6 +49,14 @@ const Pill: React.FC<{ icon: React.ReactNode; label: string; children: React.Rea
 export const isNewTool = (t: ToolStat, today: string) => t.created >= addDays(today, -13);
 
 /** 도구 카드 — 누리집 틀(연한 테두리·둥근 10px). 카드 전체는 상세로, 아래 단추는 게시판 원글로 */
+/** 출처 표시 — 교직원 제작은 하늘색, 교육청 배포는 남색. 같은 파랑 계열이되 한눈에 구분되게 */
+export const SourceTag: React.FC<{ board?: string; className?: string }> = ({ board, className = '' }) =>
+  board === 'official' ? (
+    <span className={`inline-flex shrink-0 items-center rounded-md bg-[#2f3a73] px-2 py-0.5 text-[12px] font-bold text-white ${className}`}>교육청 배포</span>
+  ) : (
+    <span className={`inline-flex shrink-0 items-center rounded-md bg-[#dcefff] px-2 py-0.5 text-[12px] font-bold text-[#0a62a8] ring-1 ring-inset ring-[#a9d3f5] ${className}`}>교직원 제작</span>
+  );
+
 export const ToolCard: React.FC<{
   t: ToolStat;
   today: string;
@@ -60,10 +68,8 @@ export const ToolCard: React.FC<{
   return (
     <div className="group relative flex flex-col rounded-[10px] border border-[var(--nr-line)] bg-white p-5 transition hover:border-[var(--nr-p3)] hover:shadow-[0_4px_16px_rgba(28,100,172,0.12)]">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="rounded-md bg-[var(--nr-bg)] px-2 py-0.5 text-[12px] font-bold text-[var(--nr-p3)]">{t.purpose || '분류 없음'}</span>
-        {t.board === 'official' && (
-          <span className="rounded-md bg-[var(--nr-p2)] px-2 py-0.5 text-[12px] font-bold text-white">교육청 배포</span>
-        )}
+        <SourceTag board={t.board} />
+        <span className="rounded-md bg-[#f1f3f6] px-2 py-0.5 text-[12px] font-bold text-slate-700">{t.purpose || '분류 없음'}</span>
         {isNewTool(t, today) && <span className="rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>}
         <span className="ml-auto text-[12px] tabular-nums text-slate-500">{shortDay(t.created)}</span>
       </div>
@@ -149,8 +155,9 @@ export const ToolTable: React.FC<{
                   {t.title}
                 </a>
                 <span className="mt-0.5 block truncate text-[13px] text-slate-500">
-                  <span className="text-[var(--nr-p3)]">{t.purpose}</span> ·{' '}
-                  {t.board === 'official' ? <span className="font-bold text-[var(--nr-p2)]">교육청 배포</span> : t.author}
+                  <SourceTag board={t.board} className="mr-1.5 align-[1px] !px-1.5 !py-0 !text-[11px]" />
+                  <span className="text-[var(--nr-p3)]">{t.purpose}</span>
+                  {t.board !== 'official' && <> · {t.author}</>}
                 </span>
               </td>
               <td className="py-3.5 text-[14px] text-slate-600">{t.target}</td>

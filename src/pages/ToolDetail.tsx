@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ArrowUpRight, CalendarDays, Eye, FileText, History, Info, MessageCircle, TrendingUp, Wrench } from 'lucide-react';
-import { UseToolLink, CommentGap, CommentItem, MakerLink } from '../components/Lists';
+import { UseToolLink, CommentGap, CommentItem, MakerLink, SourceTag } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
 import { Badge, Card, EmptyState, Stat } from '../components/Ui';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
@@ -170,9 +170,9 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-4xl">
           <div className="flex flex-wrap gap-1.5">
+            <SourceTag board={t.board} className="!text-[13px] !py-1" />
             <Badge tone="blue">{t.purpose || '분류 없음'}</Badge>
             <Badge>적용기관 {t.target || '미기재'}</Badge>
-            {official && <Badge tone="blue">교육청 배포</Badge>}
             {chips.map((c) => (
               <Badge key={c.label}>{c.label}</Badge>
             ))}
