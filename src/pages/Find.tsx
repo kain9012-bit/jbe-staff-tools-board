@@ -17,7 +17,8 @@ import { BOARD_LABEL, type Board } from '../types';
  *  2. 업무별로 둘러보기 타일        → 모르는 사람은 업무로 고르고
  *  3. 요즘 많이 찾는 도구 · 새 도구 → 무엇이 쓸 만한지 보고
  *  4. 전체 도구(조건·정렬·보기 전환)
- * 교직원 제작 도구와 교육청 배포 도구를 한 번에 검색. 사용목적·학교급은 교직원 제작 도구에만 있는 분류
+ * 평소 화면(둘러보기·인기·새 도구·전체 목록)은 교직원 제작 도구만.
+ * 검색어를 넣었을 때만 교육청 배포 도구까지 함께 찾음. 사용목적·학교급은 교직원 제작 도구에만 있는 분류
  * 검색어나 조건을 고르면 2·3을 접고 결과를 검색창 바로 아래에 올림
  */
 
@@ -96,13 +97,15 @@ export const Find: React.FC<{
   const hit = matcher(q);
   const chipHit = chipMatcher(KEYWORD_CHIPS.find((c) => c.label === chip));
   const okTarget = (t: ToolStat, tg: string) => !tg || targetsOf(t.target).some((x) => x === tg || x === '전체');
-  /** 기간 정렬(제작자 현황에서 넘어옴)은 교직원 제작 도구만 셈 */
+  /** 검색어가 있을 때만 교육청 배포 도구를 더함. 기간 정렬(제작자 현황에서 넘어옴)은 교직원 제작 도구만 셈 */
   const everything = useMemo(() => allTools(m), [m]);
-  const pool = ps ? m.tools : everything;
+  const searching = Boolean(q.trim()) && !ps;
+  const pool = searching ? everything : m.tools;
   const offCount = m.official?.tools.length ?? 0;
   const matched = pool.filter((t) => hit(t.title, t.author, t.purpose, summaryText(t.sid)) && chipHit(...chipFields(t)) && okTarget(t, target));
   const srcCount = (b: Board) => matched.filter((t) => (t.board ?? 'staff') === b).length;
-  const base = matched.filter((t) => !src || (t.board ?? 'staff') === src);
+  const srcOn = searching ? src : '';
+  const base = matched.filter((t) => !srcOn || (t.board ?? 'staff') === srcOn);
 
   const purposes = useMemo(() => {
     const c = new Map<string, number>();
@@ -134,7 +137,7 @@ export const Find: React.FC<{
     toResults();
   };
 
-  const filtered = Boolean(q.trim() || chip || target || purpose || src || ps);
+  const filtered = Boolean(q.trim() || chip || target || purpose || srcOn || ps);
   const clearAll = () => {
     setQ('');
     setChip('');
@@ -143,11 +146,11 @@ export const Find: React.FC<{
     setSrc('');
   };
 
-  const byRecent = useMemo(() => [...everything].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views), [m]);
+  const byRecent = useMemo(() => [...m.tools].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views), [m]);
   const popular = byRecent.slice(0, 4);
   const fresh = useMemo(
-    () => [...everything].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 4),
-    [everything],
+    () => [...m.tools].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 4),
+    [m],
   );
   const tiles = useMemo(
     () =>
@@ -160,7 +163,7 @@ export const Find: React.FC<{
 
   const activeTags = [
     q.trim() && { k: 'q', label: `"${q.trim()}"`, clear: () => setQ('') },
-    src && { k: 'src', label: BOARD_LABEL[src], clear: () => setSrc('') },
+    srcOn && { k: 'src', label: BOARD_LABEL[srcOn], clear: () => setSrc('') },
     chip && { k: 'chip', label: chip, clear: () => setChip('') },
     purpose && { k: 'p', label: purpose, clear: () => setPurpose('') },
     target && { k: 't', label: TARGET_LABEL[target], clear: () => setTarget('') },
@@ -173,13 +176,11 @@ export const Find: React.FC<{
       {/* 1. 검색 — 남색 바탕 큰 검색창(누리집 통합검색 상자 색) */}
       <section aria-label="도구 검색" className="mt-6 rounded-[20px] bg-[var(--nr-p2)] px-5 py-7 sm:px-10 sm:py-9 text-white">
         <p className="nr-title text-[22px] sm:text-[28px] leading-snug">
-          업무도구 <span className="text-[#ffd85c]">{m.tools.length + offCount}개</span>,
+          동료 교직원이 만든 업무도구 <span className="text-[#ffd85c]">{m.tools.length}개</span>,
           <br className="sm:hidden" /> 필요한 걸 찾아보세요
         </p>
         {offCount > 0 && (
-          <p className="mt-1.5 text-[14px] text-white/75">
-            교직원 제작 {m.tools.length}개 · 교육청 배포 {offCount}개를 한 번에 찾습니다
-          </p>
+          <p className="mt-1.5 text-[14px] text-white/75">검색하면 교육청 배포 도구 {offCount}개도 함께 찾습니다</p>
         )}
         <form
           className="mt-5 flex gap-2"
@@ -319,7 +320,7 @@ export const Find: React.FC<{
         <SectionHead id="all-h" title={filtered ? '찾은 도구' : '전체 도구'} />
 
         <div className="mt-4 rounded-[14px] bg-[var(--nr-bg)] p-4 sm:p-5 space-y-3">
-          {offCount > 0 && !ps && (
+          {searching && offCount > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="w-16 shrink-0 text-[14px] font-bold text-slate-700">출처</span>
               {(
@@ -332,7 +333,7 @@ export const Find: React.FC<{
                 <button
                   key={v || 'all'}
                   type="button"
-                  aria-pressed={src === v}
+                  aria-pressed={srcOn === v}
                   onClick={() => {
                     setSrc(v);
                     if (v === 'official') {
@@ -341,7 +342,7 @@ export const Find: React.FC<{
                     }
                   }}
                   className={`rounded-full px-3.5 py-1.5 text-[14px] transition-colors ${
-                    src === v ? 'bg-[var(--nr-p3)] text-white font-bold' : 'bg-white text-slate-700 hover:text-[var(--nr-p3)]'
+                    srcOn === v ? 'bg-[var(--nr-p3)] text-white font-bold' : 'bg-white text-slate-700 hover:text-[var(--nr-p3)]'
                   }`}
                 >
                   {label} <span className="tabular-nums opacity-70">{c}</span>
@@ -349,7 +350,7 @@ export const Find: React.FC<{
               ))}
             </div>
           )}
-          {src !== 'official' && (
+          {srcOn !== 'official' && (
           <>
           <div className="flex flex-wrap items-center gap-2">
             <span className="w-16 shrink-0 text-[14px] font-bold text-slate-700">사용목적</span>
@@ -385,7 +386,7 @@ export const Find: React.FC<{
           </div>
           </>
           )}
-          {src !== 'official' && offCount > 0 && (purpose || target) && (
+          {searching && srcOn !== 'official' && offCount > 0 && (purpose || target) && (
             <p className="text-[13px] text-slate-500">사용목적·학교급은 교직원 제작 도구에만 있는 분류라, 고르면 교직원 제작 도구만 보입니다.</p>
           )}
           <div className="flex flex-wrap items-center gap-2">
