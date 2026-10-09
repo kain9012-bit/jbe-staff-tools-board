@@ -37,7 +37,7 @@ const Ext: React.FC<{ href: string; children: React.ReactNode; className?: strin
 /** 머리말 — 누리집처럼 위 작은 줄(바로가기) + 이름 줄 + 대메뉴 줄 */
 export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ active, asOf }) => (
   <header className="bg-white border-b border-[var(--nr-line)] jbe-noprint">
-    <div className="max-w-[1200px] mx-auto px-4 lg:px-5">
+    <div className="max-w-[1920px] mx-auto px-4 min-[1024px]:px-[3vw] min-[1600px]:px-[5vw]">
       <div className="hidden md:flex justify-end gap-3 pt-3 text-[13px] text-slate-600">
         <span className="tabular-nums">{asOf ? `${asOf} 수집 기준` : '수집 시점 확인 중'}</span>
         <span className="text-slate-300" aria-hidden="true">|</span>
@@ -69,7 +69,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
       </div>
     </div>
     <nav aria-label="주메뉴" className="border-t border-[var(--nr-line)]">
-      <ul className="max-w-[1200px] mx-auto px-2 lg:px-3 flex overflow-x-auto no-scrollbar">
+      <ul className="max-w-[1920px] mx-auto px-2 min-[1024px]:px-[calc(3vw-20px)] min-[1600px]:px-[calc(5vw-20px)] flex overflow-x-auto no-scrollbar">
         {MENU.map((m) => (
           <li key={m.key}>
             <a
@@ -90,8 +90,8 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
   </header>
 );
 
-/** 위치 표시 띠 — 누리집의 연한 띠 + 집 아이콘 경로. 오른쪽에 주소 복사 */
-export const SubTop: React.FC<{ trail: { label: string; href?: string }[] }> = ({ trail }) => {
+/** 위치 표시 — 누리집처럼 본문 칸 맨 위(연한 띠 안)에 집 아이콘 경로. 오른쪽에 주소 복사 */
+export const Breadcrumb: React.FC<{ trail: { label: string; href?: string }[] }> = ({ trail }) => {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -103,35 +103,56 @@ export const SubTop: React.FC<{ trail: { label: string; href?: string }[] }> = (
     }
   };
   return (
-    <div className="bg-[var(--nr-band)] jbe-noprint">
-      <div className="max-w-[1200px] mx-auto px-4 lg:px-5 lg:pl-[348px] h-14 flex items-center gap-2 text-[13px] text-slate-600">
-        <a href="#/" aria-label="처음으로" className="text-slate-600 hover:text-[var(--nr-p3)]">
-          <Home className="w-4 h-4" aria-hidden="true" />
-        </a>
-        {trail.map((t, i) => (
-          <span key={i} className={`${i === trail.length - 1 ? 'flex min-w-0' : 'hidden sm:flex shrink-0'} items-center gap-2`}>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
-            {t.href ? (
-              <a href={t.href} className="shrink-0 whitespace-nowrap hover:text-[var(--nr-p3)]">
-                {t.label}
-              </a>
-            ) : (
-              <span className={`font-bold text-slate-800 ${i === trail.length - 1 ? 'min-w-0 truncate' : 'shrink-0 whitespace-nowrap'}`}>{t.label}</span>
-            )}
-          </span>
-        ))}
-        <button
-          type="button"
-          onClick={copy}
-          className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-full bg-[var(--nr-p2)] px-3 py-1.5 text-[12px] font-bold text-white hover:opacity-90"
-        >
-          {copied ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Link2 className="w-3.5 h-3.5" aria-hidden="true" />}
-          {copied ? '복사됨' : '주소 복사'}
-        </button>
-      </div>
+    <div className="h-12 lg:h-[60px] flex items-center gap-2 text-[13px] text-slate-600 jbe-noprint">
+      <a href="#/" aria-label="처음으로" className="text-slate-600 hover:text-[var(--nr-p3)]">
+        <Home className="w-4 h-4" aria-hidden="true" />
+      </a>
+      {trail.map((t, i) => (
+        <span key={i} className={`${i === trail.length - 1 ? 'flex min-w-0' : 'hidden sm:flex shrink-0'} items-center gap-2`}>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+          {t.href ? (
+            <a href={t.href} className="shrink-0 whitespace-nowrap hover:text-[var(--nr-p3)]">
+              {t.label}
+            </a>
+          ) : (
+            <span className={`font-bold text-slate-800 ${i === trail.length - 1 ? 'min-w-0 truncate' : 'shrink-0 whitespace-nowrap'}`}>{t.label}</span>
+          )}
+        </span>
+      ))}
+      <button
+        type="button"
+        onClick={copy}
+        className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-full bg-[var(--nr-p2)] px-3 py-1.5 text-[12px] font-bold text-white hover:opacity-90"
+      >
+        {copied ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Link2 className="w-3.5 h-3.5" aria-hidden="true" />}
+        {copied ? '복사됨' : '주소 복사'}
+      </button>
     </div>
   );
 };
+
+/**
+ * 하위 화면 틀 — 누리집 sub_container 기준
+ *  · 1023px~ : 위 100px 연한 띠(#eff8fe), 좌우 20px, 왼쪽 메뉴 200px + 간격 40px
+ *  · 1200px~ : 본문 최대 1200px 가운데, 왼쪽 메뉴 280px + 간격 60px
+ *  · 1600px~ : 본문 최대 1620px
+ */
+export const SubLayout: React.FC<{ lnb: React.ReactNode; trail: { label: string; href?: string }[]; children: React.ReactNode }> = ({
+  lnb,
+  trail,
+  children,
+}) => (
+  <div className="relative flex-1">
+    <div aria-hidden="true" className="absolute inset-x-0 top-0 h-12 lg:h-[100px] bg-[var(--nr-band)]" />
+    <div className="relative mx-4 min-[1024px]:mx-5 min-[1200px]:mx-auto min-[1200px]:max-w-[1200px] min-[1600px]:max-w-[1620px] lg:pt-10 flex gap-10 min-[1200px]:gap-[60px]">
+      {lnb}
+      <main id="container" tabIndex={-1} className="min-w-0 flex-1 outline-none">
+        <Breadcrumb trail={trail} />
+        <div className="pt-6 lg:pt-8">{children}</div>
+      </main>
+    </div>
+  </div>
+);
 
 export interface LnbSub {
   label: string;
@@ -142,8 +163,8 @@ export interface LnbSub {
 
 /** 왼쪽 메뉴 — 누리집과 같은 파란 제목 카드 + 남색 활성 항목 + 연한 바탕 하위 목록 */
 export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, LnbSub[]>> }> = ({ active, subs }) => (
-  <aside className="relative z-10 hidden lg:block w-[280px] shrink-0 -mt-[86px] jbe-noprint" aria-label="하위 메뉴">
-    <h2 className="nr-title flex items-center justify-center h-[130px] rounded-[10px_10px_40px_10px] bg-[var(--nr-p1)] text-[28px] text-white">
+  <aside className="hidden lg:block w-[200px] min-[1200px]:w-[280px] shrink-0 jbe-noprint" aria-label="하위 메뉴">
+    <h2 className="nr-title flex items-center justify-center h-[130px] rounded-[10px_10px_40px_10px] bg-[var(--nr-p1)] text-[22px] min-[1200px]:text-[28px] text-white shadow-[0_0_10px_rgba(35,88,195,0.1)]">
       교직원 제작 도구
     </h2>
     <ul className="mt-5 space-y-2">

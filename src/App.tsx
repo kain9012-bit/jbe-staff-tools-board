@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
-import { Lnb, menuOf, SiteFooter, SiteHeader, SubTop, MENU, type LnbSub, type MenuKey } from './components/Shell';
+import { Lnb, menuOf, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
 import { EmptyState } from './components/Ui';
 import { hrefPurpose, useRoute } from './lib/route';
 import { useData } from './lib/useData';
@@ -128,14 +128,9 @@ export default function App() {
         본문 바로가기
       </a>
       <SiteHeader active={active} asOf={m?.asOf} />
-      <SubTop trail={trail} />
-
-      <div className="flex-1 max-w-[1200px] w-full mx-auto px-4 lg:px-5 pt-6 lg:pt-14 flex gap-12">
-        <Lnb active={active} subs={subs} />
-        <main id="container" tabIndex={-1} className="min-w-0 flex-1 outline-none">
-          {body}
-        </main>
-      </div>
+      <SubLayout lnb={<Lnb active={active} subs={subs} />} trail={trail}>
+        {body}
+      </SubLayout>
 
       <SiteFooter />
 
