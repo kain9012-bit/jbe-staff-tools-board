@@ -9,6 +9,8 @@ export const OFFICIAL_META = require('../../src/data/official-meta.json').items;
 
 export const SITE_URL = (process.env.SITE_URL || 'https://jbe-staff-tools-board.vercel.app').replace(/\/+$/, '');
 export const SERVICE = '업무경감 도구 모음';
+/** 검색 결과·탭 제목 뒤에 붙는 소속 */
+export const SITE = '데이터 도구실';
 
 export const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

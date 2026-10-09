@@ -48,7 +48,7 @@ export default function App() {
 
   useEffect(() => {
     const t = toolTitle ?? makerName ?? (active !== 'find' ? MENU.find((x) => x.key === active)?.label : undefined);
-    document.title = t ? `${t} · ${SERVICE}` : `${SERVICE} · 전북특별자치도교육청`;
+    document.title = t ? `${t} · 데이터 도구실` : `${SERVICE} · 데이터 도구실 · 전북특별자치도교육청`;
   }, [toolTitle, makerName, active]);
 
   /** 왼쪽 메뉴 '도구 찾기' 아래 사용목적 바로가기 — 교직원 제작 + 교육청 배포 함께 셈 */
@@ -73,6 +73,7 @@ export default function App() {
 
   const label = MENU.find((x) => x.key === active)?.label ?? '';
   const trail: { label: string; href?: string }[] = [
+    { label: '교육데이터 허브' },
     { label: '데이터 도구실' },
     { label: SERVICE, href: '/' },
     ...(toolTitle || makerName

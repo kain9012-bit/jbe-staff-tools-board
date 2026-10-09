@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { loadToolLists } from './_lib/sheets.mjs';
-import { SERVICE, SITE_URL, SUMMARIES, esc, withMeta } from './_lib/site.mjs';
+import { SERVICE, SITE, SITE_URL, SUMMARIES, esc, withMeta } from './_lib/site.mjs';
 
 /**
  * GET /tool/123, /makers, /maker/이름 … — 검색 엔진이 읽을 수 있는 화면.
@@ -57,7 +57,7 @@ function toolPage(t) {
   ${t.url ? `<p><a href="${esc(t.url)}">원 게시글에서 내려받기·사용하기</a></p>` : ''}
   <p><a href="/">${SERVICE} 처음으로</a></p>
 </article>`;
-  return { title: `${t.title} · ${SERVICE}`, desc, body };
+  return { title: `${t.title} · ${SITE}`, desc, body };
 }
 
 function render(parts, all) {
@@ -74,26 +74,26 @@ function render(parts, all) {
     const mine = staff.filter((t) => t.author === arg);
     if (!mine.length) return null;
     return {
-      title: `${arg} 제작 도구 · ${SERVICE}`,
+      title: `${arg} 제작 도구 · ${SITE}`,
       desc: `${arg}님이 만든 업무도구 ${mine.length}개: ${mine.slice(0, 5).map((t) => t.title).join(', ')}`,
       body: `<h1>${esc(arg)} 제작 도구</h1>${toolLinks(mine)}`,
     };
   }
   if (p === 'makers')
     return {
-      title: `교직원 제작 도구 · ${SERVICE}`,
+      title: `교직원 제작 도구 · ${SITE}`,
       desc: `교직원이 만든 업무도구 ${staff.length}개의 제작자별·도구별 조회수와 댓글 현황.`,
       body: `<h1>교직원 제작 도구</h1>${toolLinks(staff)}`,
     };
   if (p === 'official')
     return {
-      title: `교육청 배포 도구 · ${SERVICE}`,
+      title: `교육청 배포 도구 · ${SITE}`,
       desc: `전북특별자치도교육청이 배포한 업무도구 ${official.length}개의 조회수 현황.`,
       body: `<h1>교육청 배포 도구</h1>${toolLinks(official)}`,
     };
-  if (p === 'about') return { title: `집계 기준 · ${SERVICE}`, desc: DEFAULT_DESC, body: `<h1>집계 기준</h1>` };
-  if (p === 'register') return { title: `도구 등록 · ${SERVICE}`, desc: DEFAULT_DESC, body: `<h1>도구 등록</h1>` };
-  if (p === 'tools' || !p) return { title: `${SERVICE} · 전북특별자치도교육청`, desc: DEFAULT_DESC, body: `<h1>${SERVICE}</h1>${toolLinks(all)}` };
+  if (p === 'about') return { title: `집계 기준 · ${SITE}`, desc: DEFAULT_DESC, body: `<h1>집계 기준</h1>` };
+  if (p === 'register') return { title: `도구 등록 · ${SITE}`, desc: DEFAULT_DESC, body: `<h1>도구 등록</h1>` };
+  if (p === 'tools' || !p) return { title: `${SERVICE} · ${SITE} · 전북특별자치도교육청`, desc: DEFAULT_DESC, body: `<h1>${SERVICE}</h1>${toolLinks(all)}` };
   return null;
 }
 
@@ -102,7 +102,7 @@ function inject(html, { title, desc, body, canonical, noindex }) {
     `<meta name="description" content="${esc(desc)}" />`,
     noindex ? '<meta name="robots" content="noindex" />' : `<link rel="canonical" href="${esc(canonical)}" />`,
     `<meta property="og:type" content="website" />`,
-    `<meta property="og:site_name" content="${SERVICE}" />`,
+    `<meta property="og:site_name" content="교육데이터 허브 ${SITE}" />`,
     `<meta property="og:title" content="${esc(title)}" />`,
     `<meta property="og:description" content="${esc(desc)}" />`,
     canonical ? `<meta property="og:url" content="${esc(canonical)}" />` : '',
@@ -133,7 +133,7 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     if (!page) {
       res.setHeader('Cache-Control', 's-maxage=600');
-      res.status(404).send(inject(html, { title: `찾는 화면이 없음 · ${SERVICE}`, desc: DEFAULT_DESC, body: '', noindex: true }));
+      res.status(404).send(inject(html, { title: `찾는 화면이 없음 · ${SITE}`, desc: DEFAULT_DESC, body: '', noindex: true }));
       return;
     }
     res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=86400');

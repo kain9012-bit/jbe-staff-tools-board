@@ -57,8 +57,8 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
             <span className="rounded-sm bg-[var(--nr-p2)]" />
           </span>
           <span className="leading-tight">
-            <strong className="nr-title block text-[1.375rem] text-[#002f63]">업무경감 도구 모음</strong>
-            <span className="block text-[12px] text-slate-500">전북특별자치도교육청 데이터 도구실</span>
+            <strong className="nr-title block text-[1.375rem] text-[#002f63]">교육데이터 허브</strong>
+            <span className="block text-[12px] text-slate-500">전북특별자치도교육청</span>
           </span>
         </a>
         <a
@@ -169,8 +169,9 @@ export interface LnbSub {
 /** 왼쪽 메뉴 — 누리집과 같은 파란 제목 카드 + 남색 활성 항목 + 연한 바탕 하위 목록 */
 export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, LnbSub[]>> }> = ({ active, subs }) => (
   <aside className="hidden lg:block w-[200px] min-[1200px]:w-[280px] shrink-0 jbe-noprint" aria-label="메뉴">
-    <h2 className="nr-title flex items-center justify-center h-[130px] rounded-[10px_10px_40px_10px] bg-[var(--nr-p1)] text-[22px] min-[1200px]:text-[28px] text-white shadow-[0_0_10px_rgba(35,88,195,0.1)]">
-      업무경감 도구 모음
+    <h2 className="flex flex-col items-center justify-center gap-1.5 h-[130px] rounded-[10px_10px_40px_10px] bg-[var(--nr-p1)] text-white shadow-[0_0_10px_rgba(35,88,195,0.1)]">
+      <span className="nr-title text-[22px] min-[1200px]:text-[28px] leading-none">데이터 도구실</span>
+      <span className="text-[13px] min-[1200px]:text-[14px] font-medium text-white/85">업무경감 도구 모음</span>
     </h2>
     <ul className="mt-5 space-y-2">
       {MENU.map((m) => {
@@ -320,7 +321,7 @@ export const Pager: React.FC<{ page: number; pages: number; onPage: (p: number) 
 export const SiteFooter: React.FC = () => (
   <footer className="mt-16 bg-[#f7f8fa] border-t border-[var(--nr-line)] jbe-noprint">
     <div className={`${BOX} py-8 text-[14px] text-slate-600 space-y-2`}>
-      <p className="nr-title text-[18px] text-[#002f63]">업무경감 도구 모음</p>
+      <p className="nr-title text-[18px] text-[#002f63]">교육데이터 허브 데이터 도구실 · 업무경감 도구 모음</p>
       <p>데이터 도구실 「교직원 제작 도구」·「교육청 배포 도구」 게시판의 업무도구를 한곳에 모아 매시간 갱신하는 화면</p>
       <p>
         <b className="text-slate-800">담당</b> 정책기획과 빅데이터담당 · <b className="text-slate-800">전화</b> 063-239-3176
