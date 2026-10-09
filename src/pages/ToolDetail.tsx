@@ -22,7 +22,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
 
   return (
     <>
-      <a href="#/tools" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-blue-700">
+      <a href="#/tools" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[var(--nr-p3)]">
         <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 도구 목록
       </a>
 
@@ -33,7 +33,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
             <Badge>{t.target || '적용기관 미기재'}</Badge>
             <Badge>누적 {rank}위 / {m.tools.length}</Badge>
           </div>
-          <h1 className="jbe-display mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-snug">{t.title}</h1>
+          <h1 className="nr-title mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-snug">{t.title}</h1>
           <p className="mt-1 text-slate-600">
             <MakerLink name={t.author} /> · {dayLabel(t.created)} 게시
           </p>
@@ -59,7 +59,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       </section>
 
       <section className="mt-6">
-        <h2 className="jbe-display text-xl font-extrabold text-slate-900">
+        <h2 className="nr-title text-[22px] text-black">
           댓글 <span className="jbe-count text-sm font-bold tabular-nums">{n(t.comments)}개</span>
         </h2>
         <Card className="mt-3">
@@ -72,7 +72,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
           ) : (
             <p className="px-4 py-6 text-sm text-slate-500">
               {t.comments ? '댓글 내용을 아직 모으지 못함' : '아직 댓글이 없음'} ·{' '}
-              <a href={t.url} target="_blank" rel="noreferrer" className="font-bold text-blue-700 underline underline-offset-2">
+              <a href={t.url} target="_blank" rel="noreferrer" className="font-bold text-[var(--nr-p3)] underline underline-offset-2">
                 게시판에서 첫 댓글 남기기
               </a>
             </p>
@@ -84,11 +84,11 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
 
       {siblings.length > 0 && (
         <section className="mt-8">
-          <h2 className="jbe-display text-xl font-extrabold text-slate-900">같은 제작자의 다른 도구</h2>
+          <h2 className="nr-title text-[22px] text-black">같은 제작자의 다른 도구</h2>
           <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {siblings.map((s) => (
               <li key={s.sid}>
-                <a href={`#/tool/${s.sid}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 hover:border-blue-600">
+                <a href={`#/tool/${s.sid}`} className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--nr-line)] bg-white px-4 py-2.5 hover:border-[var(--nr-p3)]">
                   <span className="truncate font-bold text-slate-900">{s.title}</span>
                   <span className="shrink-0 tabular-nums text-sm text-slate-500">{n(s.views)}회</span>
                 </a>

@@ -6,7 +6,7 @@ export const Badge: React.FC<{
   children: React.ReactNode;
 }> = ({ tone = 'slate', children }) => {
   const cls = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    blue: 'bg-[var(--nr-bg)] text-[var(--nr-p3)] border-blue-100',
     slate: 'bg-slate-50 text-slate-700 border-slate-200',
     amber: 'bg-amber-50 text-amber-800 border-amber-200',
     green: 'bg-green-50 text-green-700 border-green-100',
@@ -25,7 +25,7 @@ export const SectionTitle: React.FC<{
   desc?: string;
 }> = ({ children, count, desc }) => (
   <div className="flex items-baseline gap-2 flex-wrap">
-    <h2 className="jbe-display text-xl font-extrabold text-slate-900">{children}</h2>
+    <h2 className="nr-title text-[22px] text-black">{children}</h2>
     {count !== undefined && (
       <span className="jbe-count text-sm font-bold tabular-nums">{count}건</span>
     )}
@@ -43,7 +43,7 @@ export const Stat: React.FC<{
 }> = ({ icon, label, value, desc, tone = 'slate' }) => {
   const vc = { slate: 'text-slate-900', red: 'text-red-700', amber: 'text-amber-800' }[tone];
   return (
-    <div className="bg-white rounded-lg border border-slate-200 px-4 py-3">
+    <div className="bg-white rounded-[10px] border border-[var(--nr-line)] px-4 py-3">
       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
         {icon}
         {label}
@@ -59,7 +59,7 @@ export const EmptyState: React.FC<{
   title: string;
   desc?: string;
 }> = ({ icon, title, desc }) => (
-  <div className="bg-white rounded-lg border border-slate-200 p-12 text-center space-y-3">
+  <div className="bg-white rounded-[10px] border border-[var(--nr-line)] p-12 text-center space-y-3">
     <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
       {icon}
     </div>
@@ -81,8 +81,8 @@ export const Chip: React.FC<{
     onClick={onClick}
     className={`px-3.5 py-1.5 rounded-full border text-sm font-bold transition-colors ${
       on
-        ? 'bg-slate-900 border-slate-900 text-white'
-        : 'bg-white border-slate-300 text-slate-600 hover:border-blue-600 hover:text-blue-700'
+        ? 'bg-[var(--nr-p2)] border-[var(--nr-p2)] text-white'
+        : 'bg-white border-slate-300 text-slate-600 hover:border-[var(--nr-p3)] hover:text-[var(--nr-p3)]'
     }`}
   >
     {children}
@@ -112,7 +112,7 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={`px-3 py-1 rounded-md text-sm font-bold transition-colors ${
-            value === o.value ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-blue-700'
+            value === o.value ? 'bg-[var(--nr-p2)] text-white' : 'text-slate-600 hover:text-[var(--nr-p3)]'
           }`}
         >
           {o.label}
@@ -126,4 +126,4 @@ export function Segmented<T extends string>({
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({
   children,
   className = '',
-}) => <div className={`bg-white rounded-lg border border-slate-200 ${className}`}>{children}</div>;
+}) => <div className={`bg-white rounded-[10px] border border-[var(--nr-line)] ${className}`}>{children}</div>;

@@ -5,6 +5,8 @@
 @import url("https://cdn.jsdelivr.net/gh/fonts-archive/Paperlogy/Paperlogy.css");
 @import url("https://cdn.jsdelivr.net/gh/fonts-archive/HakgyoansimUndongjang/HakgyoansimUndongjang.css");
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/variable/pretendardvariable.min.css");
+/* 전북교육청 누리집(www.jbe.go.kr) 본문 서체 SUIT — 이 서비스는 누리집 틀을 따른다 */
+@import url("https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css");
 @import "tailwindcss";
 
 /* ============================================================
@@ -96,11 +98,11 @@
    ============================================================ */
 @theme {
   /* 본문 서체 */
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system,
+  --font-sans: "SUIT Variable", SUIT, "Pretendard Variable", Pretendard, -apple-system,
                "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
   --font-mono: "Pretendard Variable", ui-monospace, SFMono-Regular, monospace;
   /* 제목용 — 누리집과 같은 Paperlogy */
-  --font-display: Paperlogy, "Pretendard Variable", Pretendard, sans-serif;
+  --font-display: GWEdupower, "SUIT Variable", SUIT, sans-serif;
 
   /* KRDS 타이포 스케일 (본문 17px 기준) */
   --text-xs:   0.8125rem;  /* 13px · body-xsmall */
@@ -710,3 +712,31 @@ html, body { max-width: 100%; overflow-x: clip; }
 .jbe-tool.is-yellow { background: var(--jbe-yellow); color: #3a2d00; }
 .jbe-tool.is-navy   { background: var(--jbe-navy); color: #fff; }
 .jbe-tool:hover     { transform: translateY(-4px); }
+
+
+/* ============================================================
+   전북교육청 누리집 틀 (2026-10 www.jbe.go.kr 하위 화면에서 실측)
+   · 제목 서체 GWEdupower(강원교육 파워) · 본문 SUIT
+   · point1 #3480cc 왼쪽 메뉴 제목 카드, 검색 단추
+   · point2 #3a457f 왼쪽 메뉴 활성, 쪽번호 활성
+   · point3 #1c64ac 분류 탭 활성
+   · bggray1 #f6f9ff 분류 탭 바탕, 표 머리
+   · 표 윗선 #343a40, 칸 줄 #dddddd
+   ============================================================ */
+@font-face {
+  font-family: GWEdupower;
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEduPowerExtraBoldA.woff") format("woff");
+  font-weight: 700;
+  font-display: swap;
+}
+:root {
+  --nr-p1: #3480cc;
+  --nr-p2: #3a457f;
+  --nr-p3: #1c64ac;
+  --nr-bg: #f6f9ff;
+  --nr-band: #eff3f9;
+  --nr-dark: #343a40;
+  --nr-line: #dddddd;
+  --nr-text: #111111;
+}
+.nr-title { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.01em; }

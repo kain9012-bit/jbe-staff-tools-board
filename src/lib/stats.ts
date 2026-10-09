@@ -13,6 +13,7 @@ export interface ToolStat extends Tool {
   daily: number[]; // dates[] 와 같은 길이
   pre: number; // 수집 전 누적
   recent7: number;
+  recent30: number;
   thisWeek: number;
   lastDate: string; // 이 도구의 마지막 수집일
   firstDate: string; // 이 도구의 첫 수집일
@@ -78,6 +79,7 @@ export function buildModel(p: Payload): Model {
 
   const weekStart = mondayOf(end);
   const recentFrom = addDays(end, -6);
+  const recent30From = addDays(end, -29);
 
   const collectedBySid = new Map<string, { n: number; maker: number }>();
   for (const c of p.comments) {
@@ -111,6 +113,7 @@ export function buildModel(p: Payload): Model {
       daily,
       pre,
       recent7: sumFrom(recentFrom),
+      recent30: sumFrom(recent30From),
       thisWeek: sumFrom(weekStart),
       lastDate: hist.length ? hist[hist.length - 1][0] : '',
       firstDate: hist.length ? hist[0][0] : start,

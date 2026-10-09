@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { Route } from '../types';
 
-/** 해시 주소: #/tools, #/tool/1183666, #/makers, #/maker/<작성자>, #/about */
+/**
+ * 해시 주소
+ *  #/            도구 찾기(?q=검색어&p=사용목적&sort=정렬&from=&to=)
+ *  #/tools       예전 주소 — 도구 찾기와 같음
+ *  #/tool/<번호> #/makers #/maker/<작성자> #/register #/about
+ */
 export function parseHash(h: string): Route {
   const [path, query = ''] = h.replace(/^#\/?/, '').split('?');
   const parts = path.split('/');
@@ -12,18 +17,24 @@ export function parseHash(h: string): Route {
     sort: sp.get('sort') || undefined,
     from: sp.get('from') || undefined,
     to: sp.get('to') || undefined,
+    p: sp.get('p') || undefined,
   };
   if (p === 'tools') return { page: 'tools', ...opt };
-  if (p === 'makers') return { page: 'makers', ...opt };
+  if (p === 'makers') return { page: 'makers', q: opt.q, sort: opt.sort, from: opt.from, to: opt.to };
+  if (p === 'register') return { page: 'register' };
   if (p === 'about') return { page: 'about' };
   if (p === 'tool' && arg) return { page: 'tool', sid: arg };
   if (p === 'maker' && arg) return { page: 'maker', name: decodeURIComponent(arg) };
-  return { page: 'home' };
+  return { page: 'home', ...opt };
 }
+
+/** 도구 찾기·제작자 현황 주소 — 'tools'는 첫 화면(#/)으로 */
+const base = (page: 'tools' | 'makers') => (page === 'tools' ? '#/' : '#/makers');
 
 export const hrefTool = (sid: string) => `#/tool/${sid}`;
 export const hrefSearch = (page: 'tools' | 'makers', q: string) =>
-  `#/${page}?q=${encodeURIComponent(q)}`;
+  `${base(page)}?q=${encodeURIComponent(q)}`;
+export const hrefPurpose = (p: string) => (p ? `#/?p=${encodeURIComponent(p)}` : '#/');
 /** 목록 탭을 정렬·기간을 정해서 열기 */
 export const hrefList = (page: 'tools' | 'makers', sort: string, period?: { from: string; to: string; all: boolean }) => {
   const sp = new URLSearchParams({ sort });
@@ -31,7 +42,7 @@ export const hrefList = (page: 'tools' | 'makers', sort: string, period?: { from
     sp.set('from', period.from);
     sp.set('to', period.to);
   }
-  return `#/${page}?${sp.toString()}`;
+  return `${base(page)}?${sp.toString()}`;
 };
 export const hrefMaker = (name: string) => `#/maker/${encodeURIComponent(name)}`;
 

@@ -22,8 +22,8 @@ const PRESETS: { value: Preset; label: string }[] = [
 /** 기간을 직접 고르기 전 기본값 — 일별은 막대가 읽히는 30일, 주·월별은 흐름을 보는 전체 */
 const defaultPreset = (g: Grain): Preset => (g === 'day' ? '30' : 'all');
 
-const BAR = 'var(--color-blue-600)';
-const BAR_PARTIAL = 'var(--color-blue-200)';
+const BAR = 'var(--nr-p1)';
+const BAR_PARTIAL = '#b9d4ef';
 
 const Tip: React.FC<{ active?: boolean; payload?: { payload: Bucket }[]; grain: Grain }> = ({
   active,
@@ -33,7 +33,7 @@ const Tip: React.FC<{ active?: boolean; payload?: { payload: Bucket }[]; grain: 
   if (!active || !payload?.length) return null;
   const b = payload[0].payload;
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-md">
+    <div className="rounded-[10px] border border-[var(--nr-line)] bg-white px-3 py-2 text-sm shadow-md">
       <div className="text-xs font-bold text-slate-500">
         {grain === 'day' ? b.key : grain === 'week' ? `${b.key} 주 (월~일)` : b.key.slice(0, 7)}
       </div>
@@ -45,7 +45,7 @@ const Tip: React.FC<{ active?: boolean; payload?: { payload: Bucket }[]; grain: 
 };
 
 const dateInput =
-  'rounded-lg border border-slate-300 px-2 py-1 text-sm tabular-nums text-slate-700 bg-white hover:border-blue-600 focus:border-blue-600';
+  'rounded-lg border border-slate-300 px-2 py-1 text-sm tabular-nums text-slate-700 bg-white hover:border-[var(--nr-p3)] focus:border-[var(--nr-p3)]';
 
 /**
  * 조회수 추이 — 막대 하나짜리 계열이라 범례 없이 제목이 이름을 대신함.
@@ -134,7 +134,7 @@ export const TrendChart: React.FC<{
   };
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 p-4">
+    <div className="bg-white rounded-[10px] border border-[var(--nr-line)] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-slate-900">{title}</h3>
@@ -151,7 +151,7 @@ export const TrendChart: React.FC<{
             type="button"
             onClick={() => setAsTable((v) => !v)}
             aria-pressed={asTable}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm font-bold text-slate-600 hover:border-blue-600 hover:text-blue-700"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm font-bold text-slate-600 hover:border-[var(--nr-p3)] hover:text-[var(--nr-p3)]"
           >
             {asTable ? <BarChart3 className="w-4 h-4" aria-hidden="true" /> : <Table2 className="w-4 h-4" aria-hidden="true" />}
             {asTable ? '그래프' : '표'}
@@ -188,7 +188,7 @@ export const TrendChart: React.FC<{
               setCustom({ from: mo.from, to: mo.to });
               setPicked('custom');
             }}
-            className={`rounded-lg border px-2.5 py-1 text-sm font-bold bg-white hover:border-blue-600 ${
+            className={`rounded-lg border px-2.5 py-1 text-sm font-bold bg-white hover:border-[var(--nr-p3)] ${
               monthKey ? 'border-slate-900 text-slate-900' : 'border-slate-300 text-slate-600'
             }`}
           >

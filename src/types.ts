@@ -32,8 +32,9 @@ export interface Payload {
 export type Grain = 'day' | 'week' | 'month';
 
 export type Route =
-  | { page: 'home' }
-  | { page: 'tools'; q?: string; sort?: string; from?: string; to?: string }
+  | { page: 'home'; q?: string; sort?: string; from?: string; to?: string; p?: string }
+  | { page: 'tools'; q?: string; sort?: string; from?: string; to?: string; p?: string }
+  | { page: 'register' }
   | { page: 'makers'; q?: string; sort?: string; from?: string; to?: string }
   | { page: 'about' }
   | { page: 'tool'; sid: string }

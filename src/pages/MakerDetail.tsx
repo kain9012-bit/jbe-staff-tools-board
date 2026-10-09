@@ -21,13 +21,13 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
 
   return (
     <>
-      <a href="#/makers" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-blue-700">
+      <a href="#/makers" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[var(--nr-p3)]">
         <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 제작자 목록
       </a>
 
       <div className="mt-3">
         <Badge tone="blue">누적 조회수 {idx + 1}위 / {m.makers.length}명</Badge>
-        <h1 className="jbe-display mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900">{mk.person}</h1>
+        <h1 className="nr-title mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900">{mk.person}</h1>
         <p className="mt-0.5 text-slate-600">{mk.org}</p>
       </div>
 
@@ -50,11 +50,11 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
       </section>
 
       <section className="mt-6">
-        <h2 className="jbe-display text-xl font-extrabold text-slate-900">도구별 현황</h2>
-        <ul className="mt-3 sm:hidden divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+        <h2 className="nr-title text-[22px] text-black">도구별 현황</h2>
+        <ul className="mt-3 sm:hidden divide-y divide-slate-100 rounded-[10px] border border-[var(--nr-line)] bg-white">
           {mk.tools.map((t) => (
             <li key={t.sid}>
-              <a href={hrefTool(t.sid)} className="block px-4 py-3 hover:bg-blue-50">
+              <a href={hrefTool(t.sid)} className="block px-4 py-3 hover:bg-[var(--nr-bg)]">
                 <span className="block font-bold text-slate-900">{t.title}</span>
                 <span className="mt-1 flex flex-wrap gap-x-3 text-sm tabular-nums text-slate-600">
                   <span>누적 <b className="text-slate-900">{n(t.views)}</b></span>
@@ -67,7 +67,7 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
             </li>
           ))}
         </ul>
-        <div className="mt-3 hidden sm:block overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="mt-3 hidden sm:block overflow-x-auto rounded-[10px] border border-[var(--nr-line)] bg-white">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
@@ -84,10 +84,10 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
                 <tr
                   key={t.sid}
                   onClick={() => (window.location.hash = hrefTool(t.sid).slice(1))}
-                  className="group cursor-pointer border-t border-slate-100 hover:bg-blue-50"
+                  className="group cursor-pointer border-t border-slate-100 hover:bg-[var(--nr-bg)]"
                 >
                   <td className="px-4 py-2.5">
-                    <a href={hrefTool(t.sid)} className="font-bold text-slate-900 group-hover:text-blue-700">
+                    <a href={hrefTool(t.sid)} className="font-bold text-slate-900 group-hover:text-[var(--nr-p3)]">
                       {t.title}
                     </a>
                     <span className="block text-xs text-slate-500">{t.purpose} · {t.target}</span>
@@ -105,7 +105,7 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
       </section>
 
       <section className="mt-6">
-        <h2 className="jbe-display text-xl font-extrabold text-slate-900">
+        <h2 className="nr-title text-[22px] text-black">
           내 도구에 달린 댓글 <span className="jbe-count text-sm font-bold tabular-nums">{n(mk.comments)}개</span>
         </h2>
         <p className="text-xs text-slate-500">최신순 · 내 마지막 답글 뒤에 달린 댓글은 '답글 없음' 표시</p>

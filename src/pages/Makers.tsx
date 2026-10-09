@@ -35,7 +35,7 @@ export const Makers: React.FC<{ m: Model; initialQ?: string; initialSort?: strin
         제작자
       </SectionTitle>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 flex-1 min-w-[12rem] max-w-md rounded-lg border border-slate-300 px-2.5 py-1.5 bg-white focus-within:border-blue-600">
+        <label className="flex items-center gap-1.5 flex-1 min-w-[12rem] max-w-md rounded-lg border border-slate-300 px-2.5 py-1.5 bg-white focus-within:border-[var(--nr-p3)]">
           <Search className="w-4 h-4 text-slate-400" aria-hidden="true" />
           <span className="sr-only">검색</span>
           <input
@@ -62,11 +62,11 @@ export const Makers: React.FC<{ m: Model; initialQ?: string; initialSort?: strin
 
       {shown.length ? (
         <>
-        <ol className="mt-4 sm:hidden divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+        <ol className="mt-4 sm:hidden divide-y divide-slate-100 rounded-[10px] border border-[var(--nr-line)] bg-white">
           {shown.map((mk, i) => (
             <li key={mk.name}>
-              <a href={hrefMaker(mk.name)} className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50">
-                <span className={`w-7 shrink-0 text-center tabular-nums font-extrabold ${i < 3 ? 'text-blue-700 text-lg' : 'text-slate-400 text-sm'}`}>{i + 1}</span>
+              <a href={hrefMaker(mk.name)} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--nr-bg)]">
+                <span className={`w-7 shrink-0 text-center tabular-nums font-extrabold ${i < 3 ? 'text-[var(--nr-p3)] text-lg' : 'text-slate-400 text-sm'}`}>{i + 1}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-bold text-slate-900">{mk.person}</span>
                   <span className="block truncate text-xs text-slate-500">{mk.org} · 도구 {mk.tools.length}개</span>
@@ -79,7 +79,7 @@ export const Makers: React.FC<{ m: Model; initialQ?: string; initialSort?: strin
             </li>
           ))}
         </ol>
-        <div className="mt-4 hidden sm:block overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="mt-4 hidden sm:block overflow-x-auto rounded-[10px] border border-[var(--nr-line)] bg-white">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
@@ -97,23 +97,23 @@ export const Makers: React.FC<{ m: Model; initialQ?: string; initialSort?: strin
                 <tr
                   key={mk.name}
                   onClick={() => (window.location.hash = hrefMaker(mk.name).slice(1))}
-                  className="group cursor-pointer border-t border-slate-100 hover:bg-blue-50"
+                  className="group cursor-pointer border-t border-slate-100 hover:bg-[var(--nr-bg)]"
                 >
-                  <td className={`px-4 py-2.5 tabular-nums font-extrabold ${i < 3 ? 'text-blue-700' : 'text-slate-400'}`}>{i + 1}</td>
+                  <td className={`px-4 py-2.5 tabular-nums font-extrabold ${i < 3 ? 'text-[var(--nr-p3)]' : 'text-slate-400'}`}>{i + 1}</td>
                   <td className="px-4 py-2.5">
                     
-                        <a href={hrefMaker(mk.name)} className="block text-base font-bold text-slate-900 group-hover:text-blue-700">
+                        <a href={hrefMaker(mk.name)} className="block text-base font-bold text-slate-900 group-hover:text-[var(--nr-p3)]">
                           {mk.person}
                         </a>
                         <span className="block text-xs text-slate-500">{mk.org}</span>
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{mk.tools.length}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums font-bold text-slate-900">{n(mk.views)}</td>
-                  <td className={`px-3 py-2.5 text-right tabular-nums ${ps ? 'font-bold text-blue-700' : ''}`}>+{n(ps ? pv(mk) : mk.recent7)}</td>
+                  <td className={`px-3 py-2.5 text-right tabular-nums ${ps ? 'font-bold text-[var(--nr-p3)]' : ''}`}>+{n(ps ? pv(mk) : mk.recent7)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{n(mk.comments)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
                     {shortDay(mk.latest)}
-                    <ChevronRight className="ml-1 inline w-4 h-4 text-slate-300 group-hover:text-blue-700" aria-hidden="true" />
+                    <ChevronRight className="ml-1 inline w-4 h-4 text-slate-300 group-hover:text-[var(--nr-p3)]" aria-hidden="true" />
                   </td>
                 </tr>
               ))}
