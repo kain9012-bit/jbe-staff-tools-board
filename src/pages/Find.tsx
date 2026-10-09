@@ -53,7 +53,13 @@ export const Find: React.FC<{
   to?: string;
 }> = ({ m, initialQ, initialSort, initialPurpose, from, to }) => {
   const today = m.dates[m.dates.length - 1] ?? m.start;
-  const [q, setQ] = useState(initialQ ?? '');
+  /** q = 실제 적용된 검색어, draft = 입력 중인 글자(엔터·검색 버튼을 눌러야 q에 반영) */
+  const [q, setQApplied] = useState(initialQ ?? '');
+  const [draft, setDraft] = useState(initialQ ?? '');
+  const setQ = (v: string) => {
+    setQApplied(v);
+    setDraft(v);
+  };
   const [chip, setChip] = useState('');
   const [target, setTarget] = useState('');
   const [purpose, setPurpose] = useState(initialPurpose ?? '');
@@ -161,6 +167,7 @@ export const Find: React.FC<{
           className="mt-5 flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
+            setQ(draft.trim());
             toResults();
           }}
         >
@@ -172,18 +179,18 @@ export const Find: React.FC<{
             <input
               id="find-q"
               type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
               placeholder="줄이고 싶은 업무를 입력하세요"
-              className="w-full h-14 rounded-full bg-white pl-12 pr-11 text-[17px] font-bold text-black placeholder:font-normal placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-white/40"
+              className="w-full h-14 rounded-full bg-white pl-12 pr-11 [&::-webkit-search-cancel-button]:appearance-none text-[17px] font-bold text-black placeholder:font-normal placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-white/40"
             />
-            {q && (
+            {draft && (
               <button type="button" onClick={() => setQ('')} aria-label="검색어 지우기" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-black">
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
             )}
           </div>
-          <button type="submit" className="hidden sm:inline-flex shrink-0 items-center h-14 rounded-full bg-[#ffd85c] px-7 text-base font-bold text-[#1d2550] hover:bg-[#ffe27f]">
+          <button type="submit" className="inline-flex shrink-0 items-center h-14 rounded-full bg-[#ffd85c] px-5 sm:px-7 text-base font-bold text-[#1d2550] hover:bg-[#ffe27f]">
             검색
           </button>
         </form>

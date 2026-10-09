@@ -34,10 +34,13 @@ const Ext: React.FC<{ href: string; children: React.ReactNode; className?: strin
   </a>
 );
 
+/** 머리말·본문·꼬리말이 함께 쓰는 좌우 기준선 (누리집 본문 폭) */
+export const BOX = 'mx-4 min-[1024px]:mx-5 min-[1200px]:mx-auto min-[1200px]:max-w-[1200px] min-[1600px]:max-w-[1620px]';
+
 /** 머리말 — 누리집처럼 위 작은 줄(바로가기) + 이름 줄 + 대메뉴 줄 */
 export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ active, asOf }) => (
   <header className="bg-white border-b border-[var(--nr-line)] jbe-noprint">
-    <div className="max-w-[1920px] mx-auto px-4 min-[1024px]:px-[3vw] min-[1600px]:px-[5vw]">
+    <div className={BOX}>
       <div className="hidden md:flex justify-end gap-3 pt-3 text-[13px] text-slate-600">
         <span className="tabular-nums">{asOf ? `${asOf} 수집 기준` : '수집 시점 확인 중'}</span>
         <span className="text-slate-300" aria-hidden="true">|</span>
@@ -69,7 +72,8 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
       </div>
     </div>
     <nav aria-label="주메뉴" className="border-t border-[var(--nr-line)]">
-      <ul className="max-w-[1920px] mx-auto px-2 min-[1024px]:px-[calc(3vw-20px)] min-[1600px]:px-[calc(5vw-20px)] flex overflow-x-auto no-scrollbar">
+      <div className={BOX}>
+      <ul className="-mx-3 lg:-mx-5 flex overflow-x-auto no-scrollbar">
         {MENU.map((m) => (
           <li key={m.key}>
             <a
@@ -86,6 +90,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
           </li>
         ))}
       </ul>
+      </div>
     </nav>
   </header>
 );
@@ -144,7 +149,7 @@ export const SubLayout: React.FC<{ lnb: React.ReactNode; trail: { label: string;
 }) => (
   <div className="relative flex-1">
     <div aria-hidden="true" className="absolute inset-x-0 top-0 h-12 lg:h-[100px] bg-[var(--nr-band)]" />
-    <div className="relative mx-4 min-[1024px]:mx-5 min-[1200px]:mx-auto min-[1200px]:max-w-[1200px] min-[1600px]:max-w-[1620px] lg:pt-10 flex gap-10 min-[1200px]:gap-[60px]">
+    <div className={`relative ${BOX} lg:pt-10 flex gap-10 min-[1200px]:gap-[60px]`}>
       {lnb}
       <main id="container" tabIndex={-1} className="min-w-0 flex-1 outline-none">
         <Breadcrumb trail={trail} />
@@ -294,7 +299,7 @@ export const Pager: React.FC<{ page: number; pages: number; onPage: (p: number) 
 /** 바닥글 — 누리집 하단처럼 연회색 바탕, 담당 부서 표기 */
 export const SiteFooter: React.FC = () => (
   <footer className="mt-16 bg-[#f7f8fa] border-t border-[var(--nr-line)] jbe-noprint">
-    <div className="max-w-[1200px] mx-auto px-4 lg:px-5 py-8 text-[14px] text-slate-600 space-y-2">
+    <div className={`${BOX} py-8 text-[14px] text-slate-600 space-y-2`}>
       <p className="nr-title text-[18px] text-[#002f63]">교직원 제작 도구</p>
       <p>데이터 도구실 「교직원 제작 도구」 게시판의 조회수·댓글을 매시간 모아 정리한 화면</p>
       <p>
