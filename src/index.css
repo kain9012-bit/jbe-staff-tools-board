@@ -263,6 +263,12 @@ body {
   outline-offset: 2px;
   border-radius: 2px;
 }
+/* 본문 영역(#container)은 '본문 바로가기'로 초점만 받는 자리 — 클릭할 때 본문 전체에 파란 테두리가 생기지 않게 */
+#container:focus,
+#container:focus-visible {
+  outline: none;
+}
+
 button:focus:not(:focus-visible),
 a:focus:not(:focus-visible) {
   outline: none;
