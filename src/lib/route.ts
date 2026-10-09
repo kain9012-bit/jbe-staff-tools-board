@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Route } from '../types';
 
 /**
@@ -93,7 +93,6 @@ export function useRoute(): Route {
     const on = () => {
       upgradeHash();
       setR(parseLoc(window.location.pathname, window.location.search));
-      window.scrollTo({ top: 0 });
     };
     window.addEventListener(EV, on);
     window.addEventListener('popstate', on);
@@ -108,5 +107,15 @@ export function useRoute(): Route {
       document.removeEventListener('click', onClick);
     };
   }, []);
+  // 새 화면을 그린 직후, 화면에 보이기 전에 맨 위로 올림.
+  // 주소를 바꾸자마자 올리면 이전 화면 꼭대기(남색 검색 상자)가 한 순간 보여 번쩍임
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    window.scrollTo(0, 0);
+  }, [r]);
   return r;
 }
