@@ -71,7 +71,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
         </a>
       </div>
     </div>
-    <nav aria-label="주메뉴" className="border-t border-[var(--nr-line)]">
+    <nav aria-label="주메뉴" className="border-t border-[var(--nr-line)] lg:hidden">
       <div className={BOX}>
       <ul className="-mx-3 lg:-mx-5 flex overflow-x-auto no-scrollbar">
         {MENU.map((m) => (
@@ -168,7 +168,7 @@ export interface LnbSub {
 
 /** 왼쪽 메뉴 — 누리집과 같은 파란 제목 카드 + 남색 활성 항목 + 연한 바탕 하위 목록 */
 export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, LnbSub[]>> }> = ({ active, subs }) => (
-  <aside className="hidden lg:block w-[200px] min-[1200px]:w-[280px] shrink-0 jbe-noprint" aria-label="하위 메뉴">
+  <aside className="hidden lg:block w-[200px] min-[1200px]:w-[280px] shrink-0 jbe-noprint" aria-label="메뉴">
     <h2 className="nr-title flex items-center justify-center h-[130px] rounded-[10px_10px_40px_10px] bg-[var(--nr-p1)] text-[22px] min-[1200px]:text-[28px] text-white shadow-[0_0_10px_rgba(35,88,195,0.1)]">
       교직원 제작 도구
     </h2>
