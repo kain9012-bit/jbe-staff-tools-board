@@ -212,14 +212,47 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
         );
       })}
     </ul>
-    <div className="mt-5 rounded-[10px] border border-[var(--nr-line)] p-4 text-[14px] space-y-2">
-      <p className="font-bold text-slate-800">게시판 바로가기</p>
-      <Ext href={BOARD_URL} className="text-[var(--nr-p3)] font-bold">교직원 제작 도구 게시판</Ext>
-      <br />
-      <Ext href={OFFICIAL_BOARD_URL} className="text-[var(--nr-p3)] font-bold">교육청 배포 도구 게시판</Ext>
-      <br />
-      <Ext href={WRITE_URL} className="text-[var(--nr-p3)] font-bold">내 도구 등록하기(글쓰기)</Ext>
-    </div>
+    {/* 게시판 바로가기 — 왼쪽 메뉴와 같은 크기의 큰 버튼. 글쓰기는 색을 채워 눈에 띄게 */}
+    <nav aria-label="게시판 바로가기" className="mt-6">
+      <p className="mb-2 px-1 text-[15px] font-bold text-slate-600">게시판 바로가기</p>
+      <ul className="space-y-2">
+        {[
+          { href: BOARD_URL, label: '교직원 제작 도구 게시판', note: '원글·첨부파일·댓글' },
+          { href: OFFICIAL_BOARD_URL, label: '교육청 배포 도구 게시판', note: '교육청이 배포한 업무도구' },
+        ].map((b) => (
+          <li key={b.href}>
+            <a
+              href={b.href}
+              target="_blank"
+              rel="noreferrer"
+              className="group flex items-center justify-between gap-3 rounded-[10px] bg-white px-5 py-4 shadow-[0_0_0_1px_#eef0f4,0_2px_6px_rgba(0,0,0,0.04)] hover:shadow-[0_0_0_1px_var(--nr-p3)]"
+            >
+              <span className="min-w-0">
+                <span className="block text-[17px] font-bold text-[var(--nr-text)] group-hover:text-[var(--nr-p3)]">{b.label}</span>
+                <span className="mt-0.5 block text-[13px] text-slate-500">{b.note}</span>
+              </span>
+              <ArrowUpRight className="w-5 h-5 shrink-0 text-[var(--nr-p1)]" aria-hidden="true" />
+              <span className="sr-only">(새 창)</span>
+            </a>
+          </li>
+        ))}
+        <li>
+          <a
+            href={WRITE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between gap-3 rounded-[10px] bg-[var(--nr-p1)] px-5 py-4 text-white hover:bg-[var(--nr-p3)]"
+          >
+            <span>
+              <span className="block text-[17px] font-bold">내 도구 등록하기</span>
+              <span className="mt-0.5 block text-[13px] text-white/80">교직원 제작 도구 게시판 글쓰기</span>
+            </span>
+            <ArrowUpRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+            <span className="sr-only">(새 창, 로그인 필요)</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
   </aside>
 );
 
