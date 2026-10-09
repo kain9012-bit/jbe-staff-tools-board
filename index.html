@@ -14,7 +14,10 @@
     <meta property="og:title" content="업무경감 도구 모음 · 전북특별자치도교육청" />
     <meta property="og:description" content="전북특별자치도교육청 교직원이 만든 업무도구와 교육청이 배포한 업무도구를 한곳에서 찾아보는 페이지. 도구별 요약과 조회수 현황 제공." />
     <meta property="og:url" content="https://jbe-staff-tools-board.vercel.app/" />
+    <!-- 자바스크립트가 도는 브라우저에서는 검색 엔진용 글을 숨김(화면이 뜨기 전 맨 글자가 번쩍 보이는 것 방지) -->
+    <script>document.documentElement.classList.add('js');</script>
     <style>
+      .js .seo-pre { display: none; }
       .seo-pre { max-width: 960px; margin: 0 auto; padding: 24px 16px; color: #1e2124; line-height: 1.7; font-family: system-ui, sans-serif; }
       .seo-pre h1 { font-size: 26px; font-weight: 700; margin: 0 0 8px; }
       .seo-pre h2, .seo-pre h3 { font-size: 18px; font-weight: 700; margin: 18px 0 6px; }
