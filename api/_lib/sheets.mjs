@@ -144,3 +144,14 @@ export async function loadPayload() {
   }
   return payload;
 }
+
+/** 도구 목록만 — 검색 엔진용 화면·사이트맵에서 씀(조회이력은 읽지 않아 가벼움) */
+export async function loadToolLists() {
+  const [t, ot] = await Promise.all([
+    fetchCsv(GIDS.tools),
+    fetchCsv(OFFICIAL_GIDS.tools, OFFICIAL_SHEET_ID).catch(() => null),
+  ]);
+  const staff = buildPayload(t, [['dataSid']], null, 'staff').tools;
+  const official = ot ? buildPayload(ot, [['dataSid']], null, 'official').tools : [];
+  return { staff, official };
+}

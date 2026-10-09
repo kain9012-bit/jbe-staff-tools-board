@@ -3,7 +3,7 @@ import { ArrowLeft, CalendarDays, Eye, MessageCircle, TrendingUp, UserRound, Wre
 import { CommentGap, CommentItem, unansweredIds } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
 import { Badge, Card, EmptyState, Stat } from '../components/Ui';
-import { hrefTool } from '../lib/route';
+import { hrefTool, navigate } from '../lib/route';
 import { dayLabel, n, shortDay, sum } from '../lib/stats';
 import type { Model } from '../lib/stats';
 
@@ -21,7 +21,7 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
 
   return (
     <>
-      <a href="#/makers" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[var(--nr-p3)]">
+      <a href="/makers" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[var(--nr-p3)]">
         <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 제작자 목록
       </a>
 
@@ -83,7 +83,7 @@ export const MakerDetail: React.FC<{ m: Model; name: string }> = ({ m, name }) =
               {mk.tools.map((t) => (
                 <tr
                   key={t.sid}
-                  onClick={() => (window.location.hash = hrefTool(t.sid).slice(1))}
+                  onClick={() => navigate(hrefTool(t.sid))}
                   className="group cursor-pointer border-t border-slate-100 hover:bg-[var(--nr-bg)]"
                 >
                   <td className="px-4 py-2.5">

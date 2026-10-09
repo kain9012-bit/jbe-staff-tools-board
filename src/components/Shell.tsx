@@ -13,10 +13,10 @@ import type { Route } from '../types';
 export type MenuKey = 'find' | 'makers' | 'register' | 'about';
 
 export const MENU: { key: MenuKey; label: string; href: string }[] = [
-  { key: 'find', label: '도구 찾기', href: '#/' },
-  { key: 'makers', label: '제작자 현황', href: '#/makers' },
-  { key: 'register', label: '도구 등록', href: '#/register' },
-  { key: 'about', label: '집계 기준', href: '#/about' },
+  { key: 'find', label: '도구 찾기', href: '/' },
+  { key: 'makers', label: '제작자 현황', href: '/makers' },
+  { key: 'register', label: '도구 등록', href: '/register' },
+  { key: 'about', label: '집계 기준', href: '/about' },
 ];
 
 export const menuOf = (r: Route): MenuKey =>
@@ -49,7 +49,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
         <Ext href={WRITE_URL} className="hover:text-[var(--nr-p3)]">내 도구 등록하기</Ext>
       </div>
       <div className="flex items-center gap-4 py-3 md:py-2">
-        <a href="#/" className="flex items-center gap-2.5">
+        <a href="/" className="flex items-center gap-2.5">
           <span aria-hidden="true" className="grid grid-cols-2 gap-0.5 w-8 h-8 shrink-0">
             <span className="rounded-sm bg-[var(--nr-p1)]" />
             <span className="rounded-sm bg-[#32bdb8]" />
@@ -109,7 +109,7 @@ export const Breadcrumb: React.FC<{ trail: { label: string; href?: string }[] }>
   };
   return (
     <div className="h-12 lg:h-[60px] flex items-center gap-2 text-[13px] text-slate-600 jbe-noprint">
-      <a href="#/" aria-label="처음으로" className="text-slate-600 hover:text-[var(--nr-p3)]">
+      <a href="/" aria-label="처음으로" className="text-slate-600 hover:text-[var(--nr-p3)]">
         <Home className="w-4 h-4" aria-hidden="true" />
       </a>
       {trail.map((t, i) => (

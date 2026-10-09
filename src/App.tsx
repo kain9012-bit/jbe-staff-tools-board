@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
 import { Lnb, menuOf, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
 import { EmptyState } from './components/Ui';
-import { hrefPurpose, useRoute } from './lib/route';
+import { hrefPurpose, locKey, useRoute } from './lib/route';
 import { allTools } from './lib/stats';
 import { useData } from './lib/useData';
 import { About } from './pages/About';
@@ -65,8 +65,8 @@ export default function App() {
           .map(([p, k]) => ({ label: p, href: hrefPurpose(p), on: purposeNow === p, count: k })),
       ],
       makers: [
-        { label: '교직원 제작 도구', href: '#/makers', on: route.page === 'makers' || route.page === 'maker', count: m.tools.length },
-        ...(m.official ? [{ label: '교육청 배포 도구', href: '#/official', on: route.page === 'official', count: m.official.tools.length }] : []),
+        { label: '교직원 제작 도구', href: '/makers', on: route.page === 'makers' || route.page === 'maker', count: m.tools.length },
+        ...(m.official ? [{ label: '교육청 배포 도구', href: '/official', on: route.page === 'official', count: m.official.tools.length }] : []),
       ],
     };
   }, [m, active, route.page, purposeNow]);
@@ -74,11 +74,11 @@ export default function App() {
   const label = MENU.find((x) => x.key === active)?.label ?? '';
   const trail: { label: string; href?: string }[] = [
     { label: '데이터 도구실' },
-    { label: SERVICE, href: '#/' },
+    { label: SERVICE, href: '/' },
     ...(toolTitle || makerName
       ? [{ label, href: MENU.find((x) => x.key === active)!.href }, { label: toolTitle ?? makerName ?? '' }]
       : route.page === 'makers' || route.page === 'official'
-        ? [{ label, href: '#/makers' }, { label: route.page === 'official' ? '교육청 배포 도구' : '교직원 제작 도구' }]
+        ? [{ label, href: '/makers' }, { label: route.page === 'official' ? '교육청 배포 도구' : '교직원 제작 도구' }]
         : [{ label }]),
   ];
 
@@ -108,7 +108,7 @@ export default function App() {
   else if (m) {
     if (route.page === 'home' || route.page === 'tools')
       body = (
-        <Find key={window.location.hash} m={m} initialQ={route.q} initialSort={route.sort} initialPurpose={route.p} initialSrc={route.src} from={route.from} to={route.to} />
+        <Find key={locKey()} m={m} initialQ={route.q} initialSort={route.sort} initialPurpose={route.p} initialSrc={route.src} from={route.from} to={route.to} />
       );
     else if (route.page === 'makers')
       body = (
@@ -116,7 +116,7 @@ export default function App() {
           <PageTitle desc="교직원이 만든 도구와 제작자별 조회수·댓글 현황. 기간을 골라 보면 아래 순위가 함께 바뀝니다.">교직원 제작 도구</PageTitle>
           <StatsOverview m={m} />
           <div className="mt-12" id="makers-table">
-            <Makers key={window.location.hash} m={m} initialQ={route.q} initialSort={route.sort} from={route.from} to={route.to} />
+            <Makers key={locKey()} m={m} initialQ={route.q} initialSort={route.sort} from={route.from} to={route.to} />
           </div>
         </>
       );

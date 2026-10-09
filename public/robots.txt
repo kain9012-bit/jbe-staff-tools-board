@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://jbe-staff-tools-board.vercel.app/sitemap.xml

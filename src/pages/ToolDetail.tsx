@@ -123,7 +123,7 @@ const ToolLinkList: React.FC<{ tools: ToolStat[] }> = ({ tools }) => (
   <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
     {tools.map((s) => (
       <li key={s.sid}>
-        <a href={`#/tool/${s.sid}`} className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--nr-line)] bg-white px-4 py-2.5 hover:border-[var(--nr-p3)]">
+        <a href={`/tool/${s.sid}`} className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--nr-line)] bg-white px-4 py-2.5 hover:border-[var(--nr-p3)]">
           <span className="min-w-0">
             <span className="block truncate font-bold text-slate-900">{s.title}</span>
             <span className="block truncate text-[13px] text-slate-500">{s.author}</span>
@@ -162,7 +162,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
 
   return (
     <>
-      <a href="#/" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[var(--nr-p3)]">
+      <a href="/" className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[var(--nr-p3)]">
         <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 도구 찾기
       </a>
 

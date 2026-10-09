@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 import { EmptyState, SectionTitle, Segmented } from '../components/Ui';
-import { hrefMaker } from '../lib/route';
+import { hrefMaker, navigate } from '../lib/route';
 import { matcher } from '../lib/search';
 import { n, periodStats, rangeLabel, shortDay, sum, type MakerStat, type Model } from '../lib/stats';
 
@@ -96,7 +96,7 @@ export const Makers: React.FC<{ m: Model; initialQ?: string; initialSort?: strin
               {shown.map((mk, i) => (
                 <tr
                   key={mk.name}
-                  onClick={() => (window.location.hash = hrefMaker(mk.name).slice(1))}
+                  onClick={() => navigate(hrefMaker(mk.name))}
                   className="group cursor-pointer border-t border-slate-100 hover:bg-[var(--nr-bg)]"
                 >
                   <td className={`px-4 py-2.5 tabular-nums font-extrabold ${i < 3 ? 'text-[var(--nr-p3)]' : 'text-slate-400'}`}>{i + 1}</td>

@@ -26,7 +26,7 @@ const devApi = (): Plugin => ({
 });
 
 export default defineConfig({
-  base: './',
+  base: '/',
   plugins: [react(), tailwindcss(), devApi()],
   build: { outDir: 'dist', assetsDir: 'assets' },
 });

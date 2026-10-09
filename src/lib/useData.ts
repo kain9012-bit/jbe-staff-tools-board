@@ -13,7 +13,7 @@ export function useData() {
   const load = useCallback(async () => {
     setState({ status: 'loading' });
     try {
-      const res = await fetch('./api/data', { headers: { Accept: 'application/json' } });
+      const res = await fetch('/api/data', { headers: { Accept: 'application/json' } });
       const body = await res.json().catch(() => null);
       if (!res.ok || !body || body.error) throw new Error(body?.error || `HTTP ${res.status}`);
       setState({ status: 'ready', model: buildModel(body as Payload) });

@@ -484,7 +484,7 @@ export const Find: React.FC<{
 
       {/* 등록 유도 */}
       <section className="mt-14 grid grid-cols-1 gap-3 md:grid-cols-2">
-        <a href="#/register" className="group flex items-center gap-4 rounded-[14px] bg-[var(--nr-p2)] p-6 text-white hover:opacity-95">
+        <a href="/register" className="group flex items-center gap-4 rounded-[14px] bg-[var(--nr-p2)] p-6 text-white hover:opacity-95">
           <PencilLine className="w-8 h-8 shrink-0 opacity-80" aria-hidden="true" />
           <span>
             <span className="nr-title block text-[20px]">내가 만든 도구도 올려 주세요</span>
