@@ -173,7 +173,10 @@ export const Find: React.FC<{
   const pages = Math.max(1, Math.ceil(shown.length / pageSize));
   const cur = Math.min(page, pages);
   const pageRows = shown.slice((cur - 1) * pageSize, cur * pageSize);
-  const toResults = () => setTimeout(() => resultTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  const toResults = () => {
+    setTab('all');
+    setTimeout(() => resultTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
   /**
    * 필터를 눌러도 필터 상자가 제자리에 있게 — 필터가 켜지고 꺼지면서 위쪽 구획(업무별 둘러보기·구분 안내)이
    * 나타나거나 사라져 화면이 위아래로 튀던 문제. 누르기 전 상자 위치를 기억했다가 그린 뒤 같은 자리로 맞춤
@@ -195,6 +198,12 @@ export const Find: React.FC<{
   };
 
   const filtered = Boolean(q.trim() || chip || target || purpose || srcOn || ps);
+  /** 처음엔 업무별로 둘러보기. 주소로 검색·필터·정렬을 들고 왔으면 전체 도구 */
+  const [tab, setTab] = useState<'work' | 'pick' | 'all'>(() => (filtered || initialSort ? 'all' : 'work'));
+  /** 검색하거나 필터를 걸면 전체 도구 탭으로 — 결과가 안 보이는 일 없게 */
+  useEffect(() => {
+    if (filtered) setTab('all');
+  }, [filtered, q, chip, target, purpose, srcOn]);
   const clearAll = () => {
     setQ('');
     setChip('');
@@ -205,7 +214,6 @@ export const Find: React.FC<{
 
   const byRecent = useMemo(() => [...everything].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views), [m]);
   const popular = byRecent.slice(0, 5);
-  const [pick, setPick] = useState<'popular' | 'fresh'>('popular');
   const fresh = useMemo(
     () => [...everything].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 5),
     [everything],
@@ -308,111 +316,131 @@ export const Find: React.FC<{
         </div>
       </section>
 
-      {/* 2. 업무별 바로가기 — 한두 줄 버튼. 누르면 아래 전체 도구가 그 업무로 걸러짐 */}
-      <nav aria-label="업무별로 둘러보기" className="mt-5">
-        <p className="mb-2 text-[14px] font-bold text-slate-700">
-          업무별로 둘러보기 <span className="font-normal text-slate-500">· 도구 이름과 요약에 든 낱말로 묶음</span>
-        </p>
-        <ul className="-mx-1 flex gap-1.5 overflow-x-auto no-scrollbar px-1 pb-1 sm:flex-wrap sm:overflow-visible">
-          {tiles.map((c) => {
-            const on = chip === c.label;
-            return (
-              <li key={c.label} className="shrink-0">
+      {/* 2. 탭 — 업무별로 둘러보기 / 요즘 많이 찾는 도구·새로 올라온 도구 / 전체 도구. 스크롤을 줄이려고 나눔 */}
+      <div role="tablist" aria-label="도구 보기 방식" className="mt-8 grid grid-cols-3 border-b-2 border-[var(--nr-line)]" ref={resultTop}>
+        {(
+          [
+            ['work', '업무별로 둘러보기', '업무별'],
+            ['pick', '요즘 많이 찾는 · 새로 올라온 도구', '인기·새 도구'],
+            ['all', '전체 도구', '전체 도구'],
+          ] as const
+        ).map(([k, long, short]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            id={`tab-${k}`}
+            aria-selected={tab === k}
+            aria-controls={`panel-${k}`}
+            onClick={() => setTab(k)}
+            className={`-mb-[2px] border-b-[3px] px-1 py-3.5 text-center text-[15px] sm:text-[17px] ${
+              tab === k ? 'border-[var(--nr-p3)] font-bold text-[var(--nr-p3)]' : 'border-transparent text-slate-600 hover:text-black'
+            }`}
+          >
+            <span className="sm:hidden">{short}</span>
+            <span className="hidden sm:inline">{long}</span>
+            {k === 'all' && <span className="ml-1 text-[13px] font-normal tabular-nums opacity-75">{filtered ? shown.length : everything.length}</span>}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'work' && (
+        <section id="panel-work" role="tabpanel" aria-labelledby="tab-work" className="mt-6">
+          <p className="text-[14px] text-slate-500">도구 이름과 요약에 든 낱말로 묶음 · 누르면 전체 도구에서 그 업무만 보여 줌</p>
+          <ul className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
+            {tiles.map((c) => (
+              <li key={c.label}>
                 <button
                   type="button"
-                  aria-pressed={on}
                   onClick={() => {
-                    setChip(on ? '' : c.label);
+                    setChip(c.label);
                     toResults();
                   }}
-                  className={`rounded-full border px-3.5 py-2 text-[15px] ${
-                    on ? 'border-[var(--nr-p3)] bg-[var(--nr-p3)] font-bold text-white' : 'border-[var(--nr-line)] bg-white text-slate-800 hover:border-[var(--nr-p3)] hover:text-[var(--nr-p3)]'
-                  }`}
+                  className="group flex h-full w-full flex-col rounded-[14px] border border-[var(--nr-line)] bg-white p-4 sm:p-5 text-left transition hover:border-[var(--nr-p3)] hover:shadow-[0_6px_20px_rgba(28,100,172,0.12)]"
                 >
-                  {c.label} <span className={`tabular-nums text-[13px] ${on ? 'text-white/80' : 'text-[var(--nr-p3)]'}`}>{c.count}</span>
+                  <span className="flex w-full flex-wrap items-center justify-between gap-1">
+                    <span className="text-[16px] sm:text-[18px] font-bold text-black group-hover:text-[var(--nr-p3)]">{c.label}</span>
+                    <span className="rounded-full bg-[var(--nr-bg)] px-2.5 py-0.5 text-[13px] font-bold tabular-nums text-[var(--nr-p3)]">{c.count}개</span>
+                  </span>
+                  <span className="mt-3 hidden sm:block w-full space-y-1 text-[14px] text-slate-600">
+                    {c.top.map((t) => (
+                      <span key={t.sid} className="block truncate">
+                        · {t.title}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="mt-3 hidden sm:inline-flex items-center gap-1 text-[13px] font-bold text-[var(--nr-p3)]">
+                    모두 보기 <ArrowRight className="w-3.5 h-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
+                  </span>
                 </button>
               </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      {/* 3. 요즘 많이 찾는 도구 · 새로 올라온 도구 — 같은 모양 목록이라 탭 하나로 */}
-      {!filtered && (
-        <section aria-label="추천 도구" className="mt-8 rounded-[14px] border border-[var(--nr-line)] bg-white">
-          <div role="tablist" aria-label="추천 도구" className="flex border-b border-[var(--nr-line)]">
-            {(
-              [
-                ['popular', '요즘 많이 찾는 도구', '최근 30일 조회수'],
-                ['fresh', '새로 올라온 도구', '게시일 순'],
-              ] as const
-            ).map(([k, label, note]) => (
-              <button
-                key={k}
-                type="button"
-                role="tab"
-                id={`tab-${k}`}
-                aria-selected={pick === k}
-                aria-controls="pick-panel"
-                onClick={() => setPick(k)}
-                className={`flex-1 border-b-[3px] px-3 py-3.5 text-center sm:flex-none sm:px-6 sm:text-left ${
-                  pick === k ? 'border-[var(--nr-p3)] font-bold text-[var(--nr-p3)]' : 'border-transparent text-slate-600 hover:text-black'
-                }`}
-              >
-                <span className="block text-[16px]">{label}</span>
-                <span className="hidden text-[12px] font-normal text-slate-500 sm:block">{note}</span>
-              </button>
             ))}
-          </div>
-          <ol id="pick-panel" role="tabpanel" aria-labelledby={`tab-${pick}`} className="divide-y divide-[var(--nr-line)]">
-            {(pick === 'popular' ? popular : fresh).map((t, i) => (
-              <li key={t.sid} className="flex items-center gap-4 px-5 py-3.5">
-                {pick === 'popular' ? (
-                  <span className="nr-title w-6 shrink-0 text-center text-[22px] text-[var(--nr-p1)]">{i + 1}</span>
-                ) : (
-                  <Sparkles className="w-5 h-5 shrink-0 text-[#e0a800]" aria-hidden="true" />
-                )}
-                <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
-                  <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
-                  <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
-                    <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
-                    {pick === 'popular'
-                      ? t.board === 'official'
-                        ? '교육청 배포'
-                        : t.board === 'external'
-                          ? `외부 기관 · ${t.kind ?? ''}`
-                          : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`
-                      : `${t.board === 'staff' || !t.board ? `${splitAuthor(t.author).person} · ` : ''}${shortDay(t.created)} 게시`}
-                  </span>
-                </a>
-                {pick === 'popular' ? (
-                  <span className="hidden sm:inline-flex shrink-0 items-center gap-1 text-[14px] font-bold tabular-nums text-[var(--nr-p3)]">
-                    <TrendingUp className="w-4 h-4" aria-hidden="true" />+{n(t.recent30)}
-                  </span>
-                ) : (
-                  isNewTool(t, today) && <span className="shrink-0 rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>
-                )}
-                <a href={t.url} target="_blank" rel="noreferrer" className="hidden sm:inline-flex shrink-0 rounded-full bg-[var(--nr-p1)] px-3.5 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]">
-                  사용하기<span className="sr-only">(새 창)</span>
-                </a>
-              </li>
-            ))}
-          </ol>
-          <button
-            type="button"
-            onClick={() => {
-              setSort(pick === 'popular' ? 'recent30' : 'created');
-              toResults();
-            }}
-            className="flex w-full items-center justify-center gap-1 border-t border-[var(--nr-line)] py-3 text-[14px] font-bold text-[var(--nr-p3)] hover:bg-[var(--nr-bg)]"
-          >
-            {pick === 'popular' ? '많이 찾는 순으로 전체 보기' : '새로 올라온 순으로 전체 보기'} <ArrowRight className="w-4 h-4" aria-hidden="true" />
-          </button>
+          </ul>
         </section>
       )}
 
+      {tab === 'pick' && (
+        <div id="panel-pick" role="tabpanel" aria-labelledby="tab-pick" className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-6">
+          {(
+            [
+              ['popular', '요즘 많이 찾는 도구', '최근 30일 조회수', popular, 'recent30'],
+              ['fresh', '새로 올라온 도구', '게시일 순', fresh, 'created'],
+            ] as const
+          ).map(([kind, title, note, rows, sortKey]) => (
+            <section key={kind} aria-labelledby={`${kind}-h`} className="min-w-0">
+              <SectionHead id={`${kind}-h`} title={title} note={note} />
+              <ol className="mt-4 divide-y divide-[var(--nr-line)] rounded-[14px] border border-[var(--nr-line)] bg-white">
+                {rows.map((t, i) => (
+                  <li key={t.sid} className="flex items-center gap-4 px-5 py-4">
+                    {kind === 'popular' ? (
+                      <span className="nr-title w-6 shrink-0 text-center text-[24px] text-[var(--nr-p1)]">{i + 1}</span>
+                    ) : (
+                      <Sparkles className="w-5 h-5 shrink-0 text-[#e0a800]" aria-hidden="true" />
+                    )}
+                    <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
+                      <span className="font-bold leading-snug text-black line-clamp-2 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
+                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
+                        <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
+                        {kind === 'popular'
+                          ? t.board === 'official'
+                            ? '교육청 배포'
+                            : t.board === 'external'
+                              ? `외부 기관 · ${t.kind ?? ''}`
+                              : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`
+                          : `${t.board === 'staff' || !t.board ? `${splitAuthor(t.author).person} · ` : ''}${shortDay(t.created)} 게시`}
+                      </span>
+                    </a>
+                    {kind === 'popular' ? (
+                      <span className="hidden sm:inline-flex shrink-0 items-center gap-1 text-[14px] font-bold tabular-nums text-[var(--nr-p3)]">
+                        <TrendingUp className="w-4 h-4" aria-hidden="true" />+{n(t.recent30)}
+                      </span>
+                    ) : (
+                      isNewTool(t, today) && <span className="shrink-0 rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>
+                    )}
+                    <a href={t.url} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-[var(--nr-p1)] px-3.5 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]">
+                      사용하기<span className="sr-only">(새 창)</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+              <button
+                type="button"
+                onClick={() => {
+                  setSort(sortKey);
+                  toResults();
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-[14px] font-bold text-[var(--nr-p3)] hover:underline"
+              >
+                전체 도구에서 {kind === 'popular' ? '많이 찾는 순' : '새로 올라온 순'}으로 보기 <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </section>
+          ))}
+        </div>
+      )}
+
       {/* 4. 전체 도구 */}
-      <section aria-labelledby="all-h" className="mt-10 scroll-mt-4" ref={resultTop}>
+      {tab === 'all' && (
+      <section id="panel-all" role="tabpanel" aria-labelledby="tab-all" className="mt-6">
         <SectionHead id="all-h" title={filtered ? '찾은 도구' : '전체 도구'} />
 
         <div className="mt-4 rounded-[14px] bg-[var(--nr-bg)] p-4 sm:p-5 space-y-3">
@@ -578,6 +606,7 @@ export const Find: React.FC<{
         )}
         <Pager page={cur} pages={pages} onPage={goPage} />
       </section>
+      )}
 
       {/* 등록 유도 */}
       <section className="mt-14 grid grid-cols-1 gap-3 md:grid-cols-2">
