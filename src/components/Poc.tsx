@@ -87,16 +87,15 @@ export interface Submission {
   at: string;
   stage: number; // 구분별 단계 번호 — STAGES_OF 참고
   checks: number; // 자가점검 통과 개수(교직원 제작)
-  /** 구분 — 교직원 제작 도구 등록 / 외부 공공업무 도구 추천 */
-  board?: 'staff' | 'external';
+  /** 구분 — 세 구분 모두 같은 양식·같은 절차 */
+  board?: 'staff' | 'external' | 'official';
   org?: string; // 외부 — 제작 기관
   region?: string; // 외부 — 기준 지역
   note?: string;
 }
 
-/** 구분마다 거치는 단계가 다름 — 교직원 제작은 보안 검토, 외부 공공은 운영자 확인 */
-export const STAGES_OF = {
-  staff: ['등록 신청', '자가점검', '보안 검토', '게시'],
-  external: ['추천 접수', '운영자 확인', '게시'],
-} as const;
-export const STAGES = STAGES_OF.staff;
+/** 등록 절차 — 구분과 관계없이 같음. 구분은 '누가 등록할 수 있는지'만 다름 */
+export const STAGES = ['등록 신청', '자가점검', '보안 검토', '게시'] as const;
+
+/** 고도화 — 교직원 제작 도구를 교육청이 다듬어 교육청 배포 도구로 전환 */
+export const UPGRADE_STAGES = ['고도화 후보', '제작자 동의', '고도화 개발', '교육청 배포 전환'] as const;

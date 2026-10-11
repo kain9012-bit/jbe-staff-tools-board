@@ -1,10 +1,12 @@
 import React from 'react';
-import { ArrowRight, Boxes, ClipboardCheck, GitCommitVertical, MessagesSquare } from 'lucide-react';
+import { ArrowRight, Boxes, ClipboardCheck, GitCommitVertical, MessagesSquare, Sparkles } from 'lucide-react';
 import { PocTag, versionOf } from '../components/Poc';
 import { PageTitle } from '../components/Shell';
+import { useHashScroll } from '../lib/route';
 import { allTools, n, sum, type Model } from '../lib/stats';
 import { summaryOf } from '../lib/summaries';
 import { SOURCES } from '../lib/sources';
+import { UPGRADE_RULE, upgradeCandidates } from '../lib/upgrade';
 
 /**
  * 개편 안내 — 데이터 도구실을 게시판 3개에서 하나의 플랫폼으로 바꾸는 PoC의 취지와 화면 안내.
@@ -24,9 +26,9 @@ const PILLARS = [
   },
   {
     icon: ClipboardCheck,
-    title: '등록·검수 절차',
-    now: ['자유 글쓰기라 설명 형식이 제각각', '등록 전 보안 확인 절차 없음'],
-    next: ['정해진 양식으로 등록하면 그대로 소개 화면이 됨', '보안 자가점검 6문항 → 담당자 검토 → 게시', '진행 단계를 신청자가 직접 확인'],
+    title: '같은 양식·같은 절차로 등록',
+    now: ['올리는 사람마다 글 형식이 달라 사용자가 비교하기 어려움', '게시판마다 올리는 방식이 다르고, 등록 전 보안 확인 절차 없음'],
+    next: ['세 구분 모두 같은 등록 양식 → 소개 화면이 같은 모양', '세 구분 모두 같은 절차: 자가점검 → 보안 검토 → 게시', '구분은 등록할 수 있는 사람만 다름(교육청 배포는 정책기획과 전용)', '진행 단계를 신청자가 직접 확인'],
     links: [
       ['도구 등록', '/register'],
       ['검수 현황', '/review'],
@@ -46,22 +48,31 @@ const PILLARS = [
     next: ['도구마다 버전 이력과 바뀐 내용', '업데이트 알림 받기', '검수 정보에 현재 버전 표시'],
     links: [] as string[][],
   },
+  {
+    icon: Sparkles,
+    title: '고도화 → 교육청 배포 전환',
+    now: ['많이 쓰이는 교직원 제작 도구를 키울 근거·절차가 없음', '제작자가 전보·휴직하면 도구 관리가 멈춤'],
+    next: ['조회수·써봤어요·후기·요청 공감으로 고도화 후보 선정', '제작자 동의 → 정책기획과 고도화 → 교육청 배포로 전환', "전환해도 같은 도구 화면 유지, '원작' 표시", '유지보수·문의는 교육청이 이어받음'],
+    links: [['고도화 진행', '/review#up-h']],
+  },
 ];
 
-const FLOW = ['요청', '제작', '등록', '검수', '게시', '사용·후기', '업데이트'];
+const FLOW = ['요청', '제작', '등록', '검수', '게시', '사용·후기', '업데이트', '고도화', '교육청 배포 전환'];
 
 export const PocGuide: React.FC<{ m: Model }> = ({ m }) => {
+  useHashScroll();
   const all = allTools(m);
   const off = m.official?.tools ?? [];
   const ext = m.external?.tools ?? [];
   const versioned = all.filter((t) => versionOf(t.title)).length;
+  const cands = upgradeCandidates(m);
   const summarized = all.filter((t) => summaryOf(t.sid)).length;
   const sample = [...all].filter((t) => summaryOf(t.sid) && versionOf(t.title)).sort((a, b) => b.recent30 - a.recent30)[0];
   const links = PILLARS.map((p) => (p.title === '버전·업데이트 관리' && sample ? { ...p, links: [['도구 상세 예시', `/tool/${sample.sid}`]] } : p));
 
   return (
     <>
-      <PageTitle desc="게시판 3개로 나뉜 데이터 도구실을, 찾고·등록하고·요청하고·업데이트를 받는 하나의 플랫폼으로 바꾸면 어떻게 되는지 보여 주는 시범(PoC) 화면입니다.">
+      <PageTitle desc="게시판 3개로 나뉜 데이터 도구실을, 찾고·등록하고·요청하고·업데이트를 받고, 많이 쓰이는 도구는 교육청이 키우는 하나의 플랫폼으로 바꾸면 어떻게 되는지 보여 주는 시범(PoC) 화면입니다.">
         데이터 도구실 개편 안내
       </PageTitle>
 
@@ -84,9 +95,9 @@ export const PocGuide: React.FC<{ m: Model }> = ({ m }) => {
         </dl>
       </section>
 
-      {/* 네 가지 개편 방향 */}
+      {/* 다섯 가지 개편 방향 */}
       <section className="mt-12">
-        <h2 className="nr-title text-[24px] text-black">네 가지 개편 방향</h2>
+        <h2 className="nr-title text-[24px] text-black">다섯 가지 개편 방향</h2>
         <div className="mt-4 space-y-4">
           {links.map((p, i) => {
             const Icon = p.icon;
@@ -230,14 +241,42 @@ export const PocGuide: React.FC<{ m: Model }> = ({ m }) => {
         <ol className="mt-4 flex flex-wrap items-center gap-2">
           {FLOW.map((s, i) => (
             <li key={s} className="flex items-center gap-2">
-              <span className={`rounded-full px-4 py-2 text-[15px] font-bold ${i === 4 ? 'bg-[var(--nr-p1)] text-white' : 'bg-[var(--nr-bg)] text-[var(--nr-p2)]'}`}>{s}</span>
+              <span className={`rounded-full px-4 py-2 text-[15px] font-bold ${i === 4 ? 'bg-[var(--nr-p1)] text-white' : i >= 7 ? 'bg-[#fff1d6] text-[#8a5300]' : 'bg-[var(--nr-bg)] text-[var(--nr-p2)]'}`}>{s}</span>
               {i < FLOW.length - 1 && <ArrowRight className="w-4 h-4 text-slate-400" aria-hidden="true" />}
             </li>
           ))}
         </ol>
         <p className="mt-3 text-[15px] text-slate-600">
-          사용자의 요청이 제작으로 이어지고, 검수를 거쳐 게시된 도구가 후기와 업데이트로 다시 좋아지는 구조. 지금 게시판은 '게시'만 있음
+          사용자의 요청이 제작으로 이어지고, 검수를 거쳐 게시된 도구가 후기와 업데이트로 좋아지며, 많이 쓰이면 교육청이 고도화해 배포 도구로 키우는 구조. 지금 게시판은 '게시'만 있음
         </p>
+      </section>
+
+      {/* 고도화 후보 — 실제 조회수로 계산 */}
+      <section id="upgrade" className="mt-12 scroll-mt-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="nr-title text-[24px] text-black">지금 고도화 후보</h2>
+          <PocTag label="실제 조회수 기준" />
+        </div>
+        <p className="mt-1 text-[15px] text-slate-600">
+          PoC 기준: {UPGRADE_RULE}. 개편 후에는 써봤어요·후기 평점·관련 요청 공감을 함께 봄. 후보가 곧 전환 대상은 아니며 제작자 동의가 먼저임
+        </p>
+        <ol className="mt-4 divide-y divide-[var(--nr-line)] rounded-[12px] border border-[var(--nr-line)] bg-white">
+          {cands.map((t, i) => (
+            <li key={t.sid}>
+              <a href={`/tool/${t.sid}`} className="group flex items-center gap-3 px-4 py-3 hover:bg-[#fffaf0]">
+                <span className="nr-title w-6 shrink-0 text-center text-[20px] text-[#e0a800]">{i + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold text-black group-hover:text-[var(--nr-p3)]">{t.title}</span>
+                  <span className="block truncate text-[13px] text-slate-500">원작 {t.author}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-bold tabular-nums text-[var(--nr-p3)]">+{n(t.recent30)}</span>
+                  <span className="block text-[12px] text-slate-500">최근 30일</span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ol>
       </section>
 
       {/* 실제와 예시 */}
@@ -263,6 +302,7 @@ export const PocGuide: React.FC<{ m: Model }> = ({ m }) => {
               <li>등록 양식·자가점검·검수 단계</li>
               <li>써봤어요·후기·업데이트 알림</li>
               <li>검수 정보의 '미확인' 항목</li>
+              <li>고도화 진행 단계(후보 선정만 실제 조회수 기준)</li>
               <li>누른 기록은 이 브라우저에만 저장, 서버에 남지 않음</li>
             </ul>
           </div>

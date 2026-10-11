@@ -4,6 +4,7 @@ import { PocNote, todayKst, usePocState, type Submission } from '../components/P
 import { PageTitle } from '../components/Shell';
 import { WRITE_URL } from '../lib/board';
 import { sourceOf } from '../lib/sources';
+import { SourceTag } from '../components/Lists';
 
 /**
  * 도구 등록 — 개편 PoC. 게시판 자유 글쓰기 대신 정해진 양식으로 등록하고,
@@ -27,6 +28,9 @@ const QUESTIONS: { q: string; safe: boolean; hint?: string }[] = [
 ];
 
 interface Form {
+  board: Kind | '';
+  org: string;
+  region: string;
   title: string;
   what: string;
   why: string;
@@ -42,6 +46,9 @@ interface Form {
 }
 
 const EMPTY: Form = {
+  board: '',
+  org: '',
+  region: '',
   title: '',
   what: '',
   why: '',
@@ -81,130 +88,26 @@ const Field: React.FC<{ id: string; label: string; need?: boolean; hint?: string
 
 const input = 'w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[15px] focus:border-[var(--nr-p3)] focus:outline-none';
 
-type RegType = '' | 'staff' | 'external';
+type Kind = 'staff' | 'external' | 'official';
 
-/** 첫 단계 — 구분 고르기. 구분에 따라 양식·검수가 다름 */
-const TypePicker: React.FC<{ onPick: (t: RegType) => void }> = ({ onPick }) => {
-  const cards = [
-    { key: 'staff' as const, icon: UserRound, title: '교직원 제작 도구 등록', body: '내가 만든 도구를 동료와 나눔. 정해진 양식 → 보안 자가점검 → 담당자 검토 후 게시', who: '교직원 누구나' },
-    { key: 'external' as const, icon: Globe2, title: '외부 공공업무 도구 추천', body: '다른 교육청·공공기관이 만든 쓸 만한 도구를 알림. 운영자가 확인 후 선정·게재', who: '누구나' },
-  ];
-  const off = sourceOf('official');
-  return (
-    <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-      {cards.map(({ key, icon: Icon, title, body, who }) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => onPick(key)}
-          className="group flex flex-col rounded-[14px] border-2 border-[var(--nr-line)] bg-white p-5 text-left hover:border-[var(--nr-p1)] hover:shadow-[0_6px_20px_rgba(28,100,172,0.12)]"
-        >
-          <Icon className="w-8 h-8 text-[var(--nr-p1)]" aria-hidden="true" />
-          <span className="nr-title mt-3 text-[20px] text-black group-hover:text-[var(--nr-p3)]">{title}</span>
-          <span className="mt-1.5 flex-1 text-[14px] text-slate-600">{body}</span>
-          <span className="mt-4 flex items-center justify-between text-[13px]">
-            <span className="rounded-full bg-[var(--nr-bg)] px-2.5 py-1 font-bold text-[var(--nr-p3)]">{who}</span>
-            <ArrowRight className="w-5 h-5 text-[var(--nr-p1)]" aria-hidden="true" />
-          </span>
-        </button>
-      ))}
-      <div className="flex flex-col rounded-[14px] border-2 border-dashed border-[var(--nr-line)] bg-[#fafafa] p-5">
-        <Building2 className="w-8 h-8 text-slate-400" aria-hidden="true" />
-        <span className="nr-title mt-3 text-[20px] text-slate-500">교육청 배포 도구 등록</span>
-        <span className="mt-1.5 flex-1 text-[14px] text-slate-500">교육청이 직접 만들어 배포하는 도구. 운영 부서가 배포 등록</span>
-        <span className="mt-4 inline-flex items-center gap-1 text-[13px] font-bold text-slate-500">
-          <Lock className="w-4 h-4" aria-hidden="true" /> {off.who} 전용
-        </span>
-      </div>
-    </div>
-  );
-};
-
-/** 외부 공공업무 도구 추천 — 짧은 양식 */
-const ExternalForm: React.FC<{ onDone: (s: Submission) => void; onBack: () => void }> = ({ onDone, onBack }) => {
-  const [title, setTitle] = useState('');
-  const [url, setUrl] = useState('');
-  const [org, setOrg] = useState('');
-  const [what, setWhat] = useState('');
-  const [why, setWhy] = useState('');
-  const [region, setRegion] = useState('');
-  const [run, setRun] = useState('');
-  const ok = title.trim() && /^https?:\/\/\S+\.\S+/.test(url.trim()) && org.trim() && what.trim() && run;
-  return (
-    <form
-      className="mt-6 space-y-5 rounded-[14px] border border-[var(--nr-line)] bg-white p-5 sm:p-7"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!ok) return;
-        onDone({
-          id: `me-${Date.now()}`,
-          board: 'external',
-          title: title.trim(),
-          what: what.trim(),
-          purpose: '추천',
-          run,
-          version: '-',
-          at: todayKst(),
-          stage: 0,
-          checks: 0,
-          org: org.trim(),
-          region: region.trim(),
-          note: why.trim() || undefined,
-        });
-      }}
-    >
-      <Field id="x-title" label="도구 이름" need>
-        <input id="x-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} className={input} placeholder="예: 소확엑셀" />
-      </Field>
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <Field id="x-url" label="도구 주소" need>
-          <input id="x-url" value={url} onChange={(e) => setUrl(e.target.value)} className={input} placeholder="https://" />
-        </Field>
-        <Field id="x-org" label="제작 기관" need hint="예: 강원특별자치도교육청 ○○학교">
-          <input id="x-org" value={org} onChange={(e) => setOrg(e.target.value)} maxLength={40} className={input} />
-        </Field>
-      </div>
-      <Field id="x-what" label="한 줄 소개" need hint="무엇을 해 주는 도구인지 45자 안에서">
-        <input id="x-what" value={what} onChange={(e) => setWhat(e.target.value)} maxLength={45} className={input} />
-      </Field>
-      <Field id="x-why" label="추천 이유" hint="어떤 업무에 써 봤고 무엇이 줄었는지">
-        <textarea id="x-why" rows={3} value={why} onChange={(e) => setWhy(e.target.value)} maxLength={200} className={input} />
-      </Field>
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <Field id="x-run" label="실행 방식" need>
-          <select id="x-run" value={run} onChange={(e) => setRun(e.target.value)} className={`${input} bg-white`}>
-            <option value="">선택</option>
-            {RUNS.map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-        </Field>
-        <Field id="x-region" label="기준 지역" hint="다른 시도 지침 기준이면 적어 주세요 · 예: 강원 기준">
-          <input id="x-region" value={region} onChange={(e) => setRegion(e.target.value)} maxLength={20} className={input} />
-        </Field>
-      </div>
-      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-5">
-        <button type="button" onClick={onBack} className="inline-flex items-center gap-1 rounded-lg px-4 py-2.5 text-[15px] font-bold text-slate-600">
-          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 구분 다시 고르기
-        </button>
-        <button type="submit" disabled={!ok} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--nr-p1)] px-5 py-2.5 text-[15px] font-bold text-white hover:bg-[var(--nr-p3)] disabled:opacity-40">
-          <Send className="w-4 h-4" aria-hidden="true" /> 추천하기
-        </button>
-      </div>
-    </form>
-  );
-};
+/** 구분 고르기 — 양식·절차는 같고, 누가 등록할 수 있는지만 다름 */
+const KINDS: { key: Kind; icon: typeof UserRound; title: string; who: string; body: string }[] = [
+  { key: 'staff', icon: UserRound, title: '교직원 제작 도구', who: '교직원 누구나', body: '내가 만든 도구를 동료와 나눔' },
+  { key: 'external', icon: Globe2, title: '외부 공공업무 도구', who: '누구나 추천', body: '다른 교육청·공공기관이 만든 쓸 만한 도구를 알림' },
+  { key: 'official', icon: Building2, title: '교육청 배포 도구', who: '정책기획과 빅데이터담당', body: '교육청이 만들거나 고도화해 배포하는 도구' },
+];
 
 export const Register: React.FC<{ initialType?: string }> = ({ initialType }) => {
-  const [type, setType] = useState<RegType>(initialType === 'staff' || initialType === 'external' ? initialType : '');
   const [step, setStep] = useState(0);
-  const [f, setF] = useState<Form>(EMPTY);
+  const [f, setF] = useState<Form>({ ...EMPTY, board: initialType === 'staff' || initialType === 'external' ? initialType : '' });
+  /** 교육청 배포 도구는 운영 부서만 — PoC에서는 시연용으로 켤 수 있음 */
+  const [ops, setOps] = useState(false);
   const [, setSubs] = usePocState<Submission[]>('submissions', []);
   const [sent, setSent] = useState<Submission | null>(null);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
 
   const ok = [
-    f.title.trim() && f.what.trim() && f.purpose && f.targets.length && f.run,
+    f.board && (f.board !== 'external' || f.org.trim()) && f.title.trim() && f.what.trim() && f.purpose && f.targets.length && f.run,
     lines(f.features).length > 0 && lines(f.steps).length > 0 && (f.deliver === 'file' || f.url.trim()),
     f.answers.every((a) => a !== null),
     true,
@@ -223,7 +126,9 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
       at: todayKst(),
       stage: 1,
       checks: QUESTIONS.length - riskCount,
-      board: 'staff',
+      board: f.board || 'staff',
+      org: f.org.trim() || undefined,
+      region: f.region.trim() || undefined,
     };
     setSubs((v) => [s, ...v]);
     setSent(s);
@@ -236,19 +141,13 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
         <PageTitle>도구 등록</PageTitle>
         <div className="mt-8 rounded-[14px] border-2 border-[#9fd5b0] bg-[#f3faf5] p-6 text-center sm:p-10">
           <Check className="mx-auto w-12 h-12 rounded-full bg-[#1f7a3a] p-2.5 text-white" aria-hidden="true" />
-          <h2 className="nr-title mt-4 text-[24px] text-black">{sent.board === 'external' ? '추천 접수 완료' : '등록 신청 완료'}</h2>
-          {sent.board === 'external' ? (
-            <p className="mt-2 text-[15px] text-slate-700">「{sent.title}」 · {sent.org} · 운영자가 확인한 뒤 외부 공공업무 도구로 게재합니다.</p>
-          ) : (
-            <>
-              <p className="mt-2 text-[15px] text-slate-700">
-                「{sent.title}」 v{sent.version} · 자가점검 {sent.checks}/{QUESTIONS.length} 통과
-              </p>
-              <p className="mt-1 text-[14px] text-slate-600">
-                {riskCount ? `확인이 필요한 답 ${riskCount}개는 보안 검토에서 함께 살핍니다.` : '보안 검토를 거쳐 게시됩니다.'}
-              </p>
-            </>
-          )}
+          <h2 className="nr-title mt-4 text-[24px] text-black">등록 신청 완료</h2>
+          <p className="mt-2 text-[15px] text-slate-700">
+            {sourceOf(sent.board).name} · 「{sent.title}」 v{sent.version} · 자가점검 {sent.checks}/{QUESTIONS.length} 통과
+          </p>
+          <p className="mt-1 text-[14px] text-slate-600">
+            {riskCount ? `확인이 필요한 답 ${riskCount}개는 보안 검토에서 함께 살핍니다.` : '보안 검토를 거쳐 게시됩니다.'}
+          </p>
           <p className="mt-1 text-[14px] text-slate-600">진행 상황은 검수 현황에서 볼 수 있습니다.</p>
           <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
             <a href="/review" className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--nr-p1)] px-5 py-3 text-[15px] font-bold text-white hover:bg-[var(--nr-p3)]">
@@ -260,7 +159,6 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
                 setSent(null);
                 setF(EMPTY);
                 setStep(0);
-                setType('');
               }}
               className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-[15px] font-bold text-slate-700"
             >
@@ -274,7 +172,7 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
 
   return (
     <>
-      <PageTitle desc="도구 구분을 먼저 고릅니다. 교직원 제작 도구는 정해진 양식으로 등록해 보안 검토를 거쳐 게시되고, 외부 공공업무 도구는 추천을 받아 운영자가 선정합니다.">
+      <PageTitle desc="세 구분 모두 같은 양식으로 등록하고 같은 절차(자가점검 → 보안 검토 → 게시)를 거칩니다. 그래서 어떤 도구든 소개 화면이 같은 모양으로 나옵니다.">
         도구 등록
       </PageTitle>
       <PocNote className="mt-6">
@@ -287,27 +185,8 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
         를 이용해 주세요.
       </PocNote>
 
-      {type === '' && <TypePicker onPick={setType} />}
-      {type === 'external' && (
-        <ExternalForm
-          onBack={() => setType('')}
-          onDone={(x) => {
-            setSubs((v) => [x, ...v]);
-            setSent(x);
-            window.scrollTo(0, 0);
-          }}
-        />
-      )}
-      {type === 'staff' && (
-      <>
-      <p className="mt-6 flex flex-wrap items-center gap-2 text-[15px] font-bold text-slate-700">
-        <UserRound className="w-4 h-4 text-[var(--nr-p1)]" aria-hidden="true" /> 교직원 제작 도구 등록
-        <button type="button" onClick={() => setType('')} className="text-[13px] font-normal text-slate-500 underline underline-offset-2">
-          구분 다시 고르기
-        </button>
-      </p>
       {/* 단계 표시 */}
-      <ol className="mt-3 grid grid-cols-4 gap-1.5" aria-label="등록 단계">
+      <ol className="mt-6 grid grid-cols-4 gap-1.5" aria-label="등록 단계">
         {STEPS.map(({ t, icon: Icon }, i) => (
           <li key={t}>
             <button
@@ -332,6 +211,65 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
       <div className="mt-6 rounded-[14px] border border-[var(--nr-line)] bg-white p-5 sm:p-7">
         {step === 0 && (
           <div className="space-y-5">
+            <fieldset>
+              <legend className="text-[15px] font-bold text-slate-800">
+                구분 <span className="text-[#d61e49]">*</span>
+              </legend>
+              <p className="text-[13px] text-slate-500">양식과 절차는 같고, 구분에 따라 등록할 수 있는 사람과 책임·문의 창구가 다름</p>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {KINDS.map(({ key, icon: Icon, title, who, body }) => {
+                  const locked = key === 'official' && !ops;
+                  const on = f.board === key;
+                  return (
+                    <div key={key} className={`rounded-[12px] border-2 p-3.5 ${on ? 'border-[var(--nr-p1)] bg-[var(--nr-bg)]' : locked ? 'border-dashed border-[var(--nr-line)] bg-[#fafafa]' : 'border-[var(--nr-line)] bg-white'}`}>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        disabled={locked}
+                        onClick={() => set('board', key)}
+                        className="flex w-full items-start gap-2.5 text-left disabled:cursor-not-allowed"
+                      >
+                        <Icon className={`mt-0.5 w-5 h-5 shrink-0 ${locked ? 'text-slate-400' : 'text-[var(--nr-p1)]'}`} aria-hidden="true" />
+                        <span className="min-w-0">
+                          <span className={`block text-[16px] font-bold ${locked ? 'text-slate-500' : 'text-black'}`}>{title}</span>
+                          <span className="block text-[13px] text-slate-600">{body}</span>
+                          <span className="mt-1 inline-flex items-center gap-1 text-[12px] font-bold text-[var(--nr-p3)]">
+                            {locked && <Lock className="w-3.5 h-3.5" aria-hidden="true" />}
+                            {who}
+                            {key === 'official' && ' 전용'}
+                          </span>
+                        </span>
+                      </button>
+                      {key === 'official' && (
+                        <label className="mt-2 flex items-center gap-1.5 border-t border-slate-200 pt-2 text-[12px] text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={ops}
+                            onChange={(e) => {
+                              setOps(e.target.checked);
+                              if (!e.target.checked && f.board === 'official') set('board', '');
+                            }}
+                            className="accent-[var(--nr-p3)]"
+                          />
+                          운영 부서 계정으로 시연
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
+            {f.board === 'external' && (
+              <div className="grid grid-cols-1 gap-5 rounded-[10px] bg-[#f3faf6] p-4 sm:grid-cols-2">
+                <Field id="f-org" label="제작 기관" need hint="예: 강원특별자치도교육청 ○○학교">
+                  <input id="f-org" value={f.org} onChange={(e) => set('org', e.target.value)} maxLength={40} className={input} />
+                </Field>
+                <Field id="f-region" label="기준 지역" hint="다른 시도 지침 기준이면 · 예: 강원 기준">
+                  <input id="f-region" value={f.region} onChange={(e) => set('region', e.target.value)} maxLength={20} className={input} />
+                </Field>
+              </div>
+            )}
             <Field id="f-title" label="도구 이름" need hint="버전은 다음 단계에서 따로 적습니다">
               <input id="f-title" value={f.title} onChange={(e) => set('title', e.target.value)} maxLength={60} className={input} placeholder="예: 체험학습 버스 좌석 배치" />
             </Field>
@@ -339,7 +277,7 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
               <input id="f-what" value={f.what} onChange={(e) => set('what', e.target.value)} maxLength={45} className={input} placeholder="예: 나이스 명단으로 버스 좌석 배치도와 모둠표 작성" />
               <p className="mt-1 text-right text-[12px] tabular-nums text-slate-400">{f.what.length}/45</p>
             </Field>
-            <Field id="f-why" label="만든 이유" hint="어떤 불편을 줄이는지 · 선택">
+            <Field id="f-why" label={f.board === 'external' ? '추천 이유' : '만든 이유'} hint="어떤 불편을 줄이는지 · 선택">
               <input id="f-why" value={f.why} onChange={(e) => set('why', e.target.value)} maxLength={70} className={input} placeholder="예: 체험학습 때마다 자리를 손으로 짜는 시간 감소" />
             </Field>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -479,7 +417,7 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
             <div className="mt-4 overflow-hidden rounded-[10px] border border-[var(--nr-line)]">
               <div className="border-b border-[var(--nr-line)] px-5 py-5">
                 <div className="flex flex-wrap gap-1.5 text-[12px] font-bold">
-                  <span className="rounded-md bg-[#dcefff] px-2 py-0.5 text-[#0a62a8]">교직원 제작</span>
+                  <SourceTag board={f.board || 'staff'} />
                   <span className="rounded-md bg-[#f1f3f6] px-2 py-0.5 text-slate-700">{f.purpose}</span>
                   <span className="rounded-md bg-[#f1f3f6] px-2 py-0.5 text-slate-700">적용기관 {f.targets.length === TARGETS.length ? '전체' : f.targets.join(',')}</span>
                   <span className="rounded-full bg-[var(--nr-p2)] px-2.5 py-0.5 text-white">{f.run}</span>
@@ -542,8 +480,6 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
         </div>
         {!ok[step] && step < 3 && <p className="mt-2 text-right text-[13px] text-slate-500">* 표시 항목을 채우면 다음으로 넘어갈 수 있음</p>}
       </div>
-      </>
-      )}
     </>
   );
 };

@@ -118,7 +118,19 @@ export function useRoute(): Route {
       first.current = false;
       return;
     }
-    window.scrollTo(0, 0);
+    // '/poc#upgrade' 같은 구획 주소는 그 구획으로, 나머지는 맨 위로
+    const h = window.location.hash;
+    const el = h && !h.startsWith('#/') ? document.getElementById(decodeURIComponent(h.slice(1))) : null;
+    if (el) el.scrollIntoView();
+    else window.scrollTo(0, 0);
   }, [r]);
   return r;
+}
+
+/** 화면을 새로 열었을 때 '#구획' 주소면 그 구획으로 — 자료가 늦게 와서 첫 그리기 뒤에 맞춤 */
+export function useHashScroll() {
+  useEffect(() => {
+    const h = window.location.hash;
+    if (h && !h.startsWith('#/')) document.getElementById(decodeURIComponent(h.slice(1)))?.scrollIntoView();
+  }, []);
 }
