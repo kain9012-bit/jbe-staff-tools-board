@@ -128,7 +128,38 @@ export const ToolTable: React.FC<{
   /** 댓글을 모으지 않는 목록(교육청 배포 도구)에서 댓글 칸 숨김 */
   noComments?: boolean;
 }> = ({ rows, today, startNo, extra, noComments }) => (
-  <div className="overflow-x-auto">
+  <>
+  {/* 모바일 — 표 대신 한 줄 목록 */}
+  <ol className="md:hidden border-t-2 border-[var(--nr-dark)]">
+    {rows.map((t, i) => {
+      const ex = extra?.(t);
+      return (
+        <li key={t.sid} className="border-b border-[var(--nr-line)]">
+          <a href={hrefTool(t.sid)} className="flex items-center gap-3 px-1 py-3 active:bg-[#fafcff]">
+            <span className="w-7 shrink-0 text-center tabular-nums text-[15px] text-slate-500">{startNo + i}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold leading-snug text-black line-clamp-2">
+                {isNewTool(t, today) && (
+                  <span className="mr-1.5 rounded bg-[#d61e49] px-1.5 py-px text-[11px] font-bold text-white align-[2px]">NEW</span>
+                )}
+                {t.title}
+              </span>
+              <span className="mt-0.5 block truncate text-[13px] text-slate-500">
+                <SourceTag board={t.board} className="mr-1.5 align-[1px] !px-1.5 !py-0 !text-[11px]" />
+                <span className="text-[var(--nr-p3)]">{t.purpose}</span>
+                {t.board !== 'official' && <> · {t.author}</>}
+              </span>
+            </span>
+            <span className="shrink-0 text-right">
+              <span className="block tabular-nums font-bold text-[var(--nr-p3)]">{ex ? ex.value : `+${n(t.recent30)}`}</span>
+              <span className="block tabular-nums text-[12px] text-slate-500">누적 {n(t.views)}</span>
+            </span>
+          </a>
+        </li>
+      );
+    })}
+  </ol>
+  <div className="hidden md:block overflow-x-auto">
     <table className="w-full min-w-[720px] table-fixed border-t-2 border-[var(--nr-dark)] text-[15px]">
       <caption className="sr-only">도구 목록</caption>
       <thead className="bg-[var(--nr-bg)]">
@@ -184,6 +215,7 @@ export const ToolTable: React.FC<{
       </tbody>
     </table>
   </div>
+  </>
 );
 
 /** 댓글 한 건 */

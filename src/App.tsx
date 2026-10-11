@@ -28,6 +28,25 @@ const Skeleton = () => (
 
 const SERVICE = '업무경감 도구 모음';
 
+/** 모바일 하위 메뉴 — PC는 왼쪽 메뉴에 있으므로 좁은 화면에서만 보임 */
+const SubTabs: React.FC<{ items: LnbSub[] }> = ({ items }) => (
+  <nav aria-label="하위 메뉴" className="lg:hidden mb-5 grid grid-flow-col auto-cols-fr rounded-[10px] bg-[var(--nr-bg)] p-1">
+    {items.map((it) => (
+      <a
+        key={it.href}
+        href={it.href}
+        aria-current={it.on ? 'page' : undefined}
+        className={`rounded-[8px] px-2 py-2.5 text-center text-[15px] font-bold ${
+          it.on ? 'bg-[var(--nr-p2)] text-white shadow-sm' : 'text-slate-600'
+        }`}
+      >
+        {it.label}
+        {it.count !== undefined && <span className={`ml-1 text-[13px] font-medium ${it.on ? 'text-white/80' : 'text-slate-400'}`}>{it.count}</span>}
+      </a>
+    ))}
+  </nav>
+);
+
 export default function App() {
   const route = useRoute();
   const { state, reload } = useData();
@@ -122,6 +141,13 @@ export default function App() {
         </>
       );
     else if (route.page === 'official') body = <OfficialStats m={m} />;
+    if (body && (route.page === 'makers' || route.page === 'official') && subs.makers && subs.makers.length > 1)
+      body = (
+        <>
+          <SubTabs items={subs.makers} />
+          {body}
+        </>
+      );
     else if (route.page === 'tool') body = <ToolDetail m={m} sid={route.sid} />;
     else if (route.page === 'maker') body = <MakerDetail m={m} name={route.name} />;
   }
