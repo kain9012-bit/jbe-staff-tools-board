@@ -41,7 +41,7 @@ export const SOURCES: SourceInfo[] = [
     resp: '제작자가 관리, 사용 전 내용 확인',
     ask: '제작자(질문과 답변)',
     register: { href: '/register?type=staff', label: '내 도구 등록하기' },
-    // 많이 쓰이는 도구는 고도화 후보 → 교육청 배포 도구로 전환
+    // 사업부서 협의 등 여러 조건을 갖춘 도구는 고도화를 거쳐 교육청 배포 도구로 전환될 수 있음
   },
   {
     key: 'external',

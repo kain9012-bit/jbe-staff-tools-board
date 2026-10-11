@@ -6,8 +6,7 @@ import { Badge, Card, EmptyState, Stat } from '../components/Ui';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { allTools, dayLabel, modelOf, n, type Model, type ToolStat } from '../lib/stats';
 import { summaryOf, type ToolSummary } from '../lib/summaries';
-import { ReactionPanel, TrustPanel, UpgradePanel, VersionPanel } from '../components/ToolPoc';
-import { UPGRADE_RULE, upgradeCandidates } from '../lib/upgrade';
+import { ReactionPanel, TrustPanel, VersionPanel } from '../components/ToolPoc';
 
 /** 한눈에 보기 — 원 게시글을 정해진 항목으로 짧게 정리한 요약. 본문 자체는 싣지 않음 */
 const SummaryBox: React.FC<{ s?: ToolSummary; url: string }> = ({ s, url }) => {
@@ -156,7 +155,6 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
     );
   }
   const comments = m.comments.filter((c) => c.sid === sid);
-  const rankUp = upgradeCandidates(m).findIndex((x) => x.sid === sid) + 1;
   /** 교육청 배포 도구는 작성자가 모두 같아 제작자별 묶음을 보이지 않음 */
   const siblings = single ? [] : m.makers.find((x) => x.name === t.author)?.tools.filter((x) => x.sid !== sid) ?? [];
   const chips = KEYWORD_CHIPS.filter((c) => chipMatcher(c)(...chipFields(t)));
@@ -216,7 +214,6 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         <TrustPanel t={t} s={summaryOf(sid)} />
         <VersionPanel t={t} />
       </div>
-      <UpgradePanel t={t} candidate={rankUp > 0} rank={rankUp || undefined} rule={UPGRADE_RULE} />
       <ReactionPanel t={t} />
 
       {/* 3. 질문과 답변 — 교육청 배포 도구는 댓글을 모으지 않아 게시판으로 안내 */}

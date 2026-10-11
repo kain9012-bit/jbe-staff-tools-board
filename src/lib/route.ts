@@ -118,7 +118,7 @@ export function useRoute(): Route {
       first.current = false;
       return;
     }
-    // '/poc#upgrade' 같은 구획 주소는 그 구획으로, 나머지는 맨 위로
+    // '/review#up-h' 같은 구획 주소는 그 구획으로, 나머지는 맨 위로
     const h = window.location.hash;
     const el = h && !h.startsWith('#/') ? document.getElementById(decodeURIComponent(h.slice(1))) : null;
     if (el) el.scrollIntoView();

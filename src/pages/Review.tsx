@@ -32,13 +32,13 @@ const STAGE_INFO = [
 
 /** 고도화 진행 예시 — 실제 진행 중인 도구가 아님 */
 const UPGRADES = [
-  { id: 'u1', title: '(예시) 교직원 제작 출결 집계 도구', maker: '○○초 교사', stage: 0, note: '최근 3개월 조회 상위 · 관련 요청 공감 28' },
+  { id: 'u1', title: '(예시) 교직원 제작 출결 집계 도구', maker: '○○초 교사', stage: 0, note: '사업부서(○○과) 협의 · 적용 범위 검토 중' },
   { id: 'u2', title: '(예시) 교직원 제작 계약 서류 점검표', maker: '○○고 행정실', stage: 1, note: '제작자 동의 요청 · 원작 표시 협의' },
   { id: 'u3', title: '(예시) 교직원 제작 물품 대장 정리기', maker: '○○중 행정실', stage: 2, note: '보안 보강 · 설치형 → 웹 전환' },
   { id: 'u4', title: '(예시) 교직원 제작 수신자 그룹 등록기', maker: '○○지원청 주무관', stage: 3, note: '교육청 배포 도구로 전환 · 후기·조회수 이어받음' },
 ];
 const UPGRADE_INFO = [
-  { icon: Sparkles, desc: '조회수·써봤어요·후기·요청 공감으로 후보 선정' },
+  { icon: Sparkles, desc: '사업부서 협의 · 업무 범위·지침 부합·유지보수 가능성 등 검토. 활용도 자료는 참고' },
   { icon: Handshake, desc: '제작자 동의 · 원작 표시 · 공동 개발 여부' },
   { icon: Wrench, desc: '정책기획과가 보안·기능 보강, 버전 올림' },
   { icon: Rocket, desc: '구분을 교육청 배포로 바꿈 · 같은 도구 화면 유지' },
@@ -164,7 +164,7 @@ export const Review: React.FC = () => {
           <PocTag />
         </div>
         <p className="mt-1 text-[14px] text-slate-600">
-          많이 쓰이는 교직원 제작 도구를 정책기획과가 다듬어 교육청 배포 도구로 전환. 도구 화면·주소·후기·조회수는 그대로 이어지고 구분과 책임 주체만 바뀜
+          교직원 제작 도구 중 사업부서와 협의해 여러 조건을 갖춘 도구를 정책기획과가 다듬어 교육청 배포 도구로 전환. 조회수·후기는 참고 자료일 뿐 선정 기준이 아님. 전환 뒤에도 도구 화면·주소·후기·조회수는 그대로 이어지고 구분과 책임 주체만 바뀜
         </p>
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {UPGRADE_STAGES.map((name, i) => {
@@ -186,13 +186,6 @@ export const Review: React.FC = () => {
             );
           })}
         </div>
-        <p className="mt-3 text-[14px] text-slate-600">
-          지금 기준을 충족하는 실제 후보는{' '}
-          <a href="/poc#upgrade" className="font-bold text-[var(--nr-p3)] underline underline-offset-2">
-            개편 안내
-          </a>
-          에서 볼 수 있습니다.
-        </p>
       </section>
 
       {/* 검수 기준 */}

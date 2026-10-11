@@ -98,4 +98,4 @@ export interface Submission {
 export const STAGES = ['등록 신청', '자가점검', '보안 검토', '게시'] as const;
 
 /** 고도화 — 교직원 제작 도구를 교육청이 다듬어 교육청 배포 도구로 전환 */
-export const UPGRADE_STAGES = ['고도화 후보', '제작자 동의', '고도화 개발', '교육청 배포 전환'] as const;
+export const UPGRADE_STAGES = ['고도화 검토', '제작자 동의', '고도화 개발', '교육청 배포 전환'] as const;

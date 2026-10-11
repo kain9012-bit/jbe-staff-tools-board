@@ -6,7 +6,6 @@ import { useHashScroll } from '../lib/route';
 import { allTools, n, sum, type Model } from '../lib/stats';
 import { summaryOf } from '../lib/summaries';
 import { SOURCES } from '../lib/sources';
-import { UPGRADE_RULE, upgradeCandidates } from '../lib/upgrade';
 
 /**
  * 개편 안내 — 데이터 도구실을 게시판 3개에서 하나의 플랫폼으로 바꾸는 PoC의 취지와 화면 안내.
@@ -52,7 +51,7 @@ const PILLARS = [
     icon: Sparkles,
     title: '고도화 → 교육청 배포 전환',
     now: ['많이 쓰이는 교직원 제작 도구를 키울 근거·절차가 없음', '제작자가 전보·휴직하면 도구 관리가 멈춤'],
-    next: ['조회수·써봤어요·후기·요청 공감으로 고도화 후보 선정', '제작자 동의 → 정책기획과 고도화 → 교육청 배포로 전환', "전환해도 같은 도구 화면 유지, '원작' 표시", '유지보수·문의는 교육청이 이어받음'],
+    next: ['활용도 자료(조회수·후기·요청)는 참고만, 사업부서 협의와 여러 조건을 거쳐 고도화 대상 결정', '제작자 동의 → 정책기획과 고도화 → 교육청 배포로 전환', "전환해도 같은 도구 화면 유지, '원작' 표시", '유지보수·문의는 교육청이 이어받음'],
     links: [['고도화 진행', '/review#up-h']],
   },
 ];
@@ -65,7 +64,6 @@ export const PocGuide: React.FC<{ m: Model }> = ({ m }) => {
   const off = m.official?.tools ?? [];
   const ext = m.external?.tools ?? [];
   const versioned = all.filter((t) => versionOf(t.title)).length;
-  const cands = upgradeCandidates(m);
   const summarized = all.filter((t) => summaryOf(t.sid)).length;
   const sample = [...all].filter((t) => summaryOf(t.sid) && versionOf(t.title)).sort((a, b) => b.recent30 - a.recent30)[0];
   const links = PILLARS.map((p) => (p.title === '버전·업데이트 관리' && sample ? { ...p, links: [['도구 상세 예시', `/tool/${sample.sid}`]] } : p));
@@ -251,34 +249,6 @@ export const PocGuide: React.FC<{ m: Model }> = ({ m }) => {
         </p>
       </section>
 
-      {/* 고도화 후보 — 실제 조회수로 계산 */}
-      <section id="upgrade" className="mt-12 scroll-mt-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="nr-title text-[24px] text-black">지금 고도화 후보</h2>
-          <PocTag label="실제 조회수 기준" />
-        </div>
-        <p className="mt-1 text-[15px] text-slate-600">
-          PoC 기준: {UPGRADE_RULE}. 개편 후에는 써봤어요·후기 평점·관련 요청 공감을 함께 봄. 후보가 곧 전환 대상은 아니며 제작자 동의가 먼저임
-        </p>
-        <ol className="mt-4 divide-y divide-[var(--nr-line)] rounded-[12px] border border-[var(--nr-line)] bg-white">
-          {cands.map((t, i) => (
-            <li key={t.sid}>
-              <a href={`/tool/${t.sid}`} className="group flex items-center gap-3 px-4 py-3 hover:bg-[#fffaf0]">
-                <span className="nr-title w-6 shrink-0 text-center text-[20px] text-[#e0a800]">{i + 1}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-bold text-black group-hover:text-[var(--nr-p3)]">{t.title}</span>
-                  <span className="block truncate text-[13px] text-slate-500">원작 {t.author}</span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-bold tabular-nums text-[var(--nr-p3)]">+{n(t.recent30)}</span>
-                  <span className="block text-[12px] text-slate-500">최근 30일</span>
-                </span>
-              </a>
-            </li>
-          ))}
-        </ol>
-      </section>
-
       {/* 실제와 예시 */}
       <section className="mt-12">
         <h2 className="nr-title text-[24px] text-black">이 PoC에서 실제인 것과 예시인 것</h2>
@@ -302,7 +272,7 @@ export const PocGuide: React.FC<{ m: Model }> = ({ m }) => {
               <li>등록 양식·자가점검·검수 단계</li>
               <li>써봤어요·후기·업데이트 알림</li>
               <li>검수 정보의 '미확인' 항목</li>
-              <li>고도화 진행 단계(후보 선정만 실제 조회수 기준)</li>
+              <li>고도화 진행 단계</li>
               <li>누른 기록은 이 브라우저에만 저장, 서버에 남지 않음</li>
             </ul>
           </div>

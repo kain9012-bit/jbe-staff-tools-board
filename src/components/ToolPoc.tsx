@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, BellRing, CheckCircle2, CircleDashed, GitCommitVertical, ShieldCheck, Sparkles, Star, ThumbsUp } from 'lucide-react';
+import { Bell, BellRing, CheckCircle2, CircleDashed, GitCommitVertical, ShieldCheck, Star, ThumbsUp } from 'lucide-react';
 import type { ToolStat } from '../lib/stats';
 import { dayLabel } from '../lib/stats';
 import type { ToolSummary } from '../lib/summaries';
@@ -231,42 +231,3 @@ export const ReactionPanel: React.FC<{ t: ToolStat }> = ({ t }) => {
   );
 };
 
-/**
- * 고도화 — 교직원 제작 도구가 교육청 배포 도구로 전환되는 길.
- * 후보 여부는 실제 조회수로 계산, 그다음 단계는 개편 후 운영 절차
- */
-export const UpgradePanel: React.FC<{ t: ToolStat; candidate: boolean; rank?: number; rule: string }> = ({ t, candidate, rank, rule }) => {
-  if ((t.board ?? 'staff') !== 'staff') return null;
-  const steps = ['고도화 후보', '제작자 동의', '고도화 개발', '교육청 배포 전환'];
-  return (
-    <section className={`mt-4 rounded-[10px] border p-5 ${candidate ? 'border-[#f0c36a] bg-[#fffaf0]' : 'border-[var(--nr-line)] bg-white'}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-[18px] font-bold text-black">
-          <Sparkles className="w-5 h-5 text-[#e0a800]" aria-hidden="true" /> 고도화
-          {candidate && <span className="rounded-full bg-[#e0a800] px-2.5 py-0.5 text-[12px] font-bold text-white">고도화 후보{rank ? ` ${rank}위` : ''}</span>}
-        </h2>
-        <PocTag />
-      </div>
-      <p className="mt-2 text-[14px] text-slate-700">
-        {candidate
-          ? `${rule}에 들어 교육청 배포 도구 전환을 검토할 수 있는 도구`
-          : `많이 쓰이는 교직원 제작 도구는 정책기획과가 다듬어 교육청 배포 도구로 전환함 · 후보 기준: ${rule}`}
-      </p>
-      <ol className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-        {steps.map((s, i) => (
-          <li
-            key={s}
-            className={`rounded-lg px-3 py-2 text-center text-[13px] font-bold ${
-              candidate && i === 0 ? 'bg-[#e0a800] text-white' : 'bg-white text-slate-500 ring-1 ring-inset ring-[var(--nr-line)]'
-            }`}
-          >
-            {i + 1}. {s}
-          </li>
-        ))}
-      </ol>
-      <p className="mt-3 text-[13px] text-slate-600">
-        전환되면 구분이 교육청 배포로 바뀌고 '원작 {t.author}'이 표시됨. 도구 화면·주소·후기·조회수는 그대로 이어지고, 유지보수와 문의는 정책기획과가 맡음
-      </p>
-    </section>
-  );
-};
