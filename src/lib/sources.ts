@@ -16,6 +16,8 @@ export interface SourceInfo {
   ask: string; // 문의 창구
   /** 등록 화면 — 없으면 일반 사용자 등록 불가 */
   register?: { href: string; label: string };
+  /** 일반 사용자가 등록할 수 없을 때 안내 */
+  tip?: { href: string; label: string };
 }
 
 export const SOURCES: SourceInfo[] = [
@@ -45,12 +47,12 @@ export const SOURCES: SourceInfo[] = [
     key: 'external',
     name: '외부 공공업무 도구',
     desc: '다른 교육청·공공기관 공무원이 만든 도구 중 우리 업무에 도움이 되는 도구',
-    who: '누구나 추천',
+    who: '정책기획과 빅데이터담당',
     how: '공통 등록 양식 + 제작 기관·기준 지역',
     review: '공통 절차(자가점검 → 보안 검토 → 게시)',
     resp: '사용자가 지역 지침과 맞는지 확인',
     ask: '제작 기관',
-    register: { href: '/register?type=external', label: '외부 도구 추천하기' },
+    tip: { href: '/requests', label: '알리고 싶은 외부 도구는 도구 요청으로' },
   },
 ];
 

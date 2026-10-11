@@ -63,7 +63,14 @@ const SourceIntro: React.FC<{ src: Board }> = ({ src }) => {
             {x.register.label}
           </a>
         ) : (
-          <span className="shrink-0 rounded-lg bg-[#f1f3f6] px-4 py-2.5 text-[13px] font-bold text-slate-500">{x.who} 전용 등록</span>
+          <span className="flex shrink-0 flex-col items-end gap-1">
+            <span className="rounded-lg bg-[#f1f3f6] px-4 py-2.5 text-[13px] font-bold text-slate-500">{x.who} 전용 등록</span>
+            {x.tip && (
+              <a href={x.tip.href} className="text-[13px] font-bold text-[var(--nr-p3)] underline underline-offset-2">
+                {x.tip.label}
+              </a>
+            )}
+          </span>
         )}
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px] lg:grid-cols-4">

@@ -93,13 +93,13 @@ type Kind = 'staff' | 'external' | 'official';
 /** 구분 고르기 — 양식·절차는 같고, 누가 등록할 수 있는지만 다름 */
 const KINDS: { key: Kind; icon: typeof UserRound; title: string; who: string; body: string }[] = [
   { key: 'staff', icon: UserRound, title: '교직원 제작 도구', who: '교직원 누구나', body: '내가 만든 도구를 동료와 나눔' },
-  { key: 'external', icon: Globe2, title: '외부 공공업무 도구', who: '누구나 추천', body: '다른 교육청·공공기관이 만든 쓸 만한 도구를 알림' },
+  { key: 'external', icon: Globe2, title: '외부 공공업무 도구', who: '정책기획과 빅데이터담당', body: '다른 교육청·공공기관이 만든 쓸 만한 도구를 선정해 알림' },
   { key: 'official', icon: Building2, title: '교육청 배포 도구', who: '정책기획과 빅데이터담당', body: '교육청이 만들거나 고도화해 배포하는 도구' },
 ];
 
-export const Register: React.FC<{ initialType?: string }> = ({ initialType }) => {
+export const Register: React.FC<{ initialType?: string }> = () => {
   const [step, setStep] = useState(0);
-  const [f, setF] = useState<Form>({ ...EMPTY, board: initialType === 'staff' || initialType === 'external' ? initialType : '' });
+  const [f, setF] = useState<Form>({ ...EMPTY, board: 'staff' });
   /** 교육청 배포 도구는 운영 부서만 — PoC에서는 시연용으로 켤 수 있음 */
   const [ops, setOps] = useState(false);
   const [, setSubs] = usePocState<Submission[]>('submissions', []);
@@ -172,7 +172,7 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
 
   return (
     <>
-      <PageTitle desc="세 구분 모두 같은 양식으로 등록하고 같은 절차(자가점검 → 보안 검토 → 게시)를 거칩니다. 그래서 어떤 도구든 소개 화면이 같은 모양으로 나옵니다.">
+      <PageTitle desc="혼자 쓰던 업무도구, 동료와 나눠 주세요. 정해진 양식으로 등록하면 보안 검토를 거쳐 게시되고, 등록한 내용이 그대로 도구 소개 화면이 됩니다.">
         도구 등록
       </PageTitle>
       <PocNote className="mt-6">
@@ -185,8 +185,21 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
         를 이용해 주세요.
       </PocNote>
 
+      {/* 운영 부서 화면 시연 — 일반 교직원 화면에는 교직원 제작 도구 등록만 보임 */}
+      <label className="mt-4 flex items-center justify-end gap-1.5 text-[13px] text-slate-500">
+        <input
+          type="checkbox"
+          checked={ops}
+          onChange={(e) => {
+            setOps(e.target.checked);
+            if (!e.target.checked) set('board', 'staff');
+          }}
+          className="accent-[var(--nr-p3)]"
+        />
+        운영 부서 계정으로 보기 (PoC 시연)
+      </label>
       {/* 단계 표시 */}
-      <ol className="mt-6 grid grid-cols-4 gap-1.5" aria-label="등록 단계">
+      <ol className="mt-2 grid grid-cols-4 gap-1.5" aria-label="등록 단계">
         {STEPS.map(({ t, icon: Icon }, i) => (
           <li key={t}>
             <button
@@ -211,55 +224,47 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
       <div className="mt-6 rounded-[14px] border border-[var(--nr-line)] bg-white p-5 sm:p-7">
         {step === 0 && (
           <div className="space-y-5">
-            <fieldset>
-              <legend className="text-[15px] font-bold text-slate-800">
-                구분 <span className="text-[#d61e49]">*</span>
-              </legend>
-              <p className="text-[13px] text-slate-500">양식과 절차는 같고, 구분에 따라 등록할 수 있는 사람과 책임·문의 창구가 다름</p>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {KINDS.map(({ key, icon: Icon, title, who, body }) => {
-                  const locked = key === 'official' && !ops;
-                  const on = f.board === key;
-                  return (
-                    <div key={key} className={`rounded-[12px] border-2 p-3.5 ${on ? 'border-[var(--nr-p1)] bg-[var(--nr-bg)]' : locked ? 'border-dashed border-[var(--nr-line)] bg-[#fafafa]' : 'border-[var(--nr-line)] bg-white'}`}>
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        disabled={locked}
-                        onClick={() => set('board', key)}
-                        className="flex w-full items-start gap-2.5 text-left disabled:cursor-not-allowed"
-                      >
-                        <Icon className={`mt-0.5 w-5 h-5 shrink-0 ${locked ? 'text-slate-400' : 'text-[var(--nr-p1)]'}`} aria-hidden="true" />
-                        <span className="min-w-0">
-                          <span className={`block text-[16px] font-bold ${locked ? 'text-slate-500' : 'text-black'}`}>{title}</span>
-                          <span className="block text-[13px] text-slate-600">{body}</span>
-                          <span className="mt-1 inline-flex items-center gap-1 text-[12px] font-bold text-[var(--nr-p3)]">
-                            {locked && <Lock className="w-3.5 h-3.5" aria-hidden="true" />}
-                            {who}
-                            {key === 'official' && ' 전용'}
+            {ops ? (
+              <fieldset>
+                <legend className="text-[15px] font-bold text-slate-800">
+                  구분 <span className="text-[#d61e49]">*</span>
+                </legend>
+                <p className="text-[13px] text-slate-500">양식과 절차는 같고, 구분에 따라 등록할 수 있는 사람과 책임·문의 창구가 다름</p>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {KINDS.map(({ key, icon: Icon, title, who, body }) => {
+                    const locked = key !== 'staff' && !ops;
+                    const on = f.board === key;
+                    return (
+                      <div key={key} className={`rounded-[12px] border-2 p-3.5 ${on ? 'border-[var(--nr-p1)] bg-[var(--nr-bg)]' : locked ? 'border-dashed border-[var(--nr-line)] bg-[#fafafa]' : 'border-[var(--nr-line)] bg-white'}`}>
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          disabled={locked}
+                          onClick={() => set('board', key)}
+                          className="flex w-full items-start gap-2.5 text-left disabled:cursor-not-allowed"
+                        >
+                          <Icon className={`mt-0.5 w-5 h-5 shrink-0 ${locked ? 'text-slate-400' : 'text-[var(--nr-p1)]'}`} aria-hidden="true" />
+                          <span className="min-w-0">
+                            <span className={`block text-[16px] font-bold ${locked ? 'text-slate-500' : 'text-black'}`}>{title}</span>
+                            <span className="block text-[13px] text-slate-600">{body}</span>
+                            <span className="mt-1 inline-flex items-center gap-1 text-[12px] font-bold text-[var(--nr-p3)]">
+                              {locked && <Lock className="w-3.5 h-3.5" aria-hidden="true" />}
+                              {who}
+                              {key !== 'staff' && ' 전용'}
+                            </span>
                           </span>
-                        </span>
-                      </button>
-                      {key === 'official' && (
-                        <label className="mt-2 flex items-center gap-1.5 border-t border-slate-200 pt-2 text-[12px] text-slate-600">
-                          <input
-                            type="checkbox"
-                            checked={ops}
-                            onChange={(e) => {
-                              setOps(e.target.checked);
-                              if (!e.target.checked && f.board === 'official') set('board', '');
-                            }}
-                            className="accent-[var(--nr-p3)]"
-                          />
-                          운영 부서 계정으로 시연
-                        </label>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </fieldset>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ) : (
+              <p className="flex items-center gap-2 rounded-[10px] bg-[var(--nr-bg)] px-4 py-3 text-[15px] font-bold text-[var(--nr-p2)]">
+                <UserRound className="w-5 h-5 text-[var(--nr-p1)]" aria-hidden="true" /> 교직원 제작 도구 등록
+              </p>
+            )}
             {f.board === 'external' && (
               <div className="grid grid-cols-1 gap-5 rounded-[10px] bg-[#f3faf6] p-4 sm:grid-cols-2">
                 <Field id="f-org" label="제작 기관" need hint="예: 강원특별자치도교육청 ○○학교">
@@ -277,7 +282,7 @@ export const Register: React.FC<{ initialType?: string }> = ({ initialType }) =>
               <input id="f-what" value={f.what} onChange={(e) => set('what', e.target.value)} maxLength={45} className={input} placeholder="예: 나이스 명단으로 버스 좌석 배치도와 모둠표 작성" />
               <p className="mt-1 text-right text-[12px] tabular-nums text-slate-400">{f.what.length}/45</p>
             </Field>
-            <Field id="f-why" label={f.board === 'external' ? '추천 이유' : '만든 이유'} hint="어떤 불편을 줄이는지 · 선택">
+            <Field id="f-why" label={f.board === 'external' ? '선정 이유' : '만든 이유'} hint="어떤 불편을 줄이는지 · 선택">
               <input id="f-why" value={f.why} onChange={(e) => set('why', e.target.value)} maxLength={70} className={input} placeholder="예: 체험학습 때마다 자리를 손으로 짜는 시간 감소" />
             </Field>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
