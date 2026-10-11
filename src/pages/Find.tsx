@@ -346,8 +346,8 @@ export const Find: React.FC<{
 
       {tab === 'work' && (
         <section id="panel-work" role="tabpanel" aria-labelledby="tab-work" className="mt-6">
-          <p className="text-[14px] text-slate-500">도구 이름과 요약에 든 낱말로 묶음 · 누르면 전체 도구에서 그 업무만 보여 줌</p>
-          <ul className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
+          <SectionHead id="by-work" title="업무별로 둘러보기" note="도구 이름과 요약에 든 낱말로 묶음" />
+          <ul className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
             {tiles.map((c) => (
               <li key={c.label}>
                 <button
