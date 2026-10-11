@@ -204,9 +204,10 @@ export const Find: React.FC<{
   };
 
   const byRecent = useMemo(() => [...everything].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views), [m]);
-  const popular = byRecent.slice(0, 4);
+  const popular = byRecent.slice(0, 5);
+  const [pick, setPick] = useState<'popular' | 'fresh'>('popular');
   const fresh = useMemo(
-    () => [...everything].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 4),
+    () => [...everything].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 5),
     [everything],
   );
   const tiles = useMemo(
@@ -307,95 +308,111 @@ export const Find: React.FC<{
         </div>
       </section>
 
-      {!filtered && (
-        <>
-          {/* 2. 업무별로 둘러보기 */}
-          <section aria-labelledby="by-work" className="mt-12">
-            <SectionHead id="by-work" title="업무별로 둘러보기" note="도구 이름과 요약에 든 낱말로 묶음" />
-            <ul className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
-              {tiles.map((c) => (
-                <li key={c.label}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setChip(c.label);
-                      toResults();
-                    }}
-                    className="group flex h-full w-full flex-col rounded-[14px] border border-[var(--nr-line)] bg-white p-4 sm:p-5 text-left transition hover:border-[var(--nr-p3)] hover:shadow-[0_6px_20px_rgba(28,100,172,0.12)]"
-                  >
-                    <span className="flex w-full flex-wrap items-center justify-between gap-1">
-                      <span className="text-[16px] sm:text-[18px] font-bold text-black group-hover:text-[var(--nr-p3)]">{c.label}</span>
-                      <span className="rounded-full bg-[var(--nr-bg)] px-2.5 py-0.5 text-[13px] font-bold tabular-nums text-[var(--nr-p3)]">{c.count}개</span>
-                    </span>
-                    <span className="mt-3 hidden sm:block w-full space-y-1 text-[14px] text-slate-600">
-                      {c.top.map((t) => (
-                        <span key={t.sid} className="block truncate">
-                          · {t.title}
-                        </span>
-                      ))}
-                    </span>
-                    <span className="mt-3 hidden sm:inline-flex items-center gap-1 text-[13px] font-bold text-[var(--nr-p3)]">
-                      모두 보기 <ArrowRight className="w-3.5 h-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+      {/* 2. 업무별 바로가기 — 한두 줄 버튼. 누르면 아래 전체 도구가 그 업무로 걸러짐 */}
+      <nav aria-label="업무별로 둘러보기" className="mt-5">
+        <p className="mb-2 text-[14px] font-bold text-slate-700">
+          업무별로 둘러보기 <span className="font-normal text-slate-500">· 도구 이름과 요약에 든 낱말로 묶음</span>
+        </p>
+        <ul className="-mx-1 flex gap-1.5 overflow-x-auto no-scrollbar px-1 pb-1 sm:flex-wrap sm:overflow-visible">
+          {tiles.map((c) => {
+            const on = chip === c.label;
+            return (
+              <li key={c.label} className="shrink-0">
+                <button
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => {
+                    setChip(on ? '' : c.label);
+                    toResults();
+                  }}
+                  className={`rounded-full border px-3.5 py-2 text-[15px] ${
+                    on ? 'border-[var(--nr-p3)] bg-[var(--nr-p3)] font-bold text-white' : 'border-[var(--nr-line)] bg-white text-slate-800 hover:border-[var(--nr-p3)] hover:text-[var(--nr-p3)]'
+                  }`}
+                >
+                  {c.label} <span className={`tabular-nums text-[13px] ${on ? 'text-white/80' : 'text-[var(--nr-p3)]'}`}>{c.count}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
-          {/* 3. 요즘 많이 찾는 도구 · 새로 올라온 도구 */}
-          <div className="mt-12 grid grid-cols-1 gap-10 min-[1600px]:grid-cols-2">
-            <section aria-labelledby="popular-h">
-              <SectionHead id="popular-h" title="요즘 많이 찾는 도구" note="최근 30일 조회수" />
-              <ol className="mt-4 divide-y divide-[var(--nr-line)] rounded-[14px] border border-[var(--nr-line)] bg-white">
-                {popular.map((t, i) => (
-                  <li key={t.sid} className="flex items-center gap-4 px-5 py-4">
-                    <span className="nr-title w-6 shrink-0 text-center text-[24px] text-[var(--nr-p1)]">{i + 1}</span>
-                    <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
-                      <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
-                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
-                        <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
-                        {t.board === 'official' ? '교육청 배포 게시판' : t.board === 'external' ? `외부 기관 · ${t.kind ?? ''}` : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`}
-                      </span>
-                    </a>
-                    <span className="hidden sm:inline-flex shrink-0 items-center gap-1 text-[14px] font-bold tabular-nums text-[var(--nr-p3)]">
-                      <TrendingUp className="w-4 h-4" aria-hidden="true" />+{n(t.recent30)}
-                    </span>
-                    <a href={t.url} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-[var(--nr-p1)] px-3.5 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]">
-                      사용하기<span className="sr-only">(새 창)</span>
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            </section>
-            <section aria-labelledby="fresh-h">
-              <SectionHead id="fresh-h" title="새로 올라온 도구" note="게시일 순" />
-              <ol className="mt-4 divide-y divide-[var(--nr-line)] rounded-[14px] border border-[var(--nr-line)] bg-white">
-                {fresh.map((t) => (
-                  <li key={t.sid} className="flex items-center gap-4 px-5 py-4">
-                    <Sparkles className="w-5 h-5 shrink-0 text-[#e0a800]" aria-hidden="true" />
-                    <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
-                      <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
-                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
-                        <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
-                        {t.board === 'staff' || !t.board ? `${splitAuthor(t.author).person} · ` : ''}
-                        {shortDay(t.created)} 게시
-                      </span>
-                    </a>
-                    {isNewTool(t, today) && <span className="shrink-0 rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>}
-                    <a href={t.url} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-[var(--nr-p1)] px-3.5 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]">
-                      사용하기<span className="sr-only">(새 창)</span>
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            </section>
+      {/* 3. 요즘 많이 찾는 도구 · 새로 올라온 도구 — 같은 모양 목록이라 탭 하나로 */}
+      {!filtered && (
+        <section aria-label="추천 도구" className="mt-8 rounded-[14px] border border-[var(--nr-line)] bg-white">
+          <div role="tablist" aria-label="추천 도구" className="flex border-b border-[var(--nr-line)]">
+            {(
+              [
+                ['popular', '요즘 많이 찾는 도구', '최근 30일 조회수'],
+                ['fresh', '새로 올라온 도구', '게시일 순'],
+              ] as const
+            ).map(([k, label, note]) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                id={`tab-${k}`}
+                aria-selected={pick === k}
+                aria-controls="pick-panel"
+                onClick={() => setPick(k)}
+                className={`flex-1 border-b-[3px] px-3 py-3.5 text-center sm:flex-none sm:px-6 sm:text-left ${
+                  pick === k ? 'border-[var(--nr-p3)] font-bold text-[var(--nr-p3)]' : 'border-transparent text-slate-600 hover:text-black'
+                }`}
+              >
+                <span className="block text-[16px]">{label}</span>
+                <span className="hidden text-[12px] font-normal text-slate-500 sm:block">{note}</span>
+              </button>
+            ))}
           </div>
-        </>
+          <ol id="pick-panel" role="tabpanel" aria-labelledby={`tab-${pick}`} className="divide-y divide-[var(--nr-line)]">
+            {(pick === 'popular' ? popular : fresh).map((t, i) => (
+              <li key={t.sid} className="flex items-center gap-4 px-5 py-3.5">
+                {pick === 'popular' ? (
+                  <span className="nr-title w-6 shrink-0 text-center text-[22px] text-[var(--nr-p1)]">{i + 1}</span>
+                ) : (
+                  <Sparkles className="w-5 h-5 shrink-0 text-[#e0a800]" aria-hidden="true" />
+                )}
+                <a href={hrefTool(t.sid)} className="group min-w-0 flex-1">
+                  <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
+                  <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
+                    <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
+                    {pick === 'popular'
+                      ? t.board === 'official'
+                        ? '교육청 배포'
+                        : t.board === 'external'
+                          ? `외부 기관 · ${t.kind ?? ''}`
+                          : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`
+                      : `${t.board === 'staff' || !t.board ? `${splitAuthor(t.author).person} · ` : ''}${shortDay(t.created)} 게시`}
+                  </span>
+                </a>
+                {pick === 'popular' ? (
+                  <span className="hidden sm:inline-flex shrink-0 items-center gap-1 text-[14px] font-bold tabular-nums text-[var(--nr-p3)]">
+                    <TrendingUp className="w-4 h-4" aria-hidden="true" />+{n(t.recent30)}
+                  </span>
+                ) : (
+                  isNewTool(t, today) && <span className="shrink-0 rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>
+                )}
+                <a href={t.url} target="_blank" rel="noreferrer" className="hidden sm:inline-flex shrink-0 rounded-full bg-[var(--nr-p1)] px-3.5 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]">
+                  사용하기<span className="sr-only">(새 창)</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+          <button
+            type="button"
+            onClick={() => {
+              setSort(pick === 'popular' ? 'recent30' : 'created');
+              toResults();
+            }}
+            className="flex w-full items-center justify-center gap-1 border-t border-[var(--nr-line)] py-3 text-[14px] font-bold text-[var(--nr-p3)] hover:bg-[var(--nr-bg)]"
+          >
+            {pick === 'popular' ? '많이 찾는 순으로 전체 보기' : '새로 올라온 순으로 전체 보기'} <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          </button>
+        </section>
       )}
 
       {/* 4. 전체 도구 */}
-      <section aria-labelledby="all-h" className={`${filtered ? 'mt-8' : 'mt-14'} scroll-mt-4`} ref={resultTop}>
+      <section aria-labelledby="all-h" className="mt-10 scroll-mt-4" ref={resultTop}>
         <SectionHead id="all-h" title={filtered ? '찾은 도구' : '전체 도구'} />
 
         <div className="mt-4 rounded-[14px] bg-[var(--nr-bg)] p-4 sm:p-5 space-y-3">
