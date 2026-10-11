@@ -16,7 +16,8 @@ export const About: React.FC<{ m?: Model }> = ({ m }) => (
     <h3 className="mt-6 text-base font-bold text-slate-900">자료 출처</h3>
     <Card className="mt-2">
       <dl>
-        <Row term="수집 대상">데이터 도구실 「교직원 제작 도구」 게시판 목록 전체 페이지. 공지 게시글은 제외</Row>
+        <Row term="수집 대상">데이터 도구실 「교직원 제작 도구」·「교육청 배포 도구」 게시판 목록 전체 페이지. 공지 게시글은 제외</Row>
+        <Row term="외부 공공업무 도구">조회수 수집기가 없어 게시판 목록을 한 번 받아 둔 값(2026. 10. 11.). 조회수 추이·기간 통계에는 넣지 않음</Row>
         <Row term="수집 주기">약 1시간마다. 하루에 여러 번 수집해도 그날의 마지막 값 하나만 남김</Row>
         <Row term="수집 시작">{m ? dayLabel(m.start) : '-'}</Row>
         <Row term="제작자">게시판 작성자 표기 그대로, 소속(이름). 표기가 다르면 다른 제작자로 셈</Row>

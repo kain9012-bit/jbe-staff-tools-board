@@ -6,6 +6,7 @@ import { Badge, Card, EmptyState, Stat } from '../components/Ui';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { allTools, dayLabel, modelOf, n, type Model, type ToolStat } from '../lib/stats';
 import { summaryOf, type ToolSummary } from '../lib/summaries';
+import { ReactionPanel, TrustPanel, VersionPanel } from '../components/ToolPoc';
 
 /** 한눈에 보기 — 원 게시글을 정해진 항목으로 짧게 정리한 요약. 본문 자체는 싣지 않음 */
 const SummaryBox: React.FC<{ s?: ToolSummary; url: string }> = ({ s, url }) => {
@@ -140,6 +141,10 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
   /** 이 도구가 속한 게시판의 모델 — 교육청 배포 도구는 수집 시작일이 달라 따로 계산 */
   const bm = modelOf(m, sid) ?? m;
   const official = t?.board === 'official';
+  /** 외부 공공업무 도구 — 조회수 추이·댓글이 없음 */
+  const external = t?.board === 'external';
+  /** 제작자가 게시판 운영자 한 사람인 게시판 */
+  const single = official || external;
   if (!t) {
     return (
       <EmptyState
@@ -151,11 +156,11 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
   }
   const comments = m.comments.filter((c) => c.sid === sid);
   /** 교육청 배포 도구는 작성자가 모두 같아 제작자별 묶음을 보이지 않음 */
-  const siblings = official ? [] : m.makers.find((x) => x.name === t.author)?.tools.filter((x) => x.sid !== sid) ?? [];
+  const siblings = single ? [] : m.makers.find((x) => x.name === t.author)?.tools.filter((x) => x.sid !== sid) ?? [];
   const chips = KEYWORD_CHIPS.filter((c) => chipMatcher(c)(...chipFields(t)));
   const similar = chips.length
     ? allTools(m)
-        .filter((x) => x.sid !== sid && (official || x.author !== t.author) && chips.some((c) => chipMatcher(c)(...chipFields(x))))
+        .filter((x) => x.sid !== sid && (single || x.author !== t.author) && chips.some((c) => chipMatcher(c)(...chipFields(x))))
         .sort((a, b) => b.recent30 - a.recent30 || b.views - a.views)
         .slice(0, 4)
     : [];
@@ -179,8 +184,15 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
           </div>
           <h1 className="nr-title mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-snug">{t.title}</h1>
           <p className="mt-1 text-slate-600">
-            {official ? <b className="text-slate-800">{t.author}</b> : <MakerLink name={t.author} />} · {dayLabel(t.created)} 게시 · 조회 {n(t.views)}회
-            {!official && <> · 댓글 {n(t.comments)}개</>}
+            {external ? (
+              <b className="text-slate-800">외부 기관 제작{t.kind ? ` · ${t.kind}` : ''}</b>
+            ) : official ? (
+              <b className="text-slate-800">{t.author}</b>
+            ) : (
+              <MakerLink name={t.author} />
+            )}{' '}
+            · {dayLabel(t.created)} 게시 · 조회 {n(t.views)}회
+            {!single && <> · 댓글 {n(t.comments)}개</>}
           </p>
         </div>
         <UseToolLink url={t.url} />
@@ -188,14 +200,29 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
 
       {/* 2. 한눈에 보기 */}
       <SummaryBox s={summaryOf(sid)} url={t.url} />
+      {external && t.site && (
+        <p className="mt-3 text-[14px] text-slate-600">
+          제작 기관 누리집:{' '}
+          <a href={t.site} target="_blank" rel="noreferrer" className="font-bold text-[var(--nr-p3)] underline underline-offset-2 break-all">
+            {t.site.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+          </a>
+        </p>
+      )}
+
+      {/* 개편 PoC — 검수 정보·버전 */}
+      <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <TrustPanel t={t} s={summaryOf(sid)} />
+        <VersionPanel t={t} />
+      </div>
+      <ReactionPanel t={t} />
 
       {/* 3. 질문과 답변 — 교육청 배포 도구는 댓글을 모으지 않아 게시판으로 안내 */}
-      {official ? (
+      {single ? (
         <section className="mt-10">
           <h2 className="nr-title text-[22px] text-black">질문과 답변</h2>
           <Card className="mt-3">
             <p className="px-4 py-6 text-sm text-slate-600">
-              교육청 배포 도구의 질문과 답변은 게시판 원글 댓글에서 확인할 수 있습니다 ·{' '}
+              {external ? '외부 공공업무 도구는 제작 기관 누리집의 문의 창구를 이용해 주세요' : '교육청 배포 도구의 질문과 답변은 게시판 원글 댓글에서 확인할 수 있습니다'} ·{' '}
               <a href={t.url} target="_blank" rel="noreferrer" className="font-bold text-[var(--nr-p3)] underline underline-offset-2">
                 게시판 원글 보기
               </a>
@@ -242,7 +269,12 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         </section>
       )}
 
-      {/* 5. 조회 현황 — 제작자용 통계는 맨 아래 */}
+      {/* 5. 조회 현황 — 제작자용 통계는 맨 아래. 외부 공공업무 도구는 조회수 수집기가 없어 게시판 값만 */}
+      {external ? (
+        <p className="mt-12 border-t border-[var(--nr-line)] pt-6 text-[14px] text-slate-500">
+          외부 공공업무 도구는 조회수를 매시간 모으지 않아 추이 그래프가 없습니다. 조회 {n(t.views)}회는 {dayLabel(bm.asOf.slice(0, 10))} 게시판 값
+        </p>
+      ) : (
       <section className="mt-12 border-t border-[var(--nr-line)] pt-8">
         <h2 className="nr-title text-[22px] text-black">조회 현황</h2>
         <div className={`mt-3 grid gap-3 grid-cols-2 ${official ? 'lg:grid-cols-4' : 'lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1'}`}>
@@ -263,6 +295,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
           <TrendChart model={bm} daily={t.daily} title="조회수 추이" from={t.firstDate} pre={t.pre} />
         </div>
       </section>
+      )}
     </>
   );
 };

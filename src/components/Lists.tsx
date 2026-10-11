@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowUpRight, CornerDownRight, Eye, MessageCircle, TrendingUp } from 'lucide-react';
 import { hrefMaker, hrefTool } from '../lib/route';
 import { addDays, n, shortDay, splitAuthor, type ToolStat } from '../lib/stats';
-import type { Comment } from '../types';
+import { showsAuthor, type Comment } from '../types';
 import { Badge } from './Ui';
 
 /** 순위 한 줄 — 1~3위만 강조 */
@@ -49,13 +49,16 @@ const Pill: React.FC<{ icon: React.ReactNode; label: string; children: React.Rea
 export const isNewTool = (t: ToolStat, today: string) => t.created >= addDays(today, -13);
 
 /** 도구 카드 — 누리집 틀(연한 테두리·둥근 10px). 카드 전체는 상세로, 아래 단추는 게시판 원글로 */
-/** 출처 표시 — 교직원 제작은 하늘색, 교육청 배포는 남색. 같은 파랑 계열이되 한눈에 구분되게 */
-export const SourceTag: React.FC<{ board?: string; className?: string }> = ({ board, className = '' }) =>
-  board === 'official' ? (
-    <span className={`inline-flex shrink-0 items-center rounded-md bg-[#2f3a73] px-2 py-0.5 text-[12px] font-bold text-white ${className}`}>교육청 배포</span>
-  ) : (
-    <span className={`inline-flex shrink-0 items-center rounded-md bg-[#dcefff] px-2 py-0.5 text-[12px] font-bold text-[#0a62a8] ring-1 ring-inset ring-[#a9d3f5] ${className}`}>교직원 제작</span>
-  );
+/** 출처 표시 — 교직원 제작은 하늘색, 교육청 배포는 남색, 외부 공공은 초록. 한눈에 구분되게 */
+const SOURCE_STYLE: Record<string, [string, string]> = {
+  official: ['교육청 배포', 'bg-[#2f3a73] text-white'],
+  external: ['외부 공공', 'bg-[#e3f5ee] text-[#0b6b52] ring-1 ring-inset ring-[#a8dcc8]'],
+  staff: ['교직원 제작', 'bg-[#dcefff] text-[#0a62a8] ring-1 ring-inset ring-[#a9d3f5]'],
+};
+export const SourceTag: React.FC<{ board?: string; className?: string }> = ({ board, className = '' }) => {
+  const [label, cls] = SOURCE_STYLE[board ?? 'staff'] ?? SOURCE_STYLE.staff;
+  return <span className={`inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[12px] font-bold ${cls} ${className}`}>{label}</span>;
+};
 
 export const ToolCard: React.FC<{
   t: ToolStat;
@@ -81,8 +84,17 @@ export const ToolCard: React.FC<{
       <p className="mt-1.5 text-[13px] text-slate-500">적용기관 {t.target || '미기재'}</p>
       {showAuthor && (
         <p className="mt-3 flex items-baseline gap-1.5 border-t border-slate-100 pt-3 min-w-0 text-[14px]">
-          <b className="shrink-0 text-slate-900">{person}</b>
-          <span className="truncate text-[12px] text-slate-500">{org}</span>
+          {t.board === 'external' ? (
+            <>
+              <b className="shrink-0 text-slate-900">외부 기관 제작</b>
+              <span className="truncate text-[12px] text-slate-500">{t.kind}</span>
+            </>
+          ) : (
+            <>
+              <b className="shrink-0 text-slate-900">{person}</b>
+              <span className="truncate text-[12px] text-slate-500">{org}</span>
+            </>
+          )}
         </p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -97,7 +109,7 @@ export const ToolCard: React.FC<{
             </Pill>
           )
         )}
-        {t.board !== 'official' && (
+        {showsAuthor(t.board) && (
           <Pill icon={<MessageCircle className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />} label="댓글">
             {n(t.comments)}
           </Pill>
@@ -147,7 +159,7 @@ export const ToolTable: React.FC<{
               <span className="mt-0.5 block truncate text-[13px] text-slate-500">
                 <SourceTag board={t.board} className="mr-1.5 align-[1px] !px-1.5 !py-0 !text-[11px]" />
                 <span className="text-[var(--nr-p3)]">{t.purpose}</span>
-                {t.board !== 'official' && <> · {t.author}</>}
+                {showsAuthor(t.board) && <> · {t.author}</>}
               </span>
             </span>
             <span className="shrink-0 text-right">
@@ -190,13 +202,13 @@ export const ToolTable: React.FC<{
                 <span className="mt-0.5 block truncate text-[13px] text-slate-500">
                   <SourceTag board={t.board} className="mr-1.5 align-[1px] !px-1.5 !py-0 !text-[11px]" />
                   <span className="text-[var(--nr-p3)]">{t.purpose}</span>
-                  {t.board !== 'official' && <> · {t.author}</>}
+                  {showsAuthor(t.board) && <> · {t.author}</>}
                 </span>
               </td>
               <td className="py-3.5 text-[14px] text-slate-600">{t.target}</td>
               <td className="py-3.5 tabular-nums font-bold text-[var(--nr-p3)]">{ex ? ex.value : `+${n(t.recent30)}`}</td>
               <td className="py-3.5 tabular-nums">{n(t.views)}</td>
-              {!noComments && <td className="py-3.5 tabular-nums">{t.board === 'official' ? '–' : n(t.comments)}</td>}
+              {!noComments && <td className="py-3.5 tabular-nums">{showsAuthor(t.board) ? n(t.comments) : '–'}</td>}
               <td className="py-3.5 tabular-nums text-[14px] text-slate-600">{t.created.slice(2).replace(/-/g, '.')}</td>
               <td className="py-3.5">
                 <a

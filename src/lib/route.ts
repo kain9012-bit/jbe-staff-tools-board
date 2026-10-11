@@ -28,6 +28,9 @@ export function parseLoc(pathname: string, search: string): Route {
   if (p === 'register') return { page: 'register' };
   if (p === 'about') return { page: 'about' };
   if (p === 'official') return { page: 'official' };
+  if (p === 'requests') return { page: 'requests' };
+  if (p === 'review') return { page: 'review' };
+  if (p === 'poc') return { page: 'poc' };
   if (p === 'tool' && arg) return { page: 'tool', sid: arg };
   if (p === 'maker' && arg) return { page: 'maker', name: decodeURIComponent(arg) };
   return { page: 'home', ...opt };

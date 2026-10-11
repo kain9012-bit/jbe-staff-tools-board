@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ArrowUpRight, LayoutGrid, List, PencilLine, Search, Sparkles, TrendingUp, X } from 'lucide-react';
+import { ArrowRight, LayoutGrid, List, PencilLine, Search, Sparkles, TrendingUp, X, Lightbulb } from 'lucide-react';
 import { isNewTool, SourceTag, ToolCard, ToolTable } from '../components/Lists';
 import { PageTitle, Pager } from '../components/Shell';
 import { EmptyState } from '../components/Ui';
-import { BOARD_URL } from '../lib/board';
 import { chipFields, chipMatcher, KEYWORD_CHIPS } from '../lib/keywords';
 import { summaryText } from '../lib/summaries';
 import { hrefTool } from '../lib/route';
@@ -68,7 +67,7 @@ export const Find: React.FC<{
   const [chip, setChip] = useState('');
   const [target, setTarget] = useState('');
   const [purpose, setPurpose] = useState(initialPurpose ?? '');
-  const [src, setSrc] = useState<'' | Board>(initialSrc === 'staff' || initialSrc === 'official' ? initialSrc : '');
+  const [src, setSrc] = useState<'' | Board>(initialSrc === 'staff' || initialSrc === 'official' || initialSrc === 'external' ? initialSrc : '');
   const [view, setView] = useState<'card' | 'list'>('card');
   const [page, setPage] = useState(1);
   const resultTop = useRef<HTMLDivElement>(null);
@@ -101,6 +100,7 @@ export const Find: React.FC<{
   const everything = useMemo(() => allTools(m), [m]);
   const pool = ps ? m.tools : everything;
   const offCount = m.official?.tools.length ?? 0;
+  const extCount = m.external?.tools.length ?? 0;
   const matched = pool.filter((t) => hit(t.title, t.author, t.purpose, summaryText(t.sid)) && chipHit(...chipFields(t)) && okTarget(t, target));
   const srcCount = (b: Board) => matched.filter((t) => (t.board ?? 'staff') === b).length;
   const srcOn = ps ? '' : src;
@@ -180,7 +180,7 @@ export const Find: React.FC<{
         </p>
         {offCount > 0 && (
           <p className="mt-1.5 text-[14px] text-white/75">
-            교직원 제작 {m.tools.length}개 · 교육청 배포 {offCount}개
+            교육청 배포 {offCount}개 · 교직원 제작 {m.tools.length}개{extCount > 0 && ` · 외부 공공 ${extCount}개`}
           </p>
         )}
         <form
@@ -280,7 +280,7 @@ export const Find: React.FC<{
                       <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
                       <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
                         <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
-                        {t.board === 'official' ? '교육청 배포 게시판' : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`}
+                        {t.board === 'official' ? '교육청 배포 게시판' : t.board === 'external' ? `외부 기관 · ${t.kind ?? ''}` : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`}
                       </span>
                     </a>
                     <span className="hidden sm:inline-flex shrink-0 items-center gap-1 text-[14px] font-bold tabular-nums text-[var(--nr-p3)]">
@@ -303,7 +303,7 @@ export const Find: React.FC<{
                       <span className="font-bold leading-snug text-black line-clamp-1 group-hover:text-[var(--nr-p3)] group-hover:underline underline-offset-2">{t.title}</span>
                       <span className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-slate-500">
                         <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
-                        {t.board === 'official' ? '' : `${splitAuthor(t.author).person} · `}
+                        {t.board === 'staff' || !t.board ? `${splitAuthor(t.author).person} · ` : ''}
                         {shortDay(t.created)} 게시
                       </span>
                     </a>
@@ -332,6 +332,7 @@ export const Find: React.FC<{
                   ['', '전체', matched.length],
                   ['staff', BOARD_LABEL.staff, srcCount('staff')],
                   ['official', BOARD_LABEL.official, srcCount('official')],
+                  ...(extCount > 0 ? ([['external', BOARD_LABEL.external, srcCount('external')]] as const) : []),
                 ] as const
               ).map(([v, label, c]) => (
                 <button
@@ -465,8 +466,12 @@ export const Find: React.FC<{
             <EmptyState
               icon={<Search className="w-5 h-5" aria-hidden="true" />}
               title="조건에 맞는 도구 없음"
-              desc="검색어를 줄이거나 조건을 풀어 보세요. 찾는 도구가 없다면 직접 만들어 올려 주셔도 좋습니다."
+              desc="검색어를 줄이거나 조건을 풀어 보세요."
             />
+            <a href="/requests" className="mt-3 flex items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed border-[var(--nr-p1)] bg-white px-4 py-4 text-[15px] font-bold text-[var(--nr-p3)] hover:bg-[var(--nr-bg)]">
+              <Lightbulb className="w-5 h-5 text-[#e0a800]" aria-hidden="true" />
+              찾는 도구가 없나요? {q.trim() ? `'${q.trim()}' 도구를 ` : ''}요청해 주세요
+            </a>
           </div>
         ) : view === 'list' ? (
           <div className="mt-3">
@@ -484,18 +489,18 @@ export const Find: React.FC<{
 
       {/* 등록 유도 */}
       <section className="mt-14 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <a href="/requests" className="group flex items-center gap-4 rounded-[14px] border border-[var(--nr-line)] bg-white p-6 hover:border-[var(--nr-p3)]">
+          <Lightbulb className="w-8 h-8 shrink-0 text-[#e0a800]" aria-hidden="true" />
+          <span>
+            <span className="nr-title block text-[20px] text-black">찾는 도구가 없나요?</span>
+            <span className="mt-1 block text-[14px] text-slate-600">필요한 도구를 요청하면 공감이 많은 순으로 검토해 만들거나 연결해 드립니다</span>
+          </span>
+        </a>
         <a href="/register" className="group flex items-center gap-4 rounded-[14px] bg-[var(--nr-p2)] p-6 text-white hover:opacity-95">
           <PencilLine className="w-8 h-8 shrink-0 opacity-80" aria-hidden="true" />
           <span>
             <span className="nr-title block text-[20px]">내가 만든 도구도 올려 주세요</span>
-            <span className="mt-1 block text-[14px] text-white/80">작은 엑셀 서식 하나도 괜찮습니다 · 등록 방법과 점검표 보기</span>
-          </span>
-        </a>
-        <a href={BOARD_URL} target="_blank" rel="noreferrer" className="group flex items-center gap-4 rounded-[14px] border border-[var(--nr-line)] bg-white p-6 hover:border-[var(--nr-p3)]">
-          <ArrowUpRight className="w-8 h-8 shrink-0 text-[var(--nr-p1)]" aria-hidden="true" />
-          <span>
-            <span className="nr-title block text-[20px] text-black">교직원 제작 도구 게시판</span>
-            <span className="mt-1 block text-[14px] text-slate-600">누리집 게시판에서 원글·첨부파일·댓글 보기</span>
+            <span className="mt-1 block text-[14px] text-white/80">정해진 양식으로 등록 · 보안 자가점검 후 검토를 거쳐 게시</span>
           </span>
         </a>
       </section>

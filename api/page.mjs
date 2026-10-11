@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { loadToolLists } from './_lib/sheets.mjs';
-import { SERVICE, SITE, SITE_URL, SUMMARIES, esc, withMeta } from './_lib/site.mjs';
+import { EXTERNAL_TOOLS, SERVICE, SITE, SITE_URL, SUMMARIES, esc, withMeta } from './_lib/site.mjs';
 
 /**
  * GET /tool/123, /makers, /maker/이름 … — 검색 엔진이 읽을 수 있는 화면.
@@ -22,9 +22,9 @@ async function loadTemplate(req) {
   return template;
 }
 
-const BOARD = { staff: '교직원 제작', official: '교육청 배포' };
+const BOARD = { staff: '교직원 제작', official: '교육청 배포', external: '외부 공공' };
 const DEFAULT_DESC =
-  '전북특별자치도교육청 교직원이 만든 업무도구와 교육청이 배포한 업무도구를 한곳에서 찾아보는 페이지. 도구별 요약과 조회수 현황 제공.';
+  '전북특별자치도교육청 데이터 도구실의 교육청 배포·교직원 제작·외부 공공업무 도구를 한곳에서 찾고, 요청하고, 등록하는 화면. 도구별 요약과 조회수 현황 제공.';
 
 const list = (items) => (items?.length ? `<ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '');
 const olist = (items) => (items?.length ? `<ol>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : '');
@@ -33,11 +33,11 @@ const toolLinks = (tools) =>
 
 function toolPage(t) {
   const s = SUMMARIES[t.sid];
-  const by = t.board === 'official' ? '전북특별자치도교육청 배포' : `${t.author} 제작`;
+  const by = t.board === 'official' ? '전북특별자치도교육청 배포' : t.board === 'external' ? '외부 공공기관 제작' : `${t.author} 제작`;
   const desc = s && !s.empty
     ? [s.what, s.why].filter(Boolean).join('. ')
     : `${by} 업무도구${t.purpose ? ` · ${t.purpose}` : ''}. ${SERVICE}에서 도구 정보와 조회수 현황 확인.`;
-  const facts = [BOARD[t.board], t.board === 'official' ? null : `제작자 ${t.author}`, t.purpose, t.target && `적용기관 ${t.target}`, t.created && `게시일 ${t.created}`]
+  const facts = [BOARD[t.board], t.board === 'staff' ? `제작자 ${t.author}` : null, t.purpose, t.target && `적용기관 ${t.target}`, t.created && `게시일 ${t.created}`]
     .filter(Boolean)
     .map(esc)
     .join(' · ');
@@ -91,6 +91,14 @@ function render(parts, all) {
       desc: `전북특별자치도교육청이 배포한 업무도구 ${official.length}개의 조회수 현황.`,
       body: `<h1>교육청 배포 도구</h1>${toolLinks(official)}`,
     };
+  if (p === 'poc')
+    return {
+      title: `개편 안내 · ${SITE}`,
+      desc: '게시판 3개로 나뉜 데이터 도구실을 찾고·등록하고·요청하고·업데이트를 받는 하나의 플랫폼으로 바꾸는 시범(PoC) 화면 안내.',
+      body: `<h1>데이터 도구실 개편 안내</h1>`,
+    };
+  if (p === 'requests') return { title: `도구 요청 · ${SITE}`, desc: '찾는 업무도구가 없을 때 필요한 도구를 요청하고 공감하는 화면(개편 시범).', body: `<h1>도구 요청</h1>` };
+  if (p === 'review') return { title: `검수 현황 · ${SITE}`, desc: '등록 신청한 업무도구의 보안 검토 단계를 확인하는 화면(개편 시범).', body: `<h1>검수 현황</h1>` };
   if (p === 'about') return { title: `집계 기준 · ${SITE}`, desc: DEFAULT_DESC, body: `<h1>집계 기준</h1>` };
   if (p === 'register') return { title: `도구 등록 · ${SITE}`, desc: DEFAULT_DESC, body: `<h1>도구 등록</h1>` };
   if (p === 'tools' || !p) return { title: `${SERVICE} · ${SITE} · 전북특별자치도교육청`, desc: DEFAULT_DESC, body: `<h1>${SERVICE}</h1>${toolLinks(all)}` };
@@ -127,7 +135,7 @@ export default async function handler(req, res) {
   }
   try {
     const { staff, official } = await loadToolLists();
-    const all = [...staff, ...official].map(withMeta);
+    const all = [...staff, ...official, ...EXTERNAL_TOOLS].map(withMeta);
     const page = render(parts, all);
     const canonical = `${SITE_URL}/${parts.map(encodeURIComponent).join('/')}`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');

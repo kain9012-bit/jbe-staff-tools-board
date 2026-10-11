@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
-import { Lnb, menuOf, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
+import { Lnb, menuOf, PocBanner, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
+import { Requests } from './pages/Requests';
+import { Review } from './pages/Review';
+import { PocGuide } from './pages/PocGuide';
 import { EmptyState } from './components/Ui';
 import { hrefPurpose, locKey, useRoute } from './lib/route';
 import { allTools } from './lib/stats';
@@ -72,11 +75,22 @@ export default function App() {
 
   /** 왼쪽 메뉴 '도구 찾기' 아래 사용목적 바로가기 — 교직원 제작 + 교육청 배포 함께 셈 */
   const subs = useMemo<Partial<Record<MenuKey, LnbSub[]>>>(() => {
-    if (!m) return {};
+    const fixed: Partial<Record<MenuKey, LnbSub[]>> = {
+      register: [
+        { label: '등록 신청', href: '/register', on: route.page === 'register' },
+        { label: '검수 현황', href: '/review', on: route.page === 'review' },
+      ],
+      guide: [
+        { label: '개편 안내', href: '/poc', on: route.page === 'poc' },
+        { label: '집계 기준', href: '/about', on: route.page === 'about' },
+      ],
+    };
+    if (!m) return fixed;
     const all = allTools(m);
     const c = new Map<string, number>();
     for (const t of all) c.set(t.purpose, (c.get(t.purpose) ?? 0) + 1);
     return {
+      ...fixed,
       find: [
         { label: '전체', href: hrefPurpose(''), on: active === 'find' && route.page !== 'tool' && !purposeNow, count: all.length },
         ...[...c.entries()]
@@ -91,20 +105,23 @@ export default function App() {
   }, [m, active, route.page, purposeNow]);
 
   const label = MENU.find((x) => x.key === active)?.label ?? '';
+  /** 하위 메뉴가 있는 화면은 '메뉴 > 하위 메뉴' */
+  const subNow = active !== 'find' ? subs[active]?.find((x) => x.on)?.label : undefined;
   const trail: { label: string; href?: string }[] = [
     { label: '교육데이터 허브' },
     { label: '데이터 도구실' },
     { label: SERVICE, href: '/' },
     ...(toolTitle || makerName
       ? [{ label, href: MENU.find((x) => x.key === active)!.href }, { label: toolTitle ?? makerName ?? '' }]
-      : route.page === 'makers' || route.page === 'official'
-        ? [{ label, href: '/makers' }, { label: route.page === 'official' ? '교육청 배포 도구' : '교직원 제작 도구' }]
+      : subNow && subNow !== label && (subs[active]?.length ?? 0) > 1
+        ? [{ label, href: MENU.find((x) => x.key === active)!.href }, { label: subNow }]
         : [{ label }]),
   ];
 
   let body: React.ReactNode;
   if (route.page === 'about') body = <About m={m} />;
   else if (route.page === 'register') body = <Register />;
+  else if (route.page === 'review') body = <Review />;
   else if (state.status === 'loading') body = <Skeleton />;
   else if (state.status === 'error')
     body = (
@@ -141,16 +158,20 @@ export default function App() {
         </>
       );
     else if (route.page === 'official') body = <OfficialStats m={m} />;
-    if (body && (route.page === 'makers' || route.page === 'official') && subs.makers && subs.makers.length > 1)
-      body = (
-        <>
-          <SubTabs items={subs.makers} />
-          {body}
-        </>
-      );
     else if (route.page === 'tool') body = <ToolDetail m={m} sid={route.sid} />;
     else if (route.page === 'maker') body = <MakerDetail m={m} name={route.name} />;
+    else if (route.page === 'requests') body = <Requests m={m} />;
+    else if (route.page === 'poc') body = <PocGuide m={m} />;
   }
+  /** 휴대폰 하위 메뉴 — PC는 왼쪽 메뉴에 있음 */
+  const mobileSubs = active !== 'find' && route.page !== 'maker' ? subs[active] : undefined;
+  if (body && mobileSubs && mobileSubs.length > 1)
+    body = (
+      <>
+        <SubTabs items={mobileSubs} />
+        {body}
+      </>
+    );
 
   return (
     <div className="min-h-screen overflow-x-clip bg-white text-[var(--nr-text)] font-sans antialiased flex flex-col selection:bg-[var(--nr-p3)] selection:text-white">
@@ -165,6 +186,7 @@ export default function App() {
         본문 바로가기
       </a>
       <SiteHeader active={active} asOf={m?.asOf} />
+      <PocBanner />
       <SubLayout lnb={<Lnb active={active} subs={subs} />} trail={trail}>
         {body}
       </SubLayout>

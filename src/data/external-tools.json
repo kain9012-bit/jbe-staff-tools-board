@@ -1,0 +1,83 @@
+{
+ "note": "데이터 도구실 「외부 공공업무 도구」(BBS_0000684) 게시판 목록 — 2026-10-11 수집. 조회수 수집기가 없어 수집 시점 값으로 고정",
+ "asOf": "2026-10-11",
+ "items": [
+  {
+   "sid": "1177384",
+   "title": "신규 발령자를 위한 시스템 가이드 - 교육행정 업무 시스템 길잡이",
+   "field": "AI 업무지원",
+   "kind": "웹서비스",
+   "views": 122,
+   "created": "2026-09-13",
+   "site": "https://systemguidebook.vercel.app/",
+   "purpose": "행정업무",
+   "target": "전체"
+  },
+  {
+   "sid": "1173885",
+   "title": "GAI - 교육행정 업무도구·AI 지식 공유 허브",
+   "field": "AI 업무지원",
+   "kind": "웹서비스",
+   "views": 405,
+   "created": "2026-09-05",
+   "site": "https://gaihub.net/",
+   "purpose": "범용도구",
+   "target": "전체"
+  },
+  {
+   "sid": "1155621",
+   "title": "소확엑셀 - 교육행정 엑셀 업무자동화 도구 모음",
+   "field": "업무자동화",
+   "kind": "웹서비스",
+   "views": 590,
+   "created": "2026-07-24",
+   "site": "https://scan0.net/",
+   "purpose": "행정업무",
+   "target": "전체"
+  },
+  {
+   "sid": "1154326",
+   "title": "업무천재 고주무관 - 교육행정 업무 효율화 웹페이지",
+   "field": "업무자동화",
+   "kind": "웹서비스",
+   "views": 584,
+   "created": "2026-07-22",
+   "site": "https://edusprouthaey.co.kr/",
+   "purpose": "행정업무",
+   "target": "전체"
+  },
+  {
+   "sid": "1154325",
+   "title": "교행노트(강원) - 교행 업무를 하며 공부한 것들을 기록하는 곳",
+   "field": "AI 업무지원",
+   "kind": "웹서비스",
+   "views": 525,
+   "created": "2026-07-22",
+   "site": "https://gyohaeng.pages.dev/",
+   "purpose": "행정업무",
+   "target": "전체"
+  },
+  {
+   "sid": "1154210",
+   "title": "쉽다한글 - 한글 효율화 프로그램",
+   "field": "한글 문서",
+   "kind": "설치형",
+   "views": 1615,
+   "created": "2026-07-22",
+   "site": "https://brojun.kr/%EC%89%BD%EB%8B%A4%ED%95%9C%EA%B8%80/",
+   "purpose": "범용도구",
+   "target": "전체"
+  },
+  {
+   "sid": "1154193",
+   "title": "Anything - PC 문서 내용 통합 검색",
+   "field": "문서·파일",
+   "kind": "설치형",
+   "views": 899,
+   "created": "2026-07-22",
+   "site": "https://github.com/chrisryugj/Docufinder",
+   "purpose": "범용도구",
+   "target": "전체"
+  }
+ ]
+}

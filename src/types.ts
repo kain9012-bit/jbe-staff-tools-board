@@ -9,12 +9,19 @@ export interface Tool {
   purpose: string;
   target: string;
   firstSeen: string;
-  /** 출처 게시판 — staff: 교직원 제작 도구, official: 교육청 배포 도구 */
+  /** 출처 게시판 — staff: 교직원 제작 도구, official: 교육청 배포 도구, external: 외부 공공업무 도구 */
   board?: Board;
+  /** 외부 공공업무 도구 — 제작 기관 누리집 */
+  site?: string;
+  /** 외부 공공업무 도구 — 게시판의 업무분야·이용형태 */
+  field?: string;
+  kind?: string;
 }
 
-export type Board = 'staff' | 'official';
-export const BOARD_LABEL: Record<Board, string> = { staff: '교직원 제작', official: '교육청 배포' };
+export type Board = 'staff' | 'official' | 'external';
+export const BOARD_LABEL: Record<Board, string> = { staff: '교직원 제작', official: '교육청 배포', external: '외부 공공' };
+/** 제작자 이름을 보여 주는 게시판 — 교육청 배포·외부 공공은 게시판 운영자 이름이라 숨김 */
+export const showsAuthor = (b?: Board) => (b ?? 'staff') === 'staff';
 
 export interface Comment {
   sid: string;
@@ -45,6 +52,9 @@ export type Route =
   | { page: 'makers'; q?: string; sort?: string; from?: string; to?: string }
   | { page: 'about' }
   | { page: 'official' }
+  | { page: 'requests' }
+  | { page: 'review' }
+  | { page: 'poc' }
   | { page: 'tool'; sid: string }
   | { page: 'maker'; name: string };
 

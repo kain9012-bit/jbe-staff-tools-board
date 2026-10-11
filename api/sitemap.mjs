@@ -1,5 +1,5 @@
 import { loadToolLists } from './_lib/sheets.mjs';
-import { SITE_URL, esc } from './_lib/site.mjs';
+import { EXTERNAL_TOOLS, SITE_URL, esc } from './_lib/site.mjs';
 
 /** GET /sitemap.xml — 첫 화면·현황 화면·도구 상세 화면 주소 목록. 시트에서 바로 만들어 새 도구도 바로 들어감 */
 export default async function handler(req, res) {
@@ -10,8 +10,10 @@ export default async function handler(req, res) {
       { loc: '/', lastmod: today, pri: '1.0' },
       { loc: '/makers', lastmod: today, pri: '0.6' },
       { loc: '/official', lastmod: today, pri: '0.6' },
+      { loc: '/poc', lastmod: today, pri: '0.7' },
+      { loc: '/requests', pri: '0.5' },
       { loc: '/about', pri: '0.3' },
-      ...[...staff, ...official].map((t) => ({ loc: `/tool/${t.sid}`, lastmod: /^\d{4}-\d{2}-\d{2}$/.test(t.created) ? t.created : undefined, pri: '0.8' })),
+      ...[...staff, ...official, ...EXTERNAL_TOOLS].map((t) => ({ loc: `/tool/${t.sid}`, lastmod: /^\d{4}-\d{2}-\d{2}$/.test(t.created) ? t.created : undefined, pri: '0.8' })),
       ...[...new Set(staff.map((t) => t.author))].map((a) => ({ loc: `/maker/${encodeURIComponent(a)}`, pri: '0.4' })),
     ];
     const xml =

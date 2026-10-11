@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ChevronRight, Home, Link2, Check } from 'lucide-react';
-import { BOARD_URL, OFFICIAL_BOARD_URL, WRITE_URL } from '../lib/board';
+import { BOARD_URL, EXTERNAL_BOARD_URL, OFFICIAL_BOARD_URL } from '../lib/board';
+import { FlaskConical } from 'lucide-react';
 import type { Route } from '../types';
 
 /**
@@ -10,21 +11,26 @@ import type { Route } from '../types';
  * 휴대폰에서는 왼쪽 메뉴를 가로 메뉴로 바꿈.
  */
 
-export type MenuKey = 'find' | 'makers' | 'register' | 'about';
+export type MenuKey = 'find' | 'requests' | 'register' | 'makers' | 'guide';
 
 export const MENU: { key: MenuKey; label: string; href: string }[] = [
   { key: 'find', label: '도구 찾기', href: '/' },
-  { key: 'makers', label: '제작자 현황', href: '/makers' },
+  { key: 'requests', label: '도구 요청', href: '/requests' },
   { key: 'register', label: '도구 등록', href: '/register' },
-  { key: 'about', label: '집계 기준', href: '/about' },
+  { key: 'makers', label: '제작자 현황', href: '/makers' },
+  { key: 'guide', label: '개편 안내', href: '/poc' },
 ];
 
 export const menuOf = (r: Route): MenuKey =>
   r.page === 'tool' || r.page === 'tools' || r.page === 'home'
     ? 'find'
-    : r.page === 'maker' || r.page === 'official'
+    : r.page === 'maker' || r.page === 'official' || r.page === 'makers'
       ? 'makers'
-      : (r.page as MenuKey);
+      : r.page === 'register' || r.page === 'review'
+        ? 'register'
+        : r.page === 'requests'
+          ? 'requests'
+          : 'guide';
 
 const Ext: React.FC<{ href: string; children: React.ReactNode; className?: string }> = ({ href, children, className = '' }) => (
   <a href={href} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-0.5 ${className}`}>
@@ -46,7 +52,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
         <span className="text-slate-300" aria-hidden="true">|</span>
         <Ext href={BOARD_URL} className="hover:text-[var(--nr-p3)]">교직원 제작 도구 게시판</Ext>
         <span className="text-slate-300" aria-hidden="true">|</span>
-        <Ext href={WRITE_URL} className="hover:text-[var(--nr-p3)]">내 도구 등록하기</Ext>
+        <a href="/poc" className="font-bold text-[#8a5300] hover:underline">개편 PoC 안내</a>
       </div>
       <div className="flex items-center gap-4 py-3 md:py-2">
         <a href="/" className="flex items-center gap-2.5">
@@ -93,6 +99,22 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
       </div>
     </nav>
   </header>
+);
+
+/** 개편 PoC 띠 — 모든 화면 맨 위. 결재자·시범 사용자 모두 지금 보는 화면이 시범안임을 알게 함 */
+export const PocBanner: React.FC = () => (
+  <div className="border-b border-[#f0d9a6] bg-[#fff7e3] jbe-noprint">
+    <div className={`${BOX} flex items-center gap-2 py-2 text-[13px] text-[#6b4a00]`}>
+      <FlaskConical className="w-4 h-4 shrink-0" aria-hidden="true" />
+      <p className="min-w-0 flex-1">
+        <b>데이터 도구실 개편 시범(PoC) 화면</b>
+        <span className="hidden sm:inline"> · 도구 목록·요약·조회수는 실제 자료, 'PoC 예시' 표시 기능은 흐름 시연용</span>
+      </p>
+      <a href="/poc" className="shrink-0 font-bold underline underline-offset-2">
+        개편 안내
+      </a>
+    </div>
+  </div>
 );
 
 /** 위치 표시 — 누리집처럼 본문 칸 맨 위(연한 띠 안)에 집 아이콘 경로. 오른쪽에 주소 복사 */
@@ -220,6 +242,7 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
         {[
           { href: BOARD_URL, label: '교직원 제작 도구 게시판', note: '원글·첨부파일·댓글' },
           { href: OFFICIAL_BOARD_URL, label: '교육청 배포 도구 게시판', note: '교육청이 배포한 업무도구' },
+          { href: EXTERNAL_BOARD_URL, label: '외부 공공업무 도구 게시판', note: '다른 기관이 만든 업무도구' },
         ].map((b) => (
           <li key={b.href}>
             <a
@@ -322,7 +345,7 @@ export const SiteFooter: React.FC = () => (
   <footer className="mt-16 bg-[#f7f8fa] border-t border-[var(--nr-line)] jbe-noprint">
     <div className={`${BOX} py-8 text-[14px] text-slate-600 space-y-2`}>
       <p className="nr-title text-[18px] text-[#002f63]">교육데이터 허브 데이터 도구실 · 업무경감 도구 모음</p>
-      <p>데이터 도구실 「교직원 제작 도구」·「교육청 배포 도구」 게시판의 업무도구를 한곳에 모아 매시간 갱신하는 화면</p>
+      <p>데이터 도구실 「교육청 배포 도구」·「교직원 제작 도구」·「외부 공공업무 도구」 게시판의 업무도구를 한곳에 모은 개편 시범(PoC) 화면</p>
       <p>
         <b className="text-slate-800">담당</b> 정책기획과 빅데이터담당 · <b className="text-slate-800">전화</b> 063-239-3176
       </p>
@@ -334,6 +357,10 @@ export const SiteFooter: React.FC = () => (
         ,{' '}
         <a href={OFFICIAL_BOARD_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[var(--nr-p3)]">
           교육청 배포 도구 게시판
+        </a>
+        ,{' '}
+        <a href={EXTERNAL_BOARD_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[var(--nr-p3)]">
+          외부 공공업무 도구 게시판
         </a>
       </p>
     </div>

@@ -1,5 +1,6 @@
 import type { Comment, Grain, Payload, Tool } from '../types';
 import officialMeta from '../data/official-meta.json';
+import externalTools from '../data/external-tools.json';
 
 /** 교육청 배포 도구 분류(사용목적·적용기관) — 수집 시트에 없어 직접 정한 값 */
 const OFFICIAL_META = (officialMeta as { items: Record<string, { purpose: string; target: string; category: string }> }).items;
@@ -51,6 +52,8 @@ export interface Model {
   weekStart: string; // 이번 주 월요일
   /** 교육청 배포 도구 — 수집 시작일이 달라 따로 계산한 모델. 제작자 현황·기간 통계에는 넣지 않음 */
   official?: Model;
+  /** 외부 공공업무 도구 — 정적 목록. 조회수 추이 없음 */
+  external?: Model;
 }
 
 const toDate = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -87,15 +90,55 @@ export function buildModel(p: Payload): Model {
       commentsOk: true,
     });
   }
+  main.external = buildExternal();
   return main;
 }
 
+/**
+ * 외부 공공업무 도구 — 조회수 수집기가 없어 게시판 목록을 한 번 받아 둔 정적 자료.
+ * 수집 시점 조회수를 '수집 전 누적'으로 넣어 기간 통계에는 잡히지 않게 함
+ */
+const EXTERNAL_URL = (sid: string) =>
+  `https://www.jbe.go.kr/board/view.jbe?boardId=BBS_0000684&menuCd=DOM_000000106011002003&dataSid=${sid}`;
+function buildExternal(): Model {
+  const ext = externalTools as { asOf: string; items: { sid: string; title: string; field: string; kind: string; views: number; created: string; site: string; purpose: string; target: string }[] };
+  return buildOne({
+    asOf: ext.asOf,
+    fetchedAt: ext.asOf,
+    tools: ext.items.map((e) => ({
+      sid: e.sid,
+      title: e.title,
+      url: EXTERNAL_URL(e.sid),
+      created: e.created,
+      author: '외부 기관',
+      views: e.views,
+      comments: 0,
+      purpose: e.purpose,
+      target: e.target,
+      firstSeen: ext.asOf,
+      board: 'external' as const,
+      site: e.site,
+      field: e.field,
+      kind: e.kind,
+    })),
+    history: Object.fromEntries(ext.items.map((e) => [e.sid, [[ext.asOf, e.views]] as [string, number][]])),
+    comments: [],
+    commentsOk: true,
+  });
+}
+
 /** 도구 찾기·상세에서 쓰는 전체 도구(교직원 제작 + 교육청 배포) */
-export const allTools = (m: Model): ToolStat[] => [...m.tools, ...(m.official?.tools ?? [])];
+export const allTools = (m: Model): ToolStat[] => [...m.tools, ...(m.official?.tools ?? []), ...(m.external?.tools ?? [])];
 
 /** 이 도구가 속한 모델 — 조회수 추이의 날짜축이 게시판마다 다름 */
 export const modelOf = (m: Model, sid: string): Model | undefined =>
-  m.tools.some((t) => t.sid === sid) ? m : m.official?.tools.some((t) => t.sid === sid) ? m.official : undefined;
+  m.tools.some((t) => t.sid === sid)
+    ? m
+    : m.official?.tools.some((t) => t.sid === sid)
+      ? m.official
+      : m.external?.tools.some((t) => t.sid === sid)
+        ? m.external
+        : undefined;
 
 function buildOne(p: Payload): Model {
   const allDates = Object.values(p.history).flat().map((x) => x[0]).sort();
