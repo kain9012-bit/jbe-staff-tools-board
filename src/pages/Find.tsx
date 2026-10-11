@@ -90,6 +90,9 @@ const SourceIntro: React.FC<{ src: Board }> = ({ src }) => {
   );
 };
 
+/** 마지막으로 본 탭 — 맨 위 구분을 바꿔 화면이 새로 그려져도 보던 탭 유지 */
+let lastTab: 'work' | 'pick' | 'all' | null = null;
+
 export const Find: React.FC<{
   m: Model;
   initialQ?: string;
@@ -199,11 +202,18 @@ export const Find: React.FC<{
 
   const filtered = Boolean(q.trim() || chip || target || purpose || srcOn || ps);
   /** 처음엔 업무별로 둘러보기. 주소로 검색·필터·정렬을 들고 왔으면 전체 도구 */
-  const [tab, setTab] = useState<'work' | 'pick' | 'all'>(() => (filtered || initialSort ? 'all' : 'work'));
+  /** 검색·필터(구분 제외) — 걸리면 전체 도구 탭으로. 구분은 세 탭 모두의 범위라 탭을 바꾸지 않음 */
+  const searching = Boolean(q.trim() || chip || target || purpose || ps);
+  const [tab, setTabState] = useState<'work' | 'pick' | 'all'>(() => (searching || initialSort ? 'all' : lastTab ?? 'work'));
+  const setTab = (t: 'work' | 'pick' | 'all') => {
+    lastTab = t;
+    setTabState(t);
+  };
   /** 검색하거나 필터를 걸면 전체 도구 탭으로 — 결과가 안 보이는 일 없게 */
   useEffect(() => {
-    if (filtered) setTab('all');
-  }, [filtered, q, chip, target, purpose, srcOn]);
+    if (searching) setTab('all');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searching, q, chip, target, purpose]);
   const clearAll = () => {
     setQ('');
     setChip('');
@@ -212,11 +222,13 @@ export const Find: React.FC<{
     setSrc('');
   };
 
-  const byRecent = useMemo(() => [...everything].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views), [m]);
+  /** 맨 위 구분으로 좁힌 범위 — 업무별·인기·새 도구 탭이 모두 이 안에서 계산 */
+  const scoped = useMemo(() => (srcOn ? everything.filter((t) => (t.board ?? 'staff') === srcOn) : everything), [everything, srcOn]);
+  const byRecent = useMemo(() => [...scoped].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views), [scoped]);
   const popular = byRecent.slice(0, 5);
   const fresh = useMemo(
-    () => [...everything].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 5),
-    [everything],
+    () => [...scoped].sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid)).slice(0, 5),
+    [scoped],
   );
   const tiles = useMemo(
     () =>
@@ -339,7 +351,7 @@ export const Find: React.FC<{
           >
             <span className="sm:hidden">{short}</span>
             <span className="hidden sm:inline">{long}</span>
-            {k === 'all' && <span className="ml-1 text-[13px] font-normal tabular-nums opacity-75">{filtered ? shown.length : everything.length}</span>}
+            {k === 'all' && <span className="ml-1 text-[13px] font-normal tabular-nums opacity-75">{shown.length}</span>}
           </button>
         ))}
       </div>
