@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, LayoutGrid, List, PencilLine, Search, Sparkles, TrendingUp, X, Lightbulb } from 'lucide-react';
 import { isNewTool, SourceTag, ToolCard, ToolTable } from '../components/Lists';
 import { PageTitle, Pager } from '../components/Shell';
@@ -174,6 +174,21 @@ export const Find: React.FC<{
   const cur = Math.min(page, pages);
   const pageRows = shown.slice((cur - 1) * pageSize, cur * pageSize);
   const toResults = () => setTimeout(() => resultTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  /**
+   * 필터를 눌러도 필터 상자가 제자리에 있게 — 필터가 켜지고 꺼지면서 위쪽 구획(업무별 둘러보기·구분 안내)이
+   * 나타나거나 사라져 화면이 위아래로 튀던 문제. 누르기 전 상자 위치를 기억했다가 그린 뒤 같은 자리로 맞춤
+   */
+  const anchorTop = useRef<number | null>(null);
+  const keep = <T,>(fn: (v: T) => void) => (v: T) => {
+    anchorTop.current = resultTop.current?.getBoundingClientRect().top ?? null;
+    fn(v);
+  };
+  useLayoutEffect(() => {
+    if (anchorTop.current === null || !resultTop.current) return;
+    const diff = resultTop.current.getBoundingClientRect().top - anchorTop.current;
+    anchorTop.current = null;
+    if (Math.abs(diff) > 1) window.scrollBy(0, diff);
+  });
   const goPage = (p: number) => {
     setPage(p);
     toResults();
@@ -399,7 +414,7 @@ export const Find: React.FC<{
                   key={v || 'all'}
                   type="button"
                   aria-pressed={srcOn === v}
-                  onClick={() => setSrc(v)}
+                  onClick={() => keep(setSrc)(v)}
                   className={`rounded-full px-3.5 py-1.5 text-[14px] transition-colors ${
                     srcOn === v ? 'bg-[var(--nr-p3)] text-white font-bold' : 'bg-white text-slate-700 hover:text-[var(--nr-p3)]'
                   }`}
@@ -418,7 +433,7 @@ export const Find: React.FC<{
                 key={o.v || 'all'}
                 type="button"
                 aria-pressed={purpose === o.v}
-                onClick={() => setPurpose(o.v)}
+                onClick={() => keep(setPurpose)(o.v)}
                 className={`rounded-full px-3.5 py-1.5 text-[14px] transition-colors ${
                   purpose === o.v ? 'bg-[var(--nr-p3)] text-white font-bold' : 'bg-white text-slate-700 hover:text-[var(--nr-p3)]'
                 }`}
@@ -434,7 +449,7 @@ export const Find: React.FC<{
                 key={tg || 'all'}
                 type="button"
                 aria-pressed={target === tg}
-                onClick={() => setTarget(tg)}
+                onClick={() => keep(setTarget)(tg)}
                 className={`rounded-full px-3.5 py-1.5 text-[14px] transition-colors ${
                   target === tg ? 'bg-[var(--nr-p3)] text-white font-bold' : 'bg-white text-slate-700 hover:text-[var(--nr-p3)]'
                 }`}
@@ -450,7 +465,7 @@ export const Find: React.FC<{
             <span className="w-16 shrink-0 text-[14px] font-bold text-slate-700">업무</span>
             <select
               value={chip}
-              onChange={(e) => setChip(e.target.value)}
+              onChange={(e) => keep(setChip)(e.target.value)}
               aria-label="업무"
               className="h-9 rounded-full border-0 bg-white px-3.5 text-[14px]"
             >
