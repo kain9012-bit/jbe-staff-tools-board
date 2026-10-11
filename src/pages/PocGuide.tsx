@@ -4,6 +4,7 @@ import { PocTag, versionOf } from '../components/Poc';
 import { PageTitle } from '../components/Shell';
 import { allTools, n, sum, type Model } from '../lib/stats';
 import { summaryOf } from '../lib/summaries';
+import { SOURCES } from '../lib/sources';
 
 /**
  * 개편 안내 — 데이터 도구실을 게시판 3개에서 하나의 플랫폼으로 바꾸는 PoC의 취지와 화면 안내.
@@ -13,10 +14,13 @@ import { summaryOf } from '../lib/summaries';
 const PILLARS = [
   {
     icon: Boxes,
-    title: '게시판 3개를 하나로',
+    title: '게시판 3개 → 도구 목록 1개 + 구분 3개',
     now: ['교육청 배포·교직원 제작·외부 공공업무 도구가 게시판 3개에 따로 있음', '검색도 게시판마다 따로, 제목으로만 찾음'],
-    next: ['한 번 검색으로 세 곳의 도구를 모두 찾음', '출처 표시로 누가 만든 도구인지 구분', '도구마다 같은 형식의 요약(한눈에 보기)'],
-    links: [['도구 찾기', '/']],
+    next: ['게시판은 없애고 구분을 도구의 속성으로 남김', '구분별 입구는 옛 게시판 이름 그대로 유지', '한 번 검색으로 세 구분을 모두 찾음', '구분마다 등록·검수·책임·문의 창구가 다름'],
+    links: [
+      ['도구 찾기', '/'],
+      ['교육청 배포 도구', '/?src=official'],
+    ],
   },
   {
     icon: ClipboardCheck,
@@ -129,6 +133,94 @@ export const PocGuide: React.FC<{ m: Model }> = ({ m }) => {
               </article>
             );
           })}
+        </div>
+      </section>
+
+      {/* 구분별 운영 방식 */}
+      <section className="mt-12">
+        <h2 className="nr-title text-[24px] text-black">구분별 운영 방식</h2>
+        <p className="mt-1 text-[15px] text-slate-600">게시판 대신 구분이 누가 올리고 누가 책임지는지를 정함</p>
+        <div className="mt-4 overflow-x-auto rounded-[12px] border border-[var(--nr-line)]">
+          <table className="w-full min-w-[720px] text-[14px]">
+            <thead className="bg-[var(--nr-bg)] text-left text-[13px] text-slate-600">
+              <tr>
+                {['구분', '등록하는 사람', '등록 방식', '검수', '책임·지원', '문의'].map((h) => (
+                  <th key={h} scope="col" className="px-4 py-3 font-bold">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {SOURCES.map((x) => (
+                <tr key={x.key} className="border-t border-[var(--nr-line)] align-top">
+                  <th scope="row" className="px-4 py-3 text-left">
+                    <a href={`/?src=${x.key}`} className="font-bold text-black hover:text-[var(--nr-p3)] hover:underline">
+                      {x.name}
+                    </a>
+                    <span className="block text-[12px] font-normal text-slate-500">{all.filter((t) => (t.board ?? 'staff') === x.key).length}개</span>
+                  </th>
+                  <td className="px-4 py-3 font-bold text-slate-800">{x.who}</td>
+                  <td className="px-4 py-3 text-slate-700">{x.how}</td>
+                  <td className="px-4 py-3 text-slate-700">{x.review}</td>
+                  <td className="px-4 py-3 text-slate-700">{x.resp}</td>
+                  <td className="px-4 py-3 text-slate-700">{x.ask}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 게시판 이관 */}
+      <section className="mt-12">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="nr-title text-[24px] text-black">게시판 이관 계획</h2>
+          <PocTag label="제안" />
+        </div>
+        <p className="mt-1 text-[15px] text-slate-600">지금 게시글은 버리지 않고 구분을 붙여 그대로 옮김</p>
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-[12px] border border-[var(--nr-line)] bg-white p-5">
+            <p className="text-[16px] font-bold text-black">옮기는 글</p>
+            <ul className="mt-2 space-y-1.5 text-[15px] text-slate-700">
+              {SOURCES.map((x) => (
+                <li key={x.key} className="flex justify-between gap-2">
+                  <span>{x.name} 게시판</span>
+                  <b className="tabular-nums text-slate-900">{all.filter((t) => (t.board ?? 'staff') === x.key).length}개</b>
+                </li>
+              ))}
+              <li className="flex justify-between gap-2 border-t border-slate-100 pt-1.5">
+                <span>교직원 제작 도구 댓글</span>
+                <b className="tabular-nums text-slate-900">{n(sum(m.tools.map((t) => t.comments)))}개</b>
+              </li>
+            </ul>
+          </div>
+          <div className="rounded-[12px] border border-[var(--nr-line)] bg-white p-5">
+            <p className="text-[16px] font-bold text-black">옮기는 항목</p>
+            <ul className="mt-2 space-y-1.5 text-[15px] text-slate-700">
+              <li>제목·작성자·게시일·조회수 → 도구 정보 (구분은 원래 게시판 기준)</li>
+              <li>본문 → 등록 양식 항목(한눈에 보기)으로 정리, 원문은 보관</li>
+              <li>첨부파일 → 도구 파일, 현재 버전으로 등록</li>
+              <li>댓글 → 질문과 답변</li>
+            </ul>
+          </div>
+          <div className="rounded-[12px] border border-[var(--nr-line)] bg-white p-5">
+            <p className="text-[16px] font-bold text-black">기존 게시판 처리</p>
+            <ol className="mt-2 space-y-2 text-[15px] text-slate-700">
+              {[
+                ['글쓰기 중지', '새 등록은 새 화면으로 안내'],
+                ['읽기 전용', '일정 기간 원글 열람만 허용'],
+                ['폐쇄', '원글 주소로 들어오면 새 도구 화면으로 연결'],
+              ].map(([h, d], i) => (
+                <li key={h} className="flex gap-2.5">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--nr-p2)] text-[12px] font-bold text-white">{i + 1}</span>
+                  <span>
+                    <b className="text-slate-900">{h}</b> · {d}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </section>
 

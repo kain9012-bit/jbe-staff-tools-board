@@ -4,6 +4,7 @@ import type { ToolStat } from '../lib/stats';
 import { dayLabel } from '../lib/stats';
 import type { ToolSummary } from '../lib/summaries';
 import { PocTag, todayKst, usePocState, versionOf } from './Poc';
+import { sourceOf } from '../lib/sources';
 
 /**
  * 도구 상세의 개편 PoC 구역 — 검수 정보, 버전·업데이트, 써봤어요·후기.
@@ -65,6 +66,7 @@ export const TrustPanel: React.FC<{ t: ToolStat; s?: ToolSummary }> = ({ t, s })
         <Row label="외부 전송" level={tl} value={tv} />
         <Row label="개인정보 처리" level="unknown" value="미확인" />
         <Row label="현재 버전 표기" level={ver ? 'ok' : 'unknown'} value={ver ? `v${ver}` : '미표기'} />
+        <Row label="문의 창구" level="ok" value={sourceOf(board).ask} />
       </ul>
       <p className="mt-2 text-[12px] text-slate-500">
         '미확인' 항목은 개편 후 등록 양식의 보안 자가점검과 검수 결과로 채워짐

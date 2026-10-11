@@ -236,8 +236,9 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
       })}
     </ul>
     {/* 게시판 바로가기 — 왼쪽 메뉴와 같은 크기의 큰 버튼. 글쓰기는 위 '도구 등록' 메뉴에서 */}
-    <nav aria-label="게시판 바로가기" className="mt-6">
-      <p className="mb-2 px-1 text-[15px] font-bold text-slate-600">게시판 바로가기</p>
+    <nav aria-label="이관 전 원 게시판" className="mt-6">
+      <p className="mb-2 px-1 text-[15px] font-bold text-slate-600">이관 전 원 게시판</p>
+      <p className="-mt-1 mb-2 px-1 text-[12px] text-slate-500">PoC 기간에만 두는 바로가기. 개편 후 폐쇄</p>
       <ul className="space-y-2">
         {[
           { href: BOARD_URL, label: '교직원 제작 도구 게시판', note: '원글·첨부파일·댓글' },

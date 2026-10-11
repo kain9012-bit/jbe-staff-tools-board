@@ -9,6 +9,7 @@ import { hrefTool } from '../lib/route';
 import { matcher } from '../lib/search';
 import { allTools, n, periodStats, rangeLabel, shortDay, splitAuthor, type Model, type ToolStat } from '../lib/stats';
 import { BOARD_LABEL, type Board } from '../types';
+import { SOURCES, sourceOf } from '../lib/sources';
 
 /**
  * 도구 찾기 — 찾는 사람 중심 첫 화면
@@ -46,6 +47,41 @@ const SectionHead: React.FC<{ id: string; title: string; note?: React.ReactNode 
     {note && <span className="text-[13px] text-slate-500">{note}</span>}
   </div>
 );
+
+/** 구분 안내 — 옛 게시판 첫머리 자리. 누가 올리고 누가 책임지는지 */
+const SourceIntro: React.FC<{ src: Board }> = ({ src }) => {
+  const x = sourceOf(src);
+  return (
+    <section aria-label={`${x.name} 안내`} className="mt-4 rounded-[14px] border border-[var(--nr-line)] bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="nr-title text-[20px] text-black">{x.name}</h2>
+          <p className="mt-0.5 text-[15px] text-slate-600">{x.desc}</p>
+        </div>
+        {x.register ? (
+          <a href={x.register.href} className="shrink-0 rounded-lg bg-[var(--nr-p1)] px-4 py-2.5 text-[14px] font-bold text-white hover:bg-[var(--nr-p3)]">
+            {x.register.label}
+          </a>
+        ) : (
+          <span className="shrink-0 rounded-lg bg-[#f1f3f6] px-4 py-2.5 text-[13px] font-bold text-slate-500">{x.who} 전용 등록</span>
+        )}
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px] lg:grid-cols-4">
+        {[
+          ['등록', `${x.who} · ${x.how}`],
+          ['검수', x.review],
+          ['책임', x.resp],
+          ['문의', x.ask],
+        ].map(([k, v]) => (
+          <div key={k}>
+            <dt className="text-[12px] font-bold text-slate-500">{k}</dt>
+            <dd className="text-slate-800">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+};
 
 export const Find: React.FC<{
   m: Model;
@@ -171,6 +207,23 @@ export const Find: React.FC<{
   return (
     <>
       <PageTitle>도구 찾기</PageTitle>
+
+      {/* 0. 구분 — 옛 게시판 3개 자리. 구분마다 등록·책임·문의가 다름 */}
+      <nav aria-label="도구 구분" className="mt-5 -mx-1 flex gap-1.5 overflow-x-auto no-scrollbar px-1">
+        {[{ key: '' as const, name: '전체', n: everything.length }, ...SOURCES.map((x) => ({ key: x.key, name: x.name, n: everything.filter((t) => (t.board ?? 'staff') === x.key).length }))].map((x) => (
+          <a
+            key={x.key || 'all'}
+            href={x.key ? `/?src=${x.key}` : '/'}
+            aria-current={srcOn === x.key ? 'page' : undefined}
+            className={`shrink-0 rounded-full px-4 py-2 text-[15px] ${
+              srcOn === x.key ? 'bg-[var(--nr-p2)] font-bold text-white' : 'bg-[var(--nr-bg)] text-slate-700 hover:text-[var(--nr-p3)]'
+            }`}
+          >
+            {x.name} <span className="tabular-nums opacity-75">{x.n}</span>
+          </a>
+        ))}
+      </nav>
+      {srcOn && !ps && <SourceIntro src={srcOn} />}
 
       {/* 1. 검색 — 남색 바탕 큰 검색창(누리집 통합검색 상자 색) */}
       <section aria-label="도구 검색" className="mt-6 rounded-[20px] bg-[var(--nr-p2)] px-5 py-7 sm:px-10 sm:py-9 text-white">
@@ -326,7 +379,7 @@ export const Find: React.FC<{
         <div className="mt-4 rounded-[14px] bg-[var(--nr-bg)] p-4 sm:p-5 space-y-3">
           {offCount > 0 && !ps && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="w-16 shrink-0 text-[14px] font-bold text-slate-700">출처</span>
+              <span className="w-16 shrink-0 text-[14px] font-bold text-slate-700">구분</span>
               {(
                 [
                   ['', '전체', matched.length],

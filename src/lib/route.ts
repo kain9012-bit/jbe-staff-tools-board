@@ -25,7 +25,7 @@ export function parseLoc(pathname: string, search: string): Route {
   };
   if (p === 'tools') return { page: 'tools', ...opt };
   if (p === 'makers') return { page: 'makers', q: opt.q, sort: opt.sort, from: opt.from, to: opt.to };
-  if (p === 'register') return { page: 'register' };
+  if (p === 'register') return { page: 'register', type: sp.get('type') || undefined };
   if (p === 'about') return { page: 'about' };
   if (p === 'official') return { page: 'official' };
   if (p === 'requests') return { page: 'requests' };

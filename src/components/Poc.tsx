@@ -85,8 +85,18 @@ export interface Submission {
   run: string;
   version: string;
   at: string;
-  stage: number; // 0 신청 · 1 자가점검 완료 · 2 보안 검토 · 3 게시
-  checks: number; // 자가점검 '예' 개수
+  stage: number; // 구분별 단계 번호 — STAGES_OF 참고
+  checks: number; // 자가점검 통과 개수(교직원 제작)
+  /** 구분 — 교직원 제작 도구 등록 / 외부 공공업무 도구 추천 */
+  board?: 'staff' | 'external';
+  org?: string; // 외부 — 제작 기관
+  region?: string; // 외부 — 기준 지역
+  note?: string;
 }
 
-export const STAGES = ['등록 신청', '자가점검', '보안 검토', '게시'] as const;
+/** 구분마다 거치는 단계가 다름 — 교직원 제작은 보안 검토, 외부 공공은 운영자 확인 */
+export const STAGES_OF = {
+  staff: ['등록 신청', '자가점검', '보안 검토', '게시'],
+  external: ['추천 접수', '운영자 확인', '게시'],
+} as const;
+export const STAGES = STAGES_OF.staff;

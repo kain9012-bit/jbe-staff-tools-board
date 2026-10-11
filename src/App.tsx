@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
 import { Lnb, menuOf, PocBanner, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
 import { Requests } from './pages/Requests';
+import { SOURCES } from './lib/sources';
 import { Review } from './pages/Review';
 import { PocGuide } from './pages/PocGuide';
 import { EmptyState } from './components/Ui';
-import { hrefPurpose, locKey, useRoute } from './lib/route';
+import { locKey, useRoute } from './lib/route';
 import { allTools } from './lib/stats';
 import { useData } from './lib/useData';
 import { About } from './pages/About';
@@ -63,9 +64,11 @@ export default function App() {
 
   const m = state.status === 'ready' ? state.model : undefined;
   const active: MenuKey = menuOf(route);
-  const purposeNow = route.page === 'home' || route.page === 'tools' ? route.p ?? '' : '';
+  const srcNow = route.page === 'home' || route.page === 'tools' ? route.src ?? '' : '';
 
-  const toolTitle = route.page === 'tool' && m ? allTools(m).find((x) => x.sid === route.sid)?.title : undefined;
+  const toolNow = route.page === 'tool' && m ? allTools(m).find((x) => x.sid === route.sid) : undefined;
+  const toolTitle = toolNow?.title;
+  const toolBoard = toolNow ? toolNow.board ?? 'staff' : '';
   const makerName = route.page === 'maker' ? route.name : undefined;
 
   useEffect(() => {
@@ -92,21 +95,24 @@ export default function App() {
     return {
       ...fixed,
       find: [
-        { label: '전체', href: hrefPurpose(''), on: active === 'find' && route.page !== 'tool' && !purposeNow, count: all.length },
-        ...[...c.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .map(([p, k]) => ({ label: p, href: hrefPurpose(p), on: purposeNow === p, count: k })),
+        { label: '전체', href: '/', on: active === 'find' && route.page !== 'tool' && !srcNow, count: all.length },
+        ...SOURCES.map((x) => ({
+          label: x.name,
+          href: `/?src=${x.key}`,
+          on: srcNow === x.key || (route.page === 'tool' && toolBoard === x.key),
+          count: all.filter((t) => (t.board ?? 'staff') === x.key).length,
+        })),
       ],
       makers: [
         { label: '교직원 제작 도구', href: '/makers', on: route.page === 'makers' || route.page === 'maker', count: m.tools.length },
         ...(m.official ? [{ label: '교육청 배포 도구', href: '/official', on: route.page === 'official', count: m.official.tools.length }] : []),
       ],
     };
-  }, [m, active, route.page, purposeNow]);
+  }, [m, active, route.page, srcNow, toolBoard]);
 
   const label = MENU.find((x) => x.key === active)?.label ?? '';
   /** 하위 메뉴가 있는 화면은 '메뉴 > 하위 메뉴' */
-  const subNow = active !== 'find' ? subs[active]?.find((x) => x.on)?.label : undefined;
+  const subNow = active !== 'find' || srcNow ? subs[active]?.find((x) => x.on)?.label : undefined;
   const trail: { label: string; href?: string }[] = [
     { label: '교육데이터 허브' },
     { label: '데이터 도구실' },
@@ -120,7 +126,7 @@ export default function App() {
 
   let body: React.ReactNode;
   if (route.page === 'about') body = <About m={m} />;
-  else if (route.page === 'register') body = <Register />;
+  else if (route.page === 'register') body = <Register key={locKey()} initialType={route.type} />;
   else if (route.page === 'review') body = <Review />;
   else if (state.status === 'loading') body = <Skeleton />;
   else if (state.status === 'error')
