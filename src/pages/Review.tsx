@@ -5,6 +5,7 @@ import { PocNote, PocTag, STAGES, UPGRADE_STAGES, usePocState, type Submission }
 import { PageTitle } from '../components/Shell';
 import { useHashScroll } from '../lib/route';
 import { SOURCES } from '../lib/sources';
+import { useManage } from '../lib/manage';
 import { dayLabel } from '../lib/stats';
 
 /**
@@ -71,6 +72,8 @@ export const Review: React.FC = () => {
   useHashScroll();
   const [mine, setMine] = usePocState<Submission[]>('submissions', []);
   const [kind, setKind] = useState('');
+  const { ups } = useManage();
+  const myUps = Object.entries(ups).map(([sid, u]) => ({ id: sid, title: u.title ?? sid, maker: u.maker ?? '', stage: u.stage, note: u.notes.filter(Boolean).slice(-1)[0] ?? '', mine: true }));
   const all: (Submission & { mine?: boolean })[] = [...mine.map((s) => ({ ...s, mine: true })), ...SAMPLES].filter((s) => !kind || (s.board ?? 'staff') === kind);
   const advance = (id: string) => setMine((v) => v.map((s) => (s.id === id ? { ...s, stage: Math.min(STAGES.length - 1, s.stage + 1) } : s)));
 
@@ -168,16 +171,25 @@ export const Review: React.FC = () => {
         </p>
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {UPGRADE_STAGES.map((name, i) => {
-            const items = UPGRADES.filter((u) => u.stage === i);
+            const items = [...myUps, ...UPGRADES.map((x) => ({ ...x, mine: false }))].filter((u) => u.stage === i);
             return (
               <Column key={name} icon={UPGRADE_INFO[i].icon} no={i + 1} name={name} desc={UPGRADE_INFO[i].desc} count={items.length}>
                 {items.map((u) => (
-                  <li key={u.id} className="rounded-[10px] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                  <li key={u.id} className={`rounded-[10px] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)] ${u.mine ? 'ring-2 ring-[#e0a800]' : ''}`}>
                     <div className="flex flex-wrap items-center gap-1">
+                      {u.mine && <PocTag label="시연 중" />}
                       <SourceTag board={i === 3 ? 'official' : 'staff'} className="!px-1.5 !py-0 !text-[11px]" />
                       {i === 3 && <span className="text-[11px] font-bold text-slate-500">← 교직원 제작</span>}
                     </div>
-                    <p className="mt-1.5 text-[15px] font-bold leading-snug text-black">{u.title}</p>
+                    <p className="mt-1.5 text-[15px] font-bold leading-snug text-black">
+                      {u.mine ? (
+                        <a href={`/tool/${u.id}`} className="hover:text-[var(--nr-p3)] hover:underline">
+                          {u.title}
+                        </a>
+                      ) : (
+                        u.title
+                      )}
+                    </p>
                     <p className="mt-0.5 text-[12px] text-slate-500">원작 {u.maker}</p>
                     <p className="mt-1 text-[12px] font-bold text-[#8a5300]">{u.note}</p>
                   </li>

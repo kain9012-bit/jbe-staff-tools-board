@@ -7,6 +7,8 @@ import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { allTools, dayLabel, modelOf, n, type Model, type ToolStat } from '../lib/stats';
 import { summaryOf, type ToolSummary } from '../lib/summaries';
 import { ReactionPanel, TrustPanel, VersionPanel } from '../components/ToolPoc';
+import { ManagePanel } from '../components/ManagePanel';
+import { useRequests } from '../lib/requests';
 
 /** 한눈에 보기 — 원 게시글을 정해진 항목으로 짧게 정리한 요약. 본문 자체는 싣지 않음 */
 const SummaryBox: React.FC<{ s?: ToolSummary; url: string }> = ({ s, url }) => {
@@ -137,6 +139,7 @@ const ToolLinkList: React.FC<{ tools: ToolStat[] }> = ({ tools }) => (
 );
 
 export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
+  const solved = useRequests(m).list.filter((r) => r.tools.some((x) => x.sid === sid));
   const t = allTools(m).find((x) => x.sid === sid);
   /** 이 도구가 속한 게시판의 모델 — 교육청 배포 도구는 수집 시작일이 달라 따로 계산 */
   const bm = modelOf(m, sid) ?? m;
@@ -144,7 +147,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
   /** 외부 공공업무 도구 — 조회수 추이·댓글이 없음 */
   const external = t?.board === 'external';
   /** 제작자가 게시판 운영자 한 사람인 게시판 */
-  const single = official || external;
+  const single = (official && !t?.origin) || external;
   if (!t) {
     return (
       <EmptyState
@@ -176,6 +179,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         <div className="min-w-0 max-w-4xl">
           <div className="flex flex-wrap gap-1.5">
             <SourceTag board={t.board} className="!text-[13px] !py-1" />
+            {t.origin && <Badge tone="amber">교직원 제작에서 전환</Badge>}
             <Badge tone="blue">{t.purpose || '분류 없음'}</Badge>
             <Badge>적용기관 {t.target || '미기재'}</Badge>
             {chips.map((c) => (
@@ -186,6 +190,10 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
           <p className="mt-1 text-slate-600">
             {external ? (
               <b className="text-slate-800">외부 기관 제작{t.kind ? ` · ${t.kind}` : ''}</b>
+            ) : t.origin ? (
+              <>
+                <b className="text-slate-800">{t.author}</b> · 원작 <MakerLink name={t.origin} />
+              </>
             ) : official ? (
               <b className="text-slate-800">{t.author}</b>
             ) : (
@@ -200,6 +208,17 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
 
       {/* 2. 한눈에 보기 */}
       <SummaryBox s={summaryOf(sid)} url={t.url} />
+      {solved.length > 0 && (
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[10px] bg-[#f3faf5] px-4 py-2.5 text-[14px] text-slate-700">
+          <b className="text-[#1f7a3a]">해결한 요청</b>
+          {solved.map((r) => (
+            <a key={r.id} href={`/requests/${r.id}`} className="font-bold text-[var(--nr-p3)] underline underline-offset-2">
+              {r.title}
+            </a>
+          ))}
+          <span className="text-[12px] text-slate-500">(PoC 예시 요청)</span>
+        </p>
+      )}
       {external && t.site && (
         <p className="mt-3 text-[14px] text-slate-600">
           제작 기관 누리집:{' '}
@@ -296,6 +315,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         </div>
       </section>
       )}
+      <ManagePanel t={t} />
     </>
   );
 };

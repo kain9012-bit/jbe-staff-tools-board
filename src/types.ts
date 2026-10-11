@@ -11,6 +11,10 @@ export interface Tool {
   firstSeen: string;
   /** 출처 게시판 — staff: 교직원 제작 도구, official: 교육청 배포 도구, external: 외부 공공업무 도구 */
   board?: Board;
+  /** 고도화로 교육청 배포 도구가 된 경우 원작자(교직원 제작 때 작성자) */
+  origin?: string;
+  /** 전환한 날 */
+  convertedAt?: string;
   /** 외부 공공업무 도구 — 제작 기관 누리집 */
   site?: string;
   /** 외부 공공업무 도구 — 게시판의 업무분야·이용형태 */
@@ -48,11 +52,12 @@ export type Grain = 'day' | 'week' | 'month';
 export type Route =
   | { page: 'home'; q?: string; sort?: string; from?: string; to?: string; p?: string; src?: string }
   | { page: 'tools'; q?: string; sort?: string; from?: string; to?: string; p?: string; src?: string }
-  | { page: 'register'; type?: string }
+  | { page: 'register'; type?: string; req?: string }
   | { page: 'makers'; q?: string; sort?: string; from?: string; to?: string }
   | { page: 'about' }
   | { page: 'official' }
   | { page: 'requests' }
+  | { page: 'request'; id: string }
   | { page: 'review' }
   | { page: 'poc' }
   | { page: 'tool'; sid: string }

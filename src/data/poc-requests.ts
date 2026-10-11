@@ -1,26 +1,33 @@
 /**
  * 도구 요청 PoC 예시 — 실제 접수된 요청이 아님.
- * '해결' 요청은 지금 데이터 도구실에 있는 실제 도구와 연결해 흐름을 보여 줌
+ * 요청은 누구나 올리고, 만드는 사람도 교직원 누구나. 정책기획과는 운영(연결·정리)만.
+ * 해결된 요청에 연결된 도구는 지금 데이터 도구실에 있는 실제 도구
  */
-export type ReqStatus = '접수' | '검토 중' | '제작 중' | '해결';
+export type ReqStatus = '의견 모으는 중' | '만드는 중' | '해결';
+export const REQ_STATUS: ReqStatus[] = ['의견 모으는 중', '만드는 중', '해결'];
+
+export interface ReqComment {
+  who: string; // 소속 유형만(개인 이름 없음)
+  at: string;
+  text: string;
+  maker?: boolean; // 제작자 의견
+}
 
 export interface ToolRequest {
   id: string;
   title: string;
   detail: string;
   field: string;
-  who: string; // 요청 부서 유형만(개인 이름 없음)
+  who: string; // 요청 부서 유형만
   at: string;
   likes: number;
-  status: ReqStatus;
-  /** 해결 — 연결된 도구 */
+  /** 이 요청을 해결하는 실제 도구(게시됨) */
   sids?: string[];
-  /** 제작 중 — 맡은 쪽 */
-  maker?: string;
+  /** '해결해볼게요'를 누른 제작자(가상) */
+  making?: string[];
+  comments?: ReqComment[];
   mine?: boolean;
 }
-
-export const REQ_STATUS: ReqStatus[] = ['접수', '검토 중', '제작 중', '해결'];
 
 export const SAMPLE_REQUESTS: ToolRequest[] = [
   {
@@ -31,8 +38,11 @@ export const SAMPLE_REQUESTS: ToolRequest[] = [
     who: '초등학교 교사',
     at: '2026-08-21',
     likes: 34,
-    status: '해결',
     sids: ['1172751'],
+    comments: [
+      { who: '중학교 교사', at: '2026-08-22', text: '떼어 놓아야 하는 학생 짝 설정도 있으면 좋겠습니다.' },
+      { who: '초등학교 교사', at: '2026-08-25', text: '짝꿍 규칙까지 넣어서 만들어 보겠습니다. 시안 나오면 공유할게요.', maker: true },
+    ],
   },
   {
     id: 'r2',
@@ -42,8 +52,8 @@ export const SAMPLE_REQUESTS: ToolRequest[] = [
     who: '교육지원청 주무관',
     at: '2026-06-02',
     likes: 52,
-    status: '해결',
     sids: ['1144553', '1144600'],
+    comments: [{ who: '고등학교 행정실', at: '2026-06-03', text: '교데통에 있는 그룹을 그대로 가져오는 기능도 필요합니다.' }],
   },
   {
     id: 'r3',
@@ -53,7 +63,6 @@ export const SAMPLE_REQUESTS: ToolRequest[] = [
     who: '중학교 교감',
     at: '2026-05-12',
     likes: 61,
-    status: '해결',
     sids: ['1141424'],
   },
   {
@@ -64,8 +73,8 @@ export const SAMPLE_REQUESTS: ToolRequest[] = [
     who: '고등학교 행정실',
     at: '2026-09-02',
     likes: 47,
-    status: '해결',
     sids: ['1154326'],
+    comments: [{ who: '초등학교 행정실', at: '2026-09-04', text: '외부 공공업무 도구에 비슷한 계산기가 있어 연결했습니다. 강원 기준이라 지침 확인 필요.' }],
   },
   {
     id: 'r5',
@@ -75,8 +84,11 @@ export const SAMPLE_REQUESTS: ToolRequest[] = [
     who: '초등학교 행정실',
     at: '2026-09-18',
     likes: 39,
-    status: '제작 중',
-    maker: '교육청 배포 도구로 개발 중',
+    making: ['○○중 교사', '○○교육지원청 주무관'],
+    comments: [
+      { who: '중학교 행정실', at: '2026-09-19', text: '위원 발언을 요약하는 형식도 학교마다 달라서 양식을 고를 수 있으면 좋겠습니다.' },
+      { who: '○○중 교사', at: '2026-09-21', text: '녹음 파일을 외부로 보내지 않는 방식으로 만들어 보고 있습니다.', maker: true },
+    ],
   },
   {
     id: 'r6',
@@ -86,7 +98,7 @@ export const SAMPLE_REQUESTS: ToolRequest[] = [
     who: '중학교 행정실',
     at: '2026-09-25',
     likes: 21,
-    status: '검토 중',
+    making: ['○○고 행정실'],
   },
   {
     id: 'r7',
@@ -96,7 +108,7 @@ export const SAMPLE_REQUESTS: ToolRequest[] = [
     who: '초등학교 영양교사',
     at: '2026-10-02',
     likes: 15,
-    status: '접수',
+    comments: [{ who: '중학교 영양교사', at: '2026-10-03', text: '식재료 이름 목록을 공유해 드릴 수 있습니다.' }],
   },
   {
     id: 'r8',
@@ -106,6 +118,5 @@ export const SAMPLE_REQUESTS: ToolRequest[] = [
     who: '고등학교 행정실',
     at: '2026-10-06',
     likes: 12,
-    status: '접수',
   },
 ];

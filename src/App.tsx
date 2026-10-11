@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
 import { Lnb, menuOf, PocBanner, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
 import { Requests } from './pages/Requests';
+import { RequestDetail } from './pages/RequestDetail';
 import { SOURCES } from './lib/sources';
 import { Review } from './pages/Review';
 import { PocGuide } from './pages/PocGuide';
@@ -9,6 +10,7 @@ import { EmptyState } from './components/Ui';
 import { locKey, useRoute } from './lib/route';
 import { allTools } from './lib/stats';
 import { useData } from './lib/useData';
+import { applyUpgrades, useManage } from './lib/manage';
 import { About } from './pages/About';
 import { Find } from './pages/Find';
 import { StatsOverview } from './pages/Home';
@@ -62,14 +64,16 @@ export default function App() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const m = state.status === 'ready' ? state.model : undefined;
+  const { ups } = useManage();
+  /** 고도화로 전환된 도구 반영(PoC, 이 브라우저 기록) */
+  const m = useMemo(() => (state.status === 'ready' ? applyUpgrades(state.model, ups) : undefined), [state, ups]);
   const active: MenuKey = menuOf(route);
   const srcNow = route.page === 'home' || route.page === 'tools' ? route.src ?? '' : '';
 
   const toolNow = route.page === 'tool' && m ? allTools(m).find((x) => x.sid === route.sid) : undefined;
   const toolTitle = toolNow?.title;
   const toolBoard = toolNow ? toolNow.board ?? 'staff' : '';
-  const makerName = route.page === 'maker' ? route.name : undefined;
+  const makerName = route.page === 'maker' ? route.name : route.page === 'request' ? '요청 글' : undefined;
 
   useEffect(() => {
     const t = toolTitle ?? makerName ?? (active !== 'find' ? MENU.find((x) => x.key === active)?.label : undefined);
@@ -126,7 +130,7 @@ export default function App() {
 
   let body: React.ReactNode;
   if (route.page === 'about') body = <About m={m} />;
-  else if (route.page === 'register') body = <Register key={locKey()} initialType={route.type} />;
+  else if (route.page === 'register') body = <Register key={locKey()} initialType={route.type} initialReq={route.req} />;
   else if (route.page === 'review') body = <Review />;
   else if (state.status === 'loading') body = <Skeleton />;
   else if (state.status === 'error')
@@ -167,6 +171,7 @@ export default function App() {
     else if (route.page === 'tool') body = <ToolDetail m={m} sid={route.sid} />;
     else if (route.page === 'maker') body = <MakerDetail m={m} name={route.name} />;
     else if (route.page === 'requests') body = <Requests m={m} />;
+    else if (route.page === 'request') body = <RequestDetail key={route.id} m={m} id={route.id} />;
     else if (route.page === 'poc') body = <PocGuide m={m} />;
   }
   /** 휴대폰 하위 메뉴 — PC는 왼쪽 메뉴에 있음 */

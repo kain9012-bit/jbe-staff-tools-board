@@ -5,6 +5,7 @@ import { dayLabel } from '../lib/stats';
 import type { ToolSummary } from '../lib/summaries';
 import { PocTag, todayKst, usePocState, versionOf } from './Poc';
 import { sourceOf } from '../lib/sources';
+import { useManage } from '../lib/manage';
 
 /**
  * 도구 상세의 개편 PoC 구역 — 검수 정보, 버전·업데이트, 써봤어요·후기.
@@ -38,10 +39,11 @@ const Row: React.FC<{ label: string; level: Level; value: string }> = ({ label, 
 
 /** 검수 정보 — 게시판별로 지금 상태가 다름을 그대로 보여 줌 */
 export const TrustPanel: React.FC<{ t: ToolStat; s?: ToolSummary }> = ({ t, s }) => {
+  const M = useManage();
   const board = t.board ?? 'staff';
   const head =
     board === 'official'
-      ? { tone: 'bg-[#e8f3ec] text-[#1f7a3a]', text: '교육청 배포 · 배포 전 검토', desc: '정책기획과가 만들어 배포한 도구' }
+      ? { tone: 'bg-[#e8f3ec] text-[#1f7a3a]', text: '교육청 배포 · 배포 전 검토', desc: t.origin ? `교직원 제작 도구(원작 ${t.origin})를 고도화해 배포` : '정책기획과가 만들어 배포한 도구' }
       : board === 'external'
         ? { tone: 'bg-[#eef6f3] text-[#0b6b52]', text: '외부 기관 도구 · 선정 안내', desc: '교육청 밖 공공기관 도구. 교육청 검수 대상 아님' }
         : { tone: 'bg-[#f1f3f6] text-slate-700', text: '검수 전', desc: '지금 게시판은 등록 전 검수 절차가 없음' };
@@ -67,6 +69,7 @@ export const TrustPanel: React.FC<{ t: ToolStat; s?: ToolSummary }> = ({ t, s })
         <Row label="개인정보 처리" level="unknown" value="미확인" />
         <Row label="현재 버전 표기" level={ver ? 'ok' : 'unknown'} value={ver ? `v${ver}` : '미표기'} />
         <Row label="문의 창구" level="ok" value={sourceOf(board).ask} />
+        <Row label="글 수정 권한" level="ok" value={M.editors(t).join(', ')} />
       </ul>
       <p className="mt-2 text-[12px] text-slate-500">
         '미확인' 항목은 개편 후 등록 양식의 보안 자가점검과 검수 결과로 채워짐
@@ -78,6 +81,7 @@ export const TrustPanel: React.FC<{ t: ToolStat; s?: ToolSummary }> = ({ t, s })
 /** 버전·업데이트 — 지금은 제목의 버전과 게시일만 알 수 있음 */
 export const VersionPanel: React.FC<{ t: ToolStat }> = ({ t }) => {
   const ver = versionOf(t.title);
+  const up = useManage().up(t.sid);
   const [subs, setSubs] = usePocState<string[]>('subs', []);
   const on = subs.includes(t.sid);
   return (
@@ -89,10 +93,24 @@ export const VersionPanel: React.FC<{ t: ToolStat }> = ({ t }) => {
         <PocTag />
       </div>
       <ol className="mt-4 border-l-2 border-[var(--nr-line)] pl-4 space-y-4">
+        {up?.convertedAt && (
+          <li className="relative">
+            <span aria-hidden="true" className="absolute -left-[23px] top-1 h-3 w-3 rounded-full bg-[#2f3a73] ring-4 ring-white" />
+            <p className="text-[15px] font-bold text-black">
+              v{up.version} <span className="ml-1 rounded bg-[#2f3a73] px-1.5 py-0.5 text-[11px] text-white">교육청 배포 전환</span>
+            </p>
+            <p className="text-[13px] text-slate-500">{dayLabel(up.convertedAt)} · 고도화 후 교육청 배포 도구로 전환</p>
+          </li>
+        )}
         <li className="relative">
           <span aria-hidden="true" className="absolute -left-[23px] top-1 h-3 w-3 rounded-full bg-[var(--nr-p1)] ring-4 ring-white" />
           <p className="text-[15px] font-bold text-black">
-            {ver ? `v${ver}` : '현재 버전'} <span className="ml-1 rounded bg-[var(--nr-bg)] px-1.5 py-0.5 text-[11px] text-[var(--nr-p3)]">현재</span>
+            {ver ? `v${ver}` : '현재 버전'}{' '}
+            {up?.convertedAt ? (
+              <span className="ml-1 rounded bg-[#dcefff] px-1.5 py-0.5 text-[11px] text-[#0a62a8]">교직원 제작</span>
+            ) : (
+              <span className="ml-1 rounded bg-[var(--nr-bg)] px-1.5 py-0.5 text-[11px] text-[var(--nr-p3)]">현재</span>
+            )}
           </p>
           <p className="text-[13px] text-slate-500">{dayLabel(t.created)} 게시</p>
         </li>

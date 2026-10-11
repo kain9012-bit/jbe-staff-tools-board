@@ -92,6 +92,8 @@ export interface Submission {
   org?: string; // 외부 — 제작 기관
   region?: string; // 외부 — 기준 지역
   note?: string;
+  /** 이 도구가 해결하는 요청 */
+  reqId?: string;
 }
 
 /** 등록 절차 — 구분과 관계없이 같음. 구분은 '누가 등록할 수 있는지'만 다름 */

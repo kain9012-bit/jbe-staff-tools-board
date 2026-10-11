@@ -28,7 +28,7 @@ export const menuOf = (r: Route): MenuKey =>
       ? 'makers'
       : r.page === 'register' || r.page === 'review'
         ? 'register'
-        : r.page === 'requests'
+        : r.page === 'requests' || r.page === 'request'
           ? 'requests'
           : 'guide';
 

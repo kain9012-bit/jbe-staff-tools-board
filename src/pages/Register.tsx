@@ -4,6 +4,7 @@ import { PocNote, todayKst, usePocState, type Submission } from '../components/P
 import { PageTitle } from '../components/Shell';
 import { WRITE_URL } from '../lib/board';
 import { sourceOf } from '../lib/sources';
+import { useRequests } from '../lib/requests';
 import { SourceTag } from '../components/Lists';
 
 /**
@@ -28,6 +29,7 @@ const QUESTIONS: { q: string; safe: boolean; hint?: string }[] = [
 ];
 
 interface Form {
+  reqId: string;
   board: Kind | '';
   org: string;
   region: string;
@@ -46,6 +48,7 @@ interface Form {
 }
 
 const EMPTY: Form = {
+  reqId: '',
   board: '',
   org: '',
   region: '',
@@ -97,9 +100,10 @@ const KINDS: { key: Kind; icon: typeof UserRound; title: string; who: string; bo
   { key: 'official', icon: Building2, title: '교육청 배포 도구', who: '정책기획과 빅데이터담당', body: '교육청이 만들거나 고도화해 배포하는 도구' },
 ];
 
-export const Register: React.FC<{ initialType?: string }> = () => {
+export const Register: React.FC<{ initialType?: string; initialReq?: string }> = ({ initialReq }) => {
+  const R = useRequests();
   const [step, setStep] = useState(0);
-  const [f, setF] = useState<Form>({ ...EMPTY, board: 'staff' });
+  const [f, setF] = useState<Form>({ ...EMPTY, board: 'staff', reqId: initialReq ?? '' });
   /** 교육청 배포 도구는 운영 부서만 — PoC에서는 시연용으로 켤 수 있음 */
   const [ops, setOps] = useState(false);
   const [, setSubs] = usePocState<Submission[]>('submissions', []);
@@ -129,6 +133,7 @@ export const Register: React.FC<{ initialType?: string }> = () => {
       board: f.board || 'staff',
       org: f.org.trim() || undefined,
       region: f.region.trim() || undefined,
+      reqId: f.reqId || undefined,
     };
     setSubs((v) => [s, ...v]);
     setSent(s);
@@ -149,6 +154,14 @@ export const Register: React.FC<{ initialType?: string }> = () => {
             {riskCount ? `확인이 필요한 답 ${riskCount}개는 보안 검토에서 함께 살핍니다.` : '보안 검토를 거쳐 게시됩니다.'}
           </p>
           <p className="mt-1 text-[14px] text-slate-600">진행 상황은 검수 현황에서 볼 수 있습니다.</p>
+          {sent.reqId && R.get(sent.reqId) && (
+            <p className="mt-3 rounded-lg bg-white px-4 py-3 text-[14px] text-slate-700">
+              요청 「{R.get(sent.reqId)!.title}」에 해결 도구로 연결됨 ·{' '}
+              <a href={`/requests/${sent.reqId}`} className="font-bold text-[var(--nr-p3)] underline underline-offset-2">
+                요청 글 보기
+              </a>
+            </p>
+          )}
           <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
             <a href="/review" className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--nr-p1)] px-5 py-3 text-[15px] font-bold text-white hover:bg-[var(--nr-p3)]">
               검수 현황 보기 <ArrowRight className="w-4 h-4" aria-hidden="true" />
@@ -275,6 +288,16 @@ export const Register: React.FC<{ initialType?: string }> = () => {
                 </Field>
               </div>
             )}
+            <Field id="f-req" label="이 도구가 해결하는 요청" hint="도구 요청 게시판의 요청을 해결하는 도구라면 골라 주세요 · 선택. 고르면 요청 글 아래에 해결 도구로 붙음">
+              <select id="f-req" value={f.reqId} onChange={(e) => set('reqId', e.target.value)} className={`${input} bg-white`}>
+                <option value="">연결 안 함</option>
+                {R.list.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    [{r.status}] {r.title}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field id="f-title" label="도구 이름" need hint="버전은 다음 단계에서 따로 적습니다">
               <input id="f-title" value={f.title} onChange={(e) => set('title', e.target.value)} maxLength={60} className={input} placeholder="예: 체험학습 버스 좌석 배치" />
             </Field>
