@@ -110,7 +110,7 @@ function inject(html, { title, desc, body, canonical, noindex }) {
     `<meta name="description" content="${esc(desc)}" />`,
     noindex ? '<meta name="robots" content="noindex" />' : `<link rel="canonical" href="${esc(canonical)}" />`,
     `<meta property="og:type" content="website" />`,
-    `<meta property="og:site_name" content="교육데이터 허브 ${SITE}" />`,
+    `<meta property="og:site_name" content="${SITE}" />`,
     `<meta property="og:title" content="${esc(title)}" />`,
     `<meta property="og:description" content="${esc(desc)}" />`,
     canonical ? `<meta property="og:url" content="${esc(canonical)}" />` : '',
