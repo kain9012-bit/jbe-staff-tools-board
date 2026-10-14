@@ -36,6 +36,8 @@ export const EXTERNAL_GIDS = {
 export const INFO_GID = process.env.INFO_GID || '1838979837';
 
 /** sid → { cats: 업무분류 배열 | null(빈칸=낱말로 분류), what, run } */
+const lines = (v) => String(v || '').split('\n').map((x) => x.replace(/^[-·•*]\s*/, '').trim()).filter(Boolean);
+
 export function buildInfo(rows) {
   const info = {};
   for (const g of byHeader(rows)) {
@@ -46,6 +48,12 @@ export function buildInfo(rows) {
       cats: !c ? null : c === '그 밖' ? [] : c.split(/[,\n]/).map((x) => x.trim()).filter(Boolean),
       what: g('한줄소개'),
       run: g('실행방식'),
+      // 수집기 AI가 쓰는 상세 요약 칸 — 여러 항목은 줄바꿈으로 구분
+      why: g('만든이유'),
+      features: lines(g('주요기능')),
+      steps: lines(g('사용순서')),
+      needs: lines(g('필요환경')),
+      cautions: lines(g('유의사항')),
     };
   }
   return info;

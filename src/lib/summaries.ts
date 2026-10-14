@@ -53,6 +53,12 @@ export interface SheetInfo {
   cats: string[] | null;
   what: string;
   run: string;
+  /** 수집기 AI가 쓰는 상세 요약 — 요약 파일에 없는 항목만 채움 */
+  why?: string;
+  features?: string[];
+  steps?: string[];
+  needs?: string[];
+  cautions?: string[];
 }
 let sheetCats: Record<string, string[] | null> = {};
 
@@ -67,7 +73,18 @@ export const setSheetInfo = (info?: Record<string, SheetInfo>) => {
   for (const [sid, v] of Object.entries(info)) {
     const run = (RUN_TYPES as readonly string[]).includes(v.run) ? (v.run as RunType) : undefined;
     const base = next[sid] ?? { at: '' };
-    next[sid] = { ...base, ...(v.what ? { what: v.what } : {}), ...(run ? { run } : {}) };
+    const fill = <K extends 'features' | 'steps' | 'needs' | 'cautions'>(k: K) =>
+      !base[k]?.length && v[k]?.length ? { [k]: v[k] } : {};
+    next[sid] = {
+      ...base,
+      ...(v.what ? { what: v.what } : {}),
+      ...(run ? { run } : {}),
+      ...(!base.why && v.why ? { why: v.why } : {}),
+      ...fill('features'),
+      ...fill('steps'),
+      ...fill('needs'),
+      ...fill('cautions'),
+    };
   }
   items = next;
   sheetCats = Object.fromEntries(Object.entries(info).map(([sid, v]) => [sid, v.cats]));

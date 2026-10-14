@@ -43,13 +43,15 @@ const SummaryBody: React.FC<{ s?: ToolSummary; goPost: React.ReactNode }> = ({ s
 
   const basisText = s.basis === '글·그림' ? '게시글의 글과 그림' : s.basis === '그림' ? '게시글의 그림' : '게시글';
   const sub = (t: string) => <h3 className="text-[15px] font-bold text-[var(--nr-p2)]">{t}</h3>;
+  // 웹판 — 기능·사용 순서가 없는 도구(요약 전 새 도구 등)는 빈 칸을 그리지 않음
+  const hasFS = SERVER || (s.features?.length ?? 0) > 0 || (s.steps?.length ?? 0) > 0;
 
   return (
     <section className="mt-8">
       {head}
       <div className="mt-3 overflow-hidden rounded-[10px] border border-[var(--nr-line)] bg-white">
         {/* 무엇·왜 */}
-        <div className="border-b border-[var(--nr-line)] px-5 py-5 sm:px-6">
+        <div className={hasFS ? 'border-b border-[var(--nr-line)] px-5 py-5 sm:px-6' : 'px-5 py-5 sm:px-6'}>
           <div className="flex flex-wrap items-center gap-2">
             {s.run && (
               <span className="rounded-full bg-[var(--nr-p2)] px-2.5 py-0.5 text-[12px] font-bold text-white">{s.run}</span>
@@ -60,6 +62,7 @@ const SummaryBody: React.FC<{ s?: ToolSummary; goPost: React.ReactNode }> = ({ s
         </div>
 
         {/* 기능·사용 순서 */}
+        {hasFS && (
         <div className="grid grid-cols-1 gap-6 px-5 py-5 sm:px-6 lg:grid-cols-2 lg:gap-10">
           {s.features && s.features.length > 0 && (
             <div>
@@ -90,6 +93,7 @@ const SummaryBody: React.FC<{ s?: ToolSummary; goPost: React.ReactNode }> = ({ s
             </div>
           )}
         </div>
+        )}
 
         {/* 필요한 것·유의사항 */}
         {((s.needs && s.needs.length > 0) || (s.cautions && s.cautions.length > 0)) && (
