@@ -8,13 +8,29 @@ import { EmptyState, Stat } from '../components/Ui';
 import { dayLabel, n, periodStats, rangeLabel, shortDay, sum, type Model } from '../lib/stats';
 import type { Period } from '../types';
 
+/** 게시판별 문구 */
+const BOARD_TEXT = {
+  official: {
+    name: '교육청 배포 도구',
+    desc: '정책기획과가 배포한 업무도구의 조회수 현황. 기간을 골라 보면 아래 순위가 함께 바뀝니다.',
+    chart: '교육청 배포 도구 조회수 증가량 합계',
+  },
+  external: {
+    name: '외부 공공업무 도구',
+    desc: '다른 공공기관·교육청이 만든 업무도구의 조회수 현황. 기간을 골라 보면 아래 순위가 함께 바뀝니다.',
+    chart: '외부 공공업무 도구 조회수 증가량 합계',
+  },
+} as const;
+
 /**
- * 제작자 현황 > 교육청 배포 도구
- * 교직원 제작 도구 화면을 바탕으로 하되, 제작자가 한 명이고 댓글을 모으지 않으므로
- * 제작자 순위·댓글 지표는 빼고 '도구' 기준으로만 봄. 수집 시작일(2026. 9. 1.)이 교직원 제작 도구와 다름
+ * 제작자 현황 > 교육청 배포 도구 · 외부 공공업무 도구
+ * 교직원 제작 도구 화면을 바탕으로 하되, 제작자가 한 곳이고 댓글을 모으지 않으므로
+ * 제작자 순위·댓글 지표는 빼고 '도구' 기준으로만 봄. 수집 시작일이 교직원 제작 도구와 다름
+ * (교육청 배포 2026. 9. 1., 외부 공공 2026. 10. 14.)
  */
-export const OfficialStats: React.FC<{ m: Model }> = ({ m }) => {
-  const om = m.official;
+export const OfficialStats: React.FC<{ m: Model; board?: 'official' | 'external' }> = ({ m, board = 'official' }) => {
+  const txt = BOARD_TEXT[board];
+  const om = board === 'external' ? (m.external?.staticOnly ? undefined : m.external) : m.official;
   const last = om ? om.dates[om.dates.length - 1] ?? om.start : '';
   const [period, setPeriodState] = useState<Period | null>(null);
   const setPeriod = useCallback((p: Period) => setPeriodState(p), []);
@@ -23,10 +39,10 @@ export const OfficialStats: React.FC<{ m: Model }> = ({ m }) => {
   if (!om) {
     return (
       <>
-        <PageTitle>교육청 배포 도구</PageTitle>
+        <PageTitle>{txt.name}</PageTitle>
         <EmptyState
           icon={<Wrench className="w-5 h-5" aria-hidden="true" />}
-          title="교육청 배포 도구 자료를 불러오지 못함"
+          title={`${txt.name} 자료를 불러오지 못함`}
           desc="수집 시트를 읽지 못했습니다. 잠시 뒤 다시 열어 주세요."
         />
       </>
@@ -43,7 +59,7 @@ export const OfficialStats: React.FC<{ m: Model }> = ({ m }) => {
 
   return (
     <>
-      <PageTitle desc="정책기획과가 배포한 업무도구의 조회수 현황. 기간을 골라 보면 아래 순위가 함께 바뀝니다.">교육청 배포 도구</PageTitle>
+      <PageTitle desc={txt.desc}>{txt.name}</PageTitle>
 
       <div className="mt-6 grid gap-3 grid-cols-2 lg:grid-cols-4">
         <Stat icon={<Wrench className="w-3.5 h-3.5" aria-hidden="true" />} label="등록 도구" value={n(om.tools.length)} desc="게시중 글, 공지 제외" />
@@ -67,7 +83,7 @@ export const OfficialStats: React.FC<{ m: Model }> = ({ m }) => {
           model={om}
           daily={allDaily}
           title="전체 도구 조회수 추이"
-          desc="교육청 배포 도구 조회수 증가량 합계"
+          desc={txt.chart}
           onPeriod={setPeriod}
           pre={sum(om.tools.map((t) => t.pre))}
         />

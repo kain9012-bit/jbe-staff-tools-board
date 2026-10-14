@@ -61,7 +61,7 @@ export const UserBox: React.FC<{ compact?: boolean }> = ({ compact }) => {
 export const menuOf = (r: Route): MenuKey =>
   r.page === 'tool' || r.page === 'tools' || r.page === 'home' || r.page === 'login'
     ? 'find'
-    : r.page === 'maker' || r.page === 'official' || r.page === 'makers'
+    : r.page === 'maker' || r.page === 'official' || r.page === 'external' || r.page === 'makers'
       ? 'makers'
       : r.page === 'register' || r.page === 'review'
         ? 'register'

@@ -9,6 +9,7 @@ export default async function handler(req, res) {
     const urls = [
       { loc: '/', lastmod: today, pri: '1.0' },
       { loc: '/makers', lastmod: today, pri: '0.6' },
+      { loc: '/external', lastmod: today, pri: '0.5' },
       { loc: '/official', lastmod: today, pri: '0.6' },
       { loc: '/poc', lastmod: today, pri: '0.7' },
       { loc: '/requests', pri: '0.5' },

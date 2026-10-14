@@ -65,6 +65,7 @@ function render(parts, all) {
   const arg = decodeURIComponent(rest.join('/'));
   const staff = all.filter((t) => t.board === 'staff');
   const official = all.filter((t) => t.board === 'official');
+  const external = all.filter((t) => t.board === 'external');
 
   if (p === 'tool' && arg) {
     const t = all.find((x) => x.sid === arg);
@@ -90,6 +91,12 @@ function render(parts, all) {
       title: `교육청 배포 도구 · ${SITE}`,
       desc: `전북특별자치도교육청이 배포한 업무도구 ${official.length}개의 조회수 현황.`,
       body: `<h1>교육청 배포 도구</h1>${toolLinks(official)}`,
+    };
+  if (p === 'external')
+    return {
+      title: `외부 공공업무 도구 · ${SITE}`,
+      desc: `다른 공공기관·교육청이 만든 업무도구 ${external.length}개의 조회수 현황.`,
+      body: `<h1>외부 공공업무 도구</h1>${toolLinks(external)}`,
     };
   if (p === 'poc')
     return {

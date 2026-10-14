@@ -24,6 +24,7 @@ import { PageTitle } from './components/Shell';
 import { SERVER } from './lib/edition';
 import { ReviewServer } from './pages/ReviewServer';
 import { Login } from './pages/Login';
+import { BoardHome } from './pages/BoardHome';
 import { NOTICE_EV } from './lib/server';
 
 /** 짧은 알림 띠 — 저장·오류 안내 */
@@ -141,6 +142,9 @@ export default function App() {
       makers: [
         { label: '교직원 제작 도구', href: '/makers', on: route.page === 'makers' || route.page === 'maker', count: m.tools.length },
         ...(m.official ? [{ label: '교육청 배포 도구', href: '/official', on: route.page === 'official', count: m.official.tools.length }] : []),
+        ...(m.external && !m.external.staticOnly
+          ? [{ label: '외부 공공업무 도구', href: '/external', on: route.page === 'external', count: m.external.tools.length }]
+          : []),
       ],
     };
   }, [m, active, route.page, srcNow, toolBoard]);
@@ -200,10 +204,12 @@ export default function App() {
         </>
       );
     else if (route.page === 'official') body = <OfficialStats m={m} />;
+    else if (route.page === 'external') body = <OfficialStats key="external" m={m} board="external" />;
     else if (route.page === 'tool') body = <ToolDetail m={m} sid={route.sid} />;
     else if (route.page === 'maker') body = <MakerDetail m={m} name={route.name} />;
     else if (route.page === 'requests') body = <Requests m={m} />;
     else if (route.page === 'request') body = <RequestDetail key={route.id} m={m} id={route.id} />;
+    else if ((route.page as string) === 'board-home') body = <BoardHome m={m} />;
     else if (route.page === 'poc') body = SERVER ? <About m={m} /> : <PocGuide m={m} />;
   }
   /** 휴대폰 하위 메뉴 — PC는 왼쪽 메뉴에 있음 */

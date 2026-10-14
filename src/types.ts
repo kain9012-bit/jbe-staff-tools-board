@@ -57,6 +57,7 @@ export type Route =
   | { page: 'makers'; q?: string; sort?: string; from?: string; to?: string }
   | { page: 'about' }
   | { page: 'official' }
+  | { page: 'external' }
   | { page: 'requests' }
   | { page: 'request'; id: string }
   | { page: 'review' }
