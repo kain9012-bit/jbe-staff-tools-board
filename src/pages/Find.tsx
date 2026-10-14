@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SERVER } from '../lib/edition';
+import { GUIDE_URL, WRITE_URL } from '../lib/board';
 import { ArrowRight, LayoutGrid, List, PencilLine, Search, Sparkles, TrendingUp, X, Lightbulb } from 'lucide-react';
 import { isNewTool, SourceTag, ToolCard, ToolTable } from '../components/Lists';
 import { PageTitle, Pager } from '../components/Shell';
@@ -59,7 +60,18 @@ const SourceIntro: React.FC<{ src: Board }> = ({ src }) => {
           <h2 className="nr-title text-[20px] text-black">{x.name}</h2>
           <p className="mt-0.5 text-[15px] text-slate-600">{x.desc}</p>
         </div>
-        {x.register ? (
+        {!SERVER ? (
+          x.key === 'staff' && (
+            <span className="flex shrink-0 flex-wrap items-center gap-2">
+              <a href={GUIDE_URL} target="_blank" rel="noreferrer" className="rounded-lg border border-[var(--nr-line)] bg-white px-4 py-2.5 text-[14px] font-bold text-[var(--nr-p3)] hover:border-[var(--nr-p3)]">
+                등록 안내
+              </a>
+              <a href={WRITE_URL} target="_blank" rel="noreferrer" className="rounded-lg bg-[var(--nr-p1)] px-4 py-2.5 text-[14px] font-bold text-white hover:bg-[var(--nr-p3)]">
+                내 도구 등록하기
+              </a>
+            </span>
+          )
+        ) : x.register ? (
           <a href={x.register.href} className="shrink-0 rounded-lg bg-[var(--nr-p1)] px-4 py-2.5 text-[14px] font-bold text-white hover:bg-[var(--nr-p3)]">
             {x.register.label}
           </a>
@@ -74,7 +86,7 @@ const SourceIntro: React.FC<{ src: Board }> = ({ src }) => {
           </span>
         )}
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px] lg:grid-cols-4">
+      {SERVER && <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px] lg:grid-cols-4">
         {[
           ['등록', `${x.who} · ${x.how}`],
           ['검수', x.review],
@@ -86,7 +98,7 @@ const SourceIntro: React.FC<{ src: Board }> = ({ src }) => {
             <dd className="text-slate-800">{v}</dd>
           </div>
         ))}
-      </dl>
+      </dl>}
     </section>
   );
 };
@@ -601,10 +613,10 @@ export const Find: React.FC<{
               title="조건에 맞는 도구 없음"
               desc="검색어를 줄이거나 조건을 풀어 보세요."
             />
-            <a href="/requests" className="mt-3 flex items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed border-[var(--nr-p1)] bg-white px-4 py-4 text-[15px] font-bold text-[var(--nr-p3)] hover:bg-[var(--nr-bg)]">
+            {SERVER && <a href="/requests" className="mt-3 flex items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed border-[var(--nr-p1)] bg-white px-4 py-4 text-[15px] font-bold text-[var(--nr-p3)] hover:bg-[var(--nr-bg)]">
               <Lightbulb className="w-5 h-5 text-[#e0a800]" aria-hidden="true" />
               찾는 도구가 없나요? {q.trim() ? `'${q.trim()}' 도구를 ` : ''}요청해 주세요
-            </a>
+            </a>}
           </div>
         ) : view === 'list' ? (
           <div className="mt-3">
@@ -621,7 +633,28 @@ export const Find: React.FC<{
       </section>
       )}
 
-      {/* 등록 유도 */}
+      {/* 등록 유도 — 웹판은 게시판 등록 안내·글쓰기로 */}
+      {!SERVER ? (
+        <section className="mt-14">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[14px] bg-[var(--nr-p2)] p-6 text-white">
+            <span className="flex items-center gap-4">
+              <PencilLine className="w-8 h-8 shrink-0 opacity-80" aria-hidden="true" />
+              <span>
+                <span className="nr-title block text-[20px]">내가 만든 도구도 올려 주세요</span>
+                <span className="mt-1 block text-[14px] text-white/80">교직원 제작 도구 게시판에 글로 올리면 이 화면에도 함께 보입니다</span>
+              </span>
+            </span>
+            <span className="flex flex-wrap gap-2">
+              <a href={GUIDE_URL} target="_blank" rel="noreferrer" className="rounded-lg border border-white/50 px-4 py-2.5 text-[14px] font-bold text-white hover:bg-white/10">
+                등록 안내
+              </a>
+              <a href={WRITE_URL} target="_blank" rel="noreferrer" className="rounded-lg bg-[#ffd85c] px-4 py-2.5 text-[14px] font-bold text-[#1d2550] hover:opacity-95">
+                내 도구 등록하기
+              </a>
+            </span>
+          </div>
+        </section>
+      ) : (
       <section className="mt-14 grid grid-cols-1 gap-3 md:grid-cols-2">
         <a href="/requests" className="group flex items-center gap-4 rounded-[14px] border border-[var(--nr-line)] bg-white p-6 hover:border-[var(--nr-p3)]">
           <Lightbulb className="w-8 h-8 shrink-0 text-[#e0a800]" aria-hidden="true" />
@@ -638,6 +671,7 @@ export const Find: React.FC<{
           </span>
         </a>
       </section>
+      )}
     </>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ChevronRight, Home, Link2, Check } from 'lucide-react';
-import { BOARD_URL, EXTERNAL_BOARD_URL, OFFICIAL_BOARD_URL } from '../lib/board';
-import { FlaskConical, LogIn, LogOut, UserRound } from 'lucide-react';
+import { BOARD_URL, EXTERNAL_BOARD_URL, GUIDE_URL, OFFICIAL_BOARD_URL, WRITE_URL } from '../lib/board';
+import { LogIn, LogOut, UserRound } from 'lucide-react';
 import type { Route } from '../types';
 import { SERVER } from '../lib/edition';
 import { api, goLogin, refreshState, reloadData, useSrv } from '../lib/server';
@@ -15,13 +15,20 @@ import { api, goLogin, refreshState, reloadData, useSrv } from '../lib/server';
 
 export type MenuKey = 'find' | 'requests' | 'register' | 'makers' | 'guide';
 
-export const MENU: { key: MenuKey; label: string; href: string }[] = [
-  { key: 'find', label: '도구 찾기', href: '/' },
-  { key: 'requests', label: '도구 요청', href: '/requests' },
-  { key: 'register', label: '도구 등록', href: '/register' },
-  { key: 'makers', label: '제작자 현황', href: '/makers' },
-  { key: 'guide', label: '개편 안내', href: '/poc' },
-].filter((m) => !SERVER || m.key !== 'guide') as { key: MenuKey; label: string; href: string }[];
+/** ext: 누리집 게시판 글로 가는 메뉴(새 창) */
+export const MENU: { key: MenuKey; label: string; href: string; ext?: boolean }[] = SERVER
+  ? [
+      { key: 'find', label: '도구 찾기', href: '/' },
+      { key: 'requests', label: '도구 요청', href: '/requests' },
+      { key: 'register', label: '도구 등록', href: '/register' },
+      { key: 'makers', label: '제작자 현황', href: '/makers' },
+    ]
+  : [
+      { key: 'find', label: '도구 찾기', href: '/' },
+      { key: 'makers', label: '제작자 현황', href: '/makers' },
+      { key: 'guide', label: '등록 안내', href: GUIDE_URL, ext: true },
+      { key: 'register', label: '도구 등록', href: WRITE_URL, ext: true },
+    ];
 
 /** 서버판 — 로그인 상태. 보기·내려받기는 로그인 없이, 쓰기만 로그인 */
 export const UserBox: React.FC<{ compact?: boolean }> = ({ compact }) => {
@@ -59,7 +66,9 @@ export const UserBox: React.FC<{ compact?: boolean }> = ({ compact }) => {
 };
 
 export const menuOf = (r: Route): MenuKey =>
-  r.page === 'tool' || r.page === 'tools' || r.page === 'home' || r.page === 'login'
+  !SERVER && r.page === 'about'
+    ? 'makers'
+    : r.page === 'tool' || r.page === 'tools' || r.page === 'home' || r.page === 'login'
     ? 'find'
     : r.page === 'maker' || r.page === 'official' || r.page === 'external' || r.page === 'makers'
       ? 'makers'
@@ -94,7 +103,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
         <span className="text-slate-300" aria-hidden="true">|</span>
         <Ext href={BOARD_URL} className="hover:text-[var(--nr-p3)]">교직원 제작 도구 게시판</Ext>
         <span className="text-slate-300" aria-hidden="true">|</span>
-        <a href="/poc" className="font-bold text-[#8a5300] hover:underline">개편 PoC 안내</a>
+        <Ext href={GUIDE_URL} className="hover:text-[var(--nr-p3)]">등록 안내</Ext>
       </div>
       )}
       <div className="flex items-center gap-4 py-3 md:py-2">
@@ -133,6 +142,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
           <li key={m.key}>
             <a
               href={m.href}
+              {...(m.ext ? { target: '_blank', rel: 'noreferrer' } : {})}
               aria-current={active === m.key ? 'page' : undefined}
               className={`block whitespace-nowrap px-3 lg:px-5 py-3 text-base border-b-[3px] transition-colors ${
                 active === m.key
@@ -148,22 +158,6 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
       </div>
     </nav>
   </header>
-);
-
-/** 개편 PoC 띠 — 모든 화면 맨 위. 결재자·시범 사용자 모두 지금 보는 화면이 시범안임을 알게 함 */
-export const PocBanner: React.FC = () => SERVER ? null : (
-  <div className="border-b border-[#f0d9a6] bg-[#fff7e3] jbe-noprint">
-    <div className={`${BOX} flex items-center gap-2 py-2 text-[13px] text-[#6b4a00]`}>
-      <FlaskConical className="w-4 h-4 shrink-0" aria-hidden="true" />
-      <p className="min-w-0 flex-1">
-        <b>데이터 도구실 개편 시범(PoC) 화면</b>
-        <span className="hidden sm:inline"> · 도구 목록·요약·조회수는 실제 자료, 'PoC 예시' 표시 기능은 흐름 시연용</span>
-      </p>
-      <a href="/poc" className="shrink-0 font-bold underline underline-offset-2">
-        개편 안내
-      </a>
-    </div>
-  </div>
 );
 
 /** 위치 표시 — 누리집처럼 본문 칸 맨 위(연한 띠 안)에 집 아이콘 경로. 오른쪽에 주소 복사 */
@@ -252,6 +246,7 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
           <li key={m.key}>
             <a
               href={m.href}
+              {...(m.ext ? { target: '_blank', rel: 'noreferrer' } : {})}
               aria-current={on ? 'page' : undefined}
               className={`flex items-center justify-between rounded-[10px] px-5 py-[18px] text-[18px] transition-colors ${
                 on
@@ -260,7 +255,11 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
               }`}
             >
               {m.label}
-              <ChevronRight className="w-4 h-4 opacity-70" aria-hidden="true" />
+              {m.ext ? (
+                <ArrowUpRight className="w-4 h-4 opacity-70" aria-hidden="true" />
+              ) : (
+                <ChevronRight className="w-4 h-4 opacity-70" aria-hidden="true" />
+              )}
             </a>
             {on && sub && sub.length > 0 && (
               <ul className="mt-1 rounded-[10px] bg-[var(--nr-bg)] px-4 py-3 space-y-1.5">
@@ -284,34 +283,6 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
         );
       })}
     </ul>
-    {/* 게시판 바로가기 — 왼쪽 메뉴와 같은 크기의 큰 버튼. 글쓰기는 위 '도구 등록' 메뉴에서 */}
-    {!SERVER && <nav aria-label="이관 전 원 게시판" className="mt-6">
-      <p className="mb-2 px-1 text-[15px] font-bold text-slate-600">이관 전 원 게시판</p>
-      <p className="-mt-1 mb-2 px-1 text-[12px] text-slate-500">PoC 기간에만 두는 바로가기. 개편 후 폐쇄</p>
-      <ul className="space-y-2">
-        {[
-          { href: BOARD_URL, label: '교직원 제작 도구 게시판', note: '원글·첨부파일·댓글' },
-          { href: OFFICIAL_BOARD_URL, label: '교육청 배포 도구 게시판', note: '교육청이 배포한 업무도구' },
-          { href: EXTERNAL_BOARD_URL, label: '외부 공공업무 도구 게시판', note: '다른 기관이 만든 업무도구' },
-        ].map((b) => (
-          <li key={b.href}>
-            <a
-              href={b.href}
-              target="_blank"
-              rel="noreferrer"
-              className="group flex items-center justify-between gap-3 rounded-[10px] bg-white px-5 py-4 shadow-[0_0_0_1px_#eef0f4,0_2px_6px_rgba(0,0,0,0.04)] hover:shadow-[0_0_0_1px_var(--nr-p3)]"
-            >
-              <span className="min-w-0">
-                <span className="block text-[17px] font-bold text-[var(--nr-text)] group-hover:text-[var(--nr-p3)]">{b.label}</span>
-                <span className="mt-0.5 block text-[13px] text-slate-500">{b.note}</span>
-              </span>
-              <ArrowUpRight className="w-5 h-5 shrink-0 text-[var(--nr-p1)]" aria-hidden="true" />
-              <span className="sr-only">(새 창)</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>}
   </aside>
 );
 
@@ -398,7 +369,7 @@ export const SiteFooter: React.FC = () => (
       <p>
         {SERVER
           ? '교육청 배포·교직원 제작·외부 공공업무 도구를 찾고, 요청하고, 등록하는 전북특별자치도교육청 업무도구 공간'
-          : '데이터 도구실 「교육청 배포 도구」·「교직원 제작 도구」·「외부 공공업무 도구」 게시판의 업무도구를 한곳에 모은 개편 시범(PoC) 화면'}
+          : '데이터 도구실 「교육청 배포 도구」·「교직원 제작 도구」·「외부 공공업무 도구」 게시판의 업무도구를 한곳에서 찾아보는 화면'}
       </p>
       <p>
         <b className="text-slate-800">담당</b> 정책기획과 빅데이터담당 · <b className="text-slate-800">전화</b> 063-239-3176

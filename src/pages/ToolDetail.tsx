@@ -6,7 +6,6 @@ import { Badge, Card, EmptyState, Stat } from '../components/Ui';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { allTools, dayLabel, modelOf, n, type Model, type ToolStat } from '../lib/stats';
 import { summaryOf, type ToolSummary } from '../lib/summaries';
-import { ReactionPanel, TrustPanel, VersionPanel } from '../components/ToolPoc';
 import { ManagePanel } from '../components/ManagePanel';
 import { useRequests } from '../lib/requests';
 import { SERVER } from '../lib/edition';
@@ -126,7 +125,7 @@ const SummaryBody: React.FC<{ s?: ToolSummary; goPost: React.ReactNode }> = ({ s
         ) : (
           <>
             {s.thin ? '게시글 설명이 짧아 확인된 내용만 정리했습니다.' : `${basisText}을 바탕으로 정리했습니다.`} 자세한 내용은 {goPost}
-            <span className="tabular-nums">· {dayLabel(s.at)} 정리</span>
+            {(SERVER || s.at) && <span className="tabular-nums">· {dayLabel(s.at)} 정리</span>}
           </>
         )}
       </p>
@@ -237,7 +236,7 @@ const ToolDetailBody: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
 
       {/* 2. 한눈에 보기 */}
       <SummaryBox s={summaryOf(sid)} url={SERVER ? extraOf(sid)?.legacyUrl ?? '' : t.url} />
-      {solved.length > 0 && (
+      {SERVER && solved.length > 0 && (
         <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[10px] bg-[#f3faf5] px-4 py-2.5 text-[14px] text-slate-700">
           <b className="text-[#1f7a3a]">해결한 요청</b>
           {solved.map((r) => (
@@ -245,7 +244,6 @@ const ToolDetailBody: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
               {r.title}
             </a>
           ))}
-          {!SERVER && <span className="text-[12px] text-slate-500">(PoC 예시 요청)</span>}
         </p>
       )}
       {isExt && t.site && (
@@ -257,12 +255,14 @@ const ToolDetailBody: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         </p>
       )}
 
-      {/* 개편 PoC — 검수 정보·버전 */}
-      <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {SERVER ? <SrvTrustPanel t={t} s={summaryOf(sid)} /> : <TrustPanel t={t} s={summaryOf(sid)} />}
-        {SERVER ? <SrvVersionPanel t={t} /> : <VersionPanel t={t} />}
-      </div>
-      {SERVER ? <SrvReactionPanel t={t} /> : <ReactionPanel t={t} />}
+      {/* 서버판 — 검수 정보·버전·써봤어요 */}
+      {SERVER && (
+        <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SrvTrustPanel t={t} s={summaryOf(sid)} />
+          <SrvVersionPanel t={t} />
+        </div>
+      )}
+      {SERVER && <SrvReactionPanel t={t} />}
 
       {/* 3. 질문과 답변 — 교육청 배포 도구는 댓글을 모으지 않아 게시판으로 안내 */}
       {SERVER ? (
@@ -346,7 +346,7 @@ const ToolDetailBody: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         </div>
       </section>
       )}
-      <ManagePanel t={t} />
+      {SERVER && <ManagePanel t={t} />}
     </>
   );
 };

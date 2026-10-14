@@ -24,7 +24,7 @@ async function loadTemplate(req) {
 
 const BOARD = { staff: '교직원 제작', official: '교육청 배포', external: '외부 공공' };
 const DEFAULT_DESC =
-  '전북특별자치도교육청 데이터 도구실의 교육청 배포·교직원 제작·외부 공공업무 도구를 한곳에서 찾고, 요청하고, 등록하는 화면. 도구별 요약과 조회수 현황 제공.';
+  '전북특별자치도교육청 데이터 도구실의 교육청 배포·교직원 제작·외부 공공업무 도구를 한곳에서 찾는 화면. 도구별 요약과 조회수 현황 제공.';
 
 const list = (items) => (items?.length ? `<ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '');
 const olist = (items) => (items?.length ? `<ol>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : '');
@@ -98,16 +98,7 @@ function render(parts, all) {
       desc: `다른 공공기관·교육청이 만든 업무도구 ${external.length}개의 조회수 현황.`,
       body: `<h1>외부 공공업무 도구</h1>${toolLinks(external)}`,
     };
-  if (p === 'poc')
-    return {
-      title: `개편 안내 · ${SITE}`,
-      desc: '게시판 3개로 나뉜 데이터 도구실을 찾고·등록하고·요청하고·업데이트를 받는 하나의 플랫폼으로 바꾸는 시범(PoC) 화면 안내.',
-      body: `<h1>데이터 도구실 개편 안내</h1>`,
-    };
-  if (p === 'requests') return { title: `도구 요청 · ${SITE}`, desc: '찾는 업무도구가 없을 때 필요한 도구를 요청하고 공감하는 화면(개편 시범).', body: `<h1>도구 요청</h1>` };
-  if (p === 'review') return { title: `검수 현황 · ${SITE}`, desc: '등록 신청한 업무도구의 보안 검토 단계를 확인하는 화면(개편 시범).', body: `<h1>검수 현황</h1>` };
   if (p === 'about') return { title: `집계 기준 · ${SITE}`, desc: DEFAULT_DESC, body: `<h1>집계 기준</h1>` };
-  if (p === 'register') return { title: `도구 등록 · ${SITE}`, desc: DEFAULT_DESC, body: `<h1>도구 등록</h1>` };
   if (p === 'tools' || !p) return { title: `${SERVICE} · ${SITE} · 전북특별자치도교육청`, desc: DEFAULT_DESC, body: `<h1>${SERVICE}</h1>${toolLinks(all)}` };
   return null;
 }

@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Route } from './types';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
-import { Lnb, menuOf, PocBanner, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
+import { Lnb, menuOf, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
 import { Requests } from './pages/Requests';
 import { RequestDetail } from './pages/RequestDetail';
 import { SOURCES } from './lib/sources';
-import { Review } from './pages/Review';
-import { PocGuide } from './pages/PocGuide';
 import { EmptyState } from './components/Ui';
 import { locKey, useRoute } from './lib/route';
 import { allTools } from './lib/stats';
 import { useData } from './lib/useData';
-import { applyUpgrades, useManage } from './lib/manage';
+import { useManage } from './lib/manage';
 import { About } from './pages/About';
 import { Find } from './pages/Find';
 import { StatsOverview } from './pages/Home';
@@ -83,8 +81,16 @@ const SubTabs: React.FC<{ items: LnbSub[] }> = ({ items }) => (
 
 export default function App() {
   const raw = useRoute();
-  /** 서버판 — 개편 안내·집계 기준 화면 없음. 옛 주소는 도구 찾기로 */
-  const route = SERVER && (raw.page === 'about' || raw.page === 'poc') ? ({ page: 'home' } as Route) : raw;
+  /** 서버판 — 개편 안내·집계 기준 화면 없음. 옛 주소는 도구 찾기로
+   *  웹판 — 도구 찾기·제작자 현황·집계 기준만. 요청·등록·검수·개편 안내 등 옛 주소는 도구 찾기로 */
+  const WEB_GONE = ['poc', 'requests', 'request', 'register', 'review', 'login', 'board-home'];
+  const route = SERVER
+    ? raw.page === 'about' || raw.page === 'poc'
+      ? ({ page: 'home' } as Route)
+      : raw
+    : WEB_GONE.includes(raw.page as string)
+      ? ({ page: 'home' } as Route)
+      : raw;
   const { state, reload } = useData();
   const [top, setTop] = useState(false);
 
@@ -95,8 +101,9 @@ export default function App() {
   }, []);
 
   const { ups } = useManage();
-  /** 고도화로 전환된 도구 반영(PoC, 이 브라우저 기록) */
-  const m = useMemo(() => (state.status === 'ready' ? (SERVER ? state.model : applyUpgrades(state.model, ups)) : undefined), [state, ups]);
+  /** 서버판 — 고도화로 전환된 도구는 서버 자료에 이미 반영됨. 웹판은 수집 자료 그대로 */
+  const m = useMemo(() => (state.status === 'ready' ? state.model : undefined), [state]);
+  void ups;
   const active: MenuKey = menuOf(route);
   const srcNow = route.page === 'home' || route.page === 'tools' ? route.src ?? '' : '';
 
@@ -112,18 +119,15 @@ export default function App() {
 
   /** 왼쪽 메뉴 '도구 찾기' 아래 사용목적 바로가기 — 교직원 제작 + 교육청 배포 함께 셈 */
   const subs = useMemo<Partial<Record<MenuKey, LnbSub[]>>>(() => {
-    const fixed: Partial<Record<MenuKey, LnbSub[]>> = {
-      register: [
-        { label: '등록 신청', href: '/register', on: route.page === 'register' },
-        { label: '검수 현황', href: '/review', on: route.page === 'review' },
-      ],
-      guide: SERVER
-        ? [{ label: '집계 기준', href: '/about', on: route.page === 'about' }]
-        : [
-            { label: '개편 안내', href: '/poc', on: route.page === 'poc' },
-            { label: '집계 기준', href: '/about', on: route.page === 'about' },
+    const fixed: Partial<Record<MenuKey, LnbSub[]>> = SERVER
+      ? {
+          register: [
+            { label: '등록 신청', href: '/register', on: route.page === 'register' },
+            { label: '검수 현황', href: '/review', on: route.page === 'review' },
           ],
-    };
+          guide: [{ label: '집계 기준', href: '/about', on: route.page === 'about' }],
+        }
+      : {};
     if (!m) return fixed;
     const all = allTools(m);
     const c = new Map<string, number>();
@@ -145,6 +149,8 @@ export default function App() {
         ...(m.external && !m.external.staticOnly
           ? [{ label: '외부 공공업무 도구', href: '/external', on: route.page === 'external', count: m.external.tools.length }]
           : []),
+        // 웹판 — 집계 기준은 제작자 현황 아래
+        ...(SERVER ? [] : [{ label: '집계 기준', href: '/about', on: route.page === 'about' }]),
       ],
     };
   }, [m, active, route.page, srcNow, toolBoard]);
@@ -165,8 +171,8 @@ export default function App() {
 
   let body: React.ReactNode;
   if (route.page === 'about') body = <About m={m} />;
-  else if (route.page === 'register') body = <Register key={locKey()} initialType={route.type} initialReq={route.req} m={m} edit={route.edit} />;
-  else if (route.page === 'review') body = SERVER ? <ReviewServer /> : <Review />;
+  else if (route.page === 'register' && SERVER) body = <Register key={locKey()} initialType={route.type} initialReq={route.req} m={m} edit={route.edit} />;
+  else if (route.page === 'review' && SERVER) body = <ReviewServer />;
   else if (route.page === 'login' && SERVER) body = <Login next={route.next} />;
   else if (state.status === 'loading') body = <Skeleton />;
   else if (state.status === 'error')
@@ -207,10 +213,9 @@ export default function App() {
     else if (route.page === 'external') body = <OfficialStats key="external" m={m} board="external" />;
     else if (route.page === 'tool') body = <ToolDetail m={m} sid={route.sid} />;
     else if (route.page === 'maker') body = <MakerDetail m={m} name={route.name} />;
-    else if (route.page === 'requests') body = <Requests m={m} />;
-    else if (route.page === 'request') body = <RequestDetail key={route.id} m={m} id={route.id} />;
-    else if ((route.page as string) === 'board-home') body = <BoardHome m={m} />;
-    else if (route.page === 'poc') body = SERVER ? <About m={m} /> : <PocGuide m={m} />;
+    else if (route.page === 'requests' && SERVER) body = <Requests m={m} />;
+    else if (route.page === 'request' && SERVER) body = <RequestDetail key={route.id} m={m} id={route.id} />;
+    else if ((route.page as string) === 'board-home' && SERVER) body = <BoardHome m={m} />;
   }
   /** 휴대폰 하위 메뉴 — PC는 왼쪽 메뉴에 있음 */
   const mobileSubs = active !== 'find' && route.page !== 'maker' ? subs[active] : undefined;
@@ -235,7 +240,6 @@ export default function App() {
         본문 바로가기
       </a>
       <SiteHeader active={active} asOf={m?.asOf} />
-      <PocBanner />
       <SubLayout lnb={<Lnb active={active} subs={subs} />} trail={trail}>
         {body}
       </SubLayout>

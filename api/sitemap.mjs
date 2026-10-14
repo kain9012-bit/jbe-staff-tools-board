@@ -11,8 +11,6 @@ export default async function handler(req, res) {
       { loc: '/makers', lastmod: today, pri: '0.6' },
       { loc: '/external', lastmod: today, pri: '0.5' },
       { loc: '/official', lastmod: today, pri: '0.6' },
-      { loc: '/poc', lastmod: today, pri: '0.7' },
-      { loc: '/requests', pri: '0.5' },
       { loc: '/about', pri: '0.3' },
       ...[...staff, ...official, ...(external.length ? external : EXTERNAL_TOOLS)].map((t) => ({ loc: `/tool/${t.sid}`, lastmod: /^\d{4}-\d{2}-\d{2}$/.test(t.created) ? t.created : undefined, pri: '0.8' })),
       ...[...new Set(staff.map((t) => t.author))].map((a) => ({ loc: `/maker/${encodeURIComponent(a)}`, pri: '0.4' })),
