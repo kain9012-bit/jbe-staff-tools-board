@@ -44,6 +44,12 @@
   "functions": {
     "api/page.mjs": {
       "includeFiles": "dist/index.html"
+    },
+    "api/data.mjs": {
+      "includeFiles": "src/data/external-tools.json"
+    },
+    "api/sitemap.mjs": {
+      "includeFiles": "src/data/external-tools.json"
     }
   },
   "rewrites": [

@@ -95,12 +95,21 @@ const byHeader = (rows) => {
     .map((r) => (key) => (idx[key] === undefined ? '' : (r[idx[key]] ?? '').trim()));
 };
 
-/** 외부 도구 바로가기 주소·사용목적·적용기관은 게시판 목록에 없어 정적 자료에서 보탬 */
-const EXTERNAL_META = Object.fromEntries(
-  createRequire(import.meta.url)('../../src/data/external-tools.json').items.map((e) => [e.sid, e]),
-);
+/** 외부 도구 바로가기 주소·사용목적·적용기관은 게시판 목록에 없어 정적 자료에서 보탬
+ *  (정적 자료를 못 읽어도 화면은 떠야 하므로 실패하면 빈 값) */
+const require = createRequire(import.meta.url);
+let EXTERNAL_META = null;
+function externalMeta() {
+  if (EXTERNAL_META) return EXTERNAL_META;
+  try {
+    EXTERNAL_META = Object.fromEntries(require('../../src/data/external-tools.json').items.map((e) => [e.sid, e]));
+  } catch {
+    EXTERNAL_META = {};
+  }
+  return EXTERNAL_META;
+}
 function withExternalMeta(t) {
-  const m = EXTERNAL_META[t.sid] || {};
+  const m = externalMeta()[t.sid] || {};
   return { ...t, author: '외부 기관', site: m.site || '', purpose: m.purpose || t.purpose, target: m.target || t.target, field: t.field || m.field || '', kind: t.kind || m.kind || '' };
 }
 
