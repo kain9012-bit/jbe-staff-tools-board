@@ -1,6 +1,7 @@
 import type { Comment, Grain, Payload, Tool } from '../types';
 import officialMeta from '../data/official-meta.json';
 import externalTools from '../data/external-tools.json';
+import { SERVER } from './edition';
 
 /** 교육청 배포 도구 분류(사용목적·적용기관) — 수집 시트에 없어 직접 정한 값 */
 const OFFICIAL_META = (officialMeta as { items: Record<string, { purpose: string; target: string; category: string }> }).items;
@@ -82,7 +83,7 @@ export function buildModel(p: Payload): Model {
       asOf: p.official.asOf,
       fetchedAt: p.fetchedAt,
       tools: p.official.tools.map((t) => {
-        const meta = OFFICIAL_META[t.sid];
+        const meta = SERVER ? undefined : OFFICIAL_META[t.sid];
         return meta ? { ...t, purpose: meta.purpose, target: meta.target } : t;
       }),
       history: p.official.history,
@@ -90,7 +91,11 @@ export function buildModel(p: Payload): Model {
       commentsOk: true,
     });
   }
-  main.external = buildExternal();
+  // 서버판은 외부 공공 도구도 서버 DB에서 옴
+  const ext = (p as Payload & { external?: { asOf: string; tools: Tool[]; history: Payload['history'] } }).external;
+  main.external = ext
+    ? buildOne({ asOf: ext.asOf, fetchedAt: p.fetchedAt, tools: ext.tools, history: ext.history, comments: [], commentsOk: true })
+    : buildExternal();
   return main;
 }
 

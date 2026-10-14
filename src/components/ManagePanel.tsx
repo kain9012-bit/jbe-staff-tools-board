@@ -3,6 +3,8 @@ import { ArrowRight, Check, KeyRound, Rocket, Settings2, Sparkles, Undo2, UserPl
 import { OPS, useManage } from '../lib/manage';
 import { dayLabel, type ToolStat } from '../lib/stats';
 import { PocTag, todayKst, UPGRADE_STAGES, versionOf } from './Poc';
+import { SERVER } from '../lib/edition';
+import { useSrv } from '../lib/server';
 
 /**
  * 도구 상세 맨 아래 운영 관리 — '운영 부서 계정으로 보기'를 켰을 때만 보임.
@@ -19,7 +21,11 @@ const STEP_HINT = [
 
 export const ManagePanel: React.FC<{ t: ToolStat }> = ({ t }) => {
   const M = useManage();
-  const [ops, setOps] = useState(false);
+  const S = useSrv();
+  const [opsDemo, setOps] = useState(false);
+  /** 서버판 — 운영자는 전체, 글 수정 권한자는 수정 권한만 */
+  const ops = SERVER ? !!S.me?.ops : opsDemo;
+  const canEditPost = SERVER ? S.editable.includes(t.sid) : opsDemo;
   const [who, setWho] = useState('');
   const [note, setNote] = useState('');
   const [ver, setVer] = useState('');
@@ -27,17 +33,20 @@ export const ManagePanel: React.FC<{ t: ToolStat }> = ({ t }) => {
   const u = M.up(t.sid);
   const isStaff = (t.board ?? 'staff') === 'staff';
   const cur = versionOf(t.title);
+  if (SERVER && !canEditPost && !ops) return null;
 
   return (
     <section className="mt-10 border-t border-[var(--nr-line)] pt-6">
+      {!SERVER && (
       <label className="inline-flex items-center gap-1.5 text-[13px] text-slate-500">
-        <input type="checkbox" checked={ops} onChange={(e) => setOps(e.target.checked)} className="accent-[var(--nr-p3)]" />
+        <input type="checkbox" checked={opsDemo} onChange={(e) => setOps(e.target.checked)} className="accent-[var(--nr-p3)]" />
         운영 부서 계정으로 보기 (PoC 시연)
       </label>
-      {ops && (
+      )}
+      {(ops || canEditPost) && (
         <div className="mt-3 space-y-4 rounded-[14px] border border-[var(--nr-line)] bg-[#fbfcfe] p-5">
           <h2 className="flex items-center gap-2 text-[18px] font-bold text-black">
-            <Settings2 className="w-5 h-5 text-[var(--nr-p1)]" aria-hidden="true" /> 운영 관리 <PocTag />
+            <Settings2 className="w-5 h-5 text-[var(--nr-p1)]" aria-hidden="true" /> {ops ? '운영 관리' : '글 관리'} <PocTag />
           </h2>
 
           {/* 수정 권한 */}
@@ -85,7 +94,7 @@ export const ManagePanel: React.FC<{ t: ToolStat }> = ({ t }) => {
           </div>
 
           {/* 고도화 */}
-          {(isStaff || t.origin) && (
+          {ops && (isStaff || t.origin) && (
             <div className="rounded-[10px] bg-white p-4 ring-1 ring-[var(--nr-line)]">
               <h3 className="flex items-center gap-1.5 text-[16px] font-bold text-black">
                 <Sparkles className="w-4 h-4 text-[#e0a800]" aria-hidden="true" /> 고도화 → 교육청 배포 전환
@@ -174,7 +183,7 @@ export const ManagePanel: React.FC<{ t: ToolStat }> = ({ t }) => {
                       {u.stage === 2 && <p className="text-[12px] text-slate-500">전환하면 구분·문의 창구가 바뀌고, 주소·조회수·후기·질문과 답변은 그대로. 원작자 수정 권한 유지</p>}
                     </form>
                   )}
-                  {u.convertedAt && (
+                  {u.convertedAt && !SERVER && (
                     <button type="button" onClick={() => M.setUp(t.sid, null)} className="mt-2 inline-flex items-center gap-1 text-[13px] text-slate-500 underline underline-offset-2">
                       <Undo2 className="w-3.5 h-3.5" aria-hidden="true" /> 시연 되돌리기
                     </button>

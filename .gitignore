@@ -4,3 +4,8 @@ dist
 _probe
 data/*.csv
 *.log
+dist-server
+data/tools.db*
+data/files/
+*.tar
+전달용/

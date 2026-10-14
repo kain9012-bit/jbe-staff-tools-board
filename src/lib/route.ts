@@ -25,13 +25,14 @@ export function parseLoc(pathname: string, search: string): Route {
   };
   if (p === 'tools') return { page: 'tools', ...opt };
   if (p === 'makers') return { page: 'makers', q: opt.q, sort: opt.sort, from: opt.from, to: opt.to };
-  if (p === 'register') return { page: 'register', type: sp.get('type') || undefined, req: sp.get('req') || undefined };
+  if (p === 'register') return { page: 'register', type: sp.get('type') || undefined, req: sp.get('req') || undefined, edit: sp.get('edit') || undefined };
   if (p === 'about') return { page: 'about' };
   if (p === 'official') return { page: 'official' };
   if (p === 'requests' && arg) return { page: 'request', id: arg };
   if (p === 'requests') return { page: 'requests' };
   if (p === 'review') return { page: 'review' };
   if (p === 'poc') return { page: 'poc' };
+  if (p === 'login') return { page: 'login', next: sp.get('next') || undefined };
   if (p === 'tool' && arg) return { page: 'tool', sid: arg };
   if (p === 'maker' && arg) return { page: 'maker', name: decodeURIComponent(arg) };
   return { page: 'home', ...opt };
@@ -80,7 +81,7 @@ function onClick(e: MouseEvent) {
   const a = (e.target as Element | null)?.closest?.('a');
   if (!a || a.target || a.hasAttribute('download')) return;
   const href = a.getAttribute('href') || '';
-  if (!href.startsWith('/') || href.startsWith('//') || href.startsWith('/api/')) return;
+  if (!href.startsWith('/') || href.startsWith('//') || /^\/(api|files|download|auth)\//.test(href)) return;
   e.preventDefault();
   navigate(href);
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { SERVER } from '../lib/edition';
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BarChart3, Table2 } from 'lucide-react';
 import { addDays, bucketize, n, rangeLabel, type Bucket, type Model } from '../lib/stats';
@@ -39,7 +40,7 @@ const Tip: React.FC<{ active?: boolean; payload?: { payload: Bucket }[]; grain: 
       </div>
       <div className="font-bold tabular-nums text-slate-900">{n(b.value)}회</div>
       {b.partial && <div className="text-xs text-slate-500">기간 일부만 포함되거나 진행 중인 구간</div>}
-      {b.missingDays > 0 && <div className="text-xs text-amber-800">수집 누락 {b.missingDays}일 (0으로 계산)</div>}
+      {b.missingDays > 0 && <div className="text-xs text-amber-800">{SERVER ? '기록 없음' : '수집 누락'} {b.missingDays}일 (0으로 계산)</div>}
     </div>
   );
 };
@@ -141,7 +142,7 @@ export const TrendChart: React.FC<{
           <p className="text-xs text-slate-500">
             {desc ?? '조회수 증가량'} · 선택 기간 합계 <b className="tabular-nums text-slate-700">{n(total)}회</b>
             {pre > 0 && range.from <= model.start && (
-              <> · 수집 시작 전 누적 {n(pre)}회는 날짜를 나눌 수 없어 그래프에 미포함</>
+              <> · {SERVER ? '기록' : '수집'} 시작 전 누적 {n(pre)}회는 날짜를 나눌 수 없어 그래프에 미포함</>
             )}
           </p>
         </div>

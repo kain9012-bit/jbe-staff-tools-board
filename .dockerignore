@@ -1,0 +1,9 @@
+node_modules
+dist
+data
+_probe
+.git
+.vercel
+api
+*.tar
+*.log

@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
+    "build:server": "vite build --mode server",
+    "dev:server": "vite --mode server --port=3001",
+    "start:server": "node --disable-warning=ExperimentalWarning server/index.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },

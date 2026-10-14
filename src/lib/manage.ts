@@ -1,5 +1,7 @@
 import { usePocState } from '../components/Poc';
 import type { Model, ToolStat } from './stats';
+import { SERVER } from './edition';
+import { act, errMsg, extraOf, notice, useSrv } from './server';
 
 /**
  * 운영 관리 PoC — 고도화(교직원 제작 → 교육청 배포 전환)와 게시글별 수정 권한.
@@ -18,6 +20,31 @@ export interface Upgrade {
 }
 
 export function useManage() {
+  return SERVER ? useManageServer() : useManagePoc();
+}
+
+/** 서버판 — 고도화·수정 권한을 서버에 저장. 화면(ManagePanel)은 PoC와 같은 함수를 부름 */
+function useManageServer() {
+  const S = useSrv();
+  const ups = S.upgrades as Record<string, Upgrade>;
+  const run = (p: Promise<unknown>) => p.catch((e) => notice(errMsg(e), 'err'));
+  return {
+    ups,
+    up: (sid: string) => ups[sid] as Upgrade | undefined,
+    setUp: (sid: string, u: Upgrade | null) => {
+      const cur = ups[sid];
+      if (!u) return void run(act('POST', `/api/upgrades/${encodeURIComponent(sid)}`, { action: 'cancel' }, true));
+      if (!cur) return void run(act('POST', `/api/upgrades/${encodeURIComponent(sid)}`, { action: 'start' }));
+      const raw = u.notes[cur.stage] ?? '';
+      const note = cur.stage === 2 ? raw.replace(/\s*·?\s*v[\d.]+$/, '') : raw;
+      void run(act('POST', `/api/upgrades/${encodeURIComponent(sid)}`, { action: 'next', note, version: u.version }, true));
+    },
+    editors: (t: ToolStat) => extraOf(t.sid)?.editors ?? (t.origin ? [OPS, t.origin] : (t.board ?? 'staff') === 'staff' ? [t.author] : [OPS]),
+    setEditors: (sid: string, list: string[]) => void run(act('PUT', `/api/tools/${encodeURIComponent(sid)}/editors`, { editors: list }, true)),
+  };
+}
+
+function useManagePoc() {
   const [ups, setUps] = usePocState<Record<string, Upgrade>>('upgrades', {});
   const [eds, setEds] = usePocState<Record<string, string[]>>('editors', {});
 

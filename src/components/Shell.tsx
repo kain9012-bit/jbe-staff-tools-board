@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ChevronRight, Home, Link2, Check } from 'lucide-react';
 import { BOARD_URL, EXTERNAL_BOARD_URL, OFFICIAL_BOARD_URL } from '../lib/board';
-import { FlaskConical } from 'lucide-react';
+import { FlaskConical, LogIn, LogOut, UserRound } from 'lucide-react';
 import type { Route } from '../types';
+import { SERVER } from '../lib/edition';
+import { api, goLogin, refreshState, reloadData, useSrv } from '../lib/server';
 
 /**
  * 전북교육청 누리집(www.jbe.go.kr) 하위 화면 틀을 따른 공통 뼈대.
@@ -19,10 +21,45 @@ export const MENU: { key: MenuKey; label: string; href: string }[] = [
   { key: 'register', label: '도구 등록', href: '/register' },
   { key: 'makers', label: '제작자 현황', href: '/makers' },
   { key: 'guide', label: '개편 안내', href: '/poc' },
-];
+].filter((m) => !SERVER || m.key !== 'guide') as { key: MenuKey; label: string; href: string }[];
+
+/** 서버판 — 로그인 상태. 보기·내려받기는 로그인 없이, 쓰기만 로그인 */
+export const UserBox: React.FC<{ compact?: boolean }> = ({ compact }) => {
+  const S = useSrv();
+  if (!S.ready) return <span className="text-slate-400">…</span>;
+  if (!S.me)
+    return (
+      <button type="button" onClick={goLogin} className={`inline-flex items-center gap-1 font-bold text-[var(--nr-p3)] hover:underline ${compact ? 'text-[13px]' : ''}`}>
+        <LogIn className="w-3.5 h-3.5" aria-hidden="true" /> 로그인
+      </button>
+    );
+  const out = async () => {
+    if (S.login.logoutUrl) {
+      window.location.href = S.login.logoutUrl;
+      return;
+    }
+    await api('POST', '/api/logout').catch(() => null);
+    await refreshState();
+    reloadData();
+  };
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="inline-flex items-center gap-1 text-slate-700">
+        <UserRound className="w-3.5 h-3.5" aria-hidden="true" />
+        <span className={compact ? 'max-w-[8rem] truncate' : ''}>{S.me.display}</span>
+        {S.me.ops && <span className="rounded bg-[var(--nr-p2)] px-1.5 text-[11px] font-bold text-white">운영</span>}
+      </span>
+      {S.login.mode !== 'header' || S.login.logoutUrl ? (
+        <button type="button" onClick={out} className="inline-flex items-center gap-0.5 text-slate-500 hover:text-[var(--nr-p3)]">
+          <LogOut className="w-3.5 h-3.5" aria-hidden="true" /> <span className={compact ? 'sr-only' : ''}>로그아웃</span>
+        </button>
+      ) : null}
+    </span>
+  );
+};
 
 export const menuOf = (r: Route): MenuKey =>
-  r.page === 'tool' || r.page === 'tools' || r.page === 'home'
+  r.page === 'tool' || r.page === 'tools' || r.page === 'home' || r.page === 'login'
     ? 'find'
     : r.page === 'maker' || r.page === 'official' || r.page === 'makers'
       ? 'makers'
@@ -47,6 +84,11 @@ export const BOX = 'mx-4 min-[1024px]:mx-5 min-[1200px]:mx-auto min-[1200px]:max
 export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ active, asOf }) => (
   <header className="bg-white border-b border-[var(--nr-line)] jbe-noprint">
     <div className={BOX}>
+      {SERVER ? (
+        <div className="hidden md:flex justify-end gap-3 pt-3 text-[13px] text-slate-600">
+          <UserBox />
+        </div>
+      ) : (
       <div className="hidden md:flex justify-end gap-3 pt-3 text-[13px] text-slate-600">
         <span className="tabular-nums">{asOf ? `${asOf} 수집 기준` : '수집 시점 확인 중'}</span>
         <span className="text-slate-300" aria-hidden="true">|</span>
@@ -54,6 +96,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
         <span className="text-slate-300" aria-hidden="true">|</span>
         <a href="/poc" className="font-bold text-[#8a5300] hover:underline">개편 PoC 안내</a>
       </div>
+      )}
       <div className="flex items-center gap-4 py-3 md:py-2">
         <a href="/" className="flex items-center gap-2.5">
           <span aria-hidden="true" className="grid grid-cols-2 gap-0.5 w-8 h-8 shrink-0">
@@ -67,6 +110,11 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
             <span className="block text-[12px] text-slate-500">전북특별자치도교육청</span>
           </span>
         </a>
+        {SERVER ? (
+          <span className="ml-auto md:hidden text-[13px]">
+            <UserBox compact />
+          </span>
+        ) : (
         <a
           href={BOARD_URL}
           target="_blank"
@@ -75,6 +123,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
         >
           게시판 <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
         </a>
+        )}
       </div>
     </div>
     <nav aria-label="주메뉴" className="border-t border-[var(--nr-line)] lg:hidden">
@@ -102,7 +151,7 @@ export const SiteHeader: React.FC<{ active: MenuKey; asOf?: string }> = ({ activ
 );
 
 /** 개편 PoC 띠 — 모든 화면 맨 위. 결재자·시범 사용자 모두 지금 보는 화면이 시범안임을 알게 함 */
-export const PocBanner: React.FC = () => (
+export const PocBanner: React.FC = () => SERVER ? null : (
   <div className="border-b border-[#f0d9a6] bg-[#fff7e3] jbe-noprint">
     <div className={`${BOX} flex items-center gap-2 py-2 text-[13px] text-[#6b4a00]`}>
       <FlaskConical className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -236,7 +285,7 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
       })}
     </ul>
     {/* 게시판 바로가기 — 왼쪽 메뉴와 같은 크기의 큰 버튼. 글쓰기는 위 '도구 등록' 메뉴에서 */}
-    <nav aria-label="이관 전 원 게시판" className="mt-6">
+    {!SERVER && <nav aria-label="이관 전 원 게시판" className="mt-6">
       <p className="mb-2 px-1 text-[15px] font-bold text-slate-600">이관 전 원 게시판</p>
       <p className="-mt-1 mb-2 px-1 text-[12px] text-slate-500">PoC 기간에만 두는 바로가기. 개편 후 폐쇄</p>
       <ul className="space-y-2">
@@ -262,7 +311,7 @@ export const Lnb: React.FC<{ active: MenuKey; subs?: Partial<Record<MenuKey, Lnb
           </li>
         ))}
       </ul>
-    </nav>
+    </nav>}
   </aside>
 );
 
@@ -346,11 +395,15 @@ export const SiteFooter: React.FC = () => (
   <footer className="mt-16 bg-[#f7f8fa] border-t border-[var(--nr-line)] jbe-noprint">
     <div className={`${BOX} py-8 text-[14px] text-slate-600 space-y-2`}>
       <p className="nr-title text-[18px] text-[#002f63]">교육데이터 허브 데이터 도구실 · 업무경감 도구 모음</p>
-      <p>데이터 도구실 「교육청 배포 도구」·「교직원 제작 도구」·「외부 공공업무 도구」 게시판의 업무도구를 한곳에 모은 개편 시범(PoC) 화면</p>
+      <p>
+        {SERVER
+          ? '교육청 배포·교직원 제작·외부 공공업무 도구를 찾고, 요청하고, 등록하는 전북특별자치도교육청 업무도구 공간'
+          : '데이터 도구실 「교육청 배포 도구」·「교직원 제작 도구」·「외부 공공업무 도구」 게시판의 업무도구를 한곳에 모은 개편 시범(PoC) 화면'}
+      </p>
       <p>
         <b className="text-slate-800">담당</b> 정책기획과 빅데이터담당 · <b className="text-slate-800">전화</b> 063-239-3176
       </p>
-      <p className="pt-3 border-t border-[var(--nr-line)] text-[13px] text-slate-500">
+      {!SERVER && <p className="pt-3 border-t border-[var(--nr-line)] text-[13px] text-slate-500">
         자료 출처 —{' '}
         <a href={BOARD_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[var(--nr-p3)]">
           전북특별자치도교육청 누리집 교직원 제작 도구 게시판
@@ -363,7 +416,7 @@ export const SiteFooter: React.FC = () => (
         <a href={EXTERNAL_BOARD_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[var(--nr-p3)]">
           외부 공공업무 도구 게시판
         </a>
-      </p>
+      </p>}
     </div>
   </footer>
 );

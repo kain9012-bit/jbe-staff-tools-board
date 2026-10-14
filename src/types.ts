@@ -52,7 +52,8 @@ export type Grain = 'day' | 'week' | 'month';
 export type Route =
   | { page: 'home'; q?: string; sort?: string; from?: string; to?: string; p?: string; src?: string }
   | { page: 'tools'; q?: string; sort?: string; from?: string; to?: string; p?: string; src?: string }
-  | { page: 'register'; type?: string; req?: string }
+  | { page: 'register'; type?: string; req?: string; edit?: string }
+  | { page: 'login'; next?: string }
   | { page: 'makers'; q?: string; sort?: string; from?: string; to?: string }
   | { page: 'about' }
   | { page: 'official' }

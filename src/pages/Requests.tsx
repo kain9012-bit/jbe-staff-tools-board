@@ -7,6 +7,8 @@ import { KEYWORD_CHIPS } from '../lib/keywords';
 import { useRequests } from '../lib/requests';
 import { navigate } from '../lib/route';
 import { dayLabel, n, type Model } from '../lib/stats';
+import { SERVER } from '../lib/edition';
+import { needLogin } from '../lib/server';
 
 /**
  * 도구 요청 — 필요한 사람이 요청을 올리고, 만들 수 있는 교직원이 보고 의견을 나누며 만들어 등록하는 열린 게시판.
@@ -46,12 +48,17 @@ export const Requests: React.FC<{ m: Model }> = ({ m }) => {
     e.preventDefault();
     if (!title.trim()) return;
     const id = `me-${Date.now()}`;
-    R.addRequest({ id, title: title.trim().slice(0, 80), detail: detail.trim().slice(0, 300), field: field || '기타', who: '나', at: todayKst(), likes: 0, mine: true });
-    setTitle('');
-    setDetail('');
-    setField('');
-    setOpen(false);
-    navigate(`/requests/${id}`);
+    const made = R.addRequest({ id, title: title.trim().slice(0, 80), detail: detail.trim().slice(0, 300), field: field || '기타', who: '나', at: todayKst(), likes: 0, mine: true });
+    const done = (rid?: string) => {
+      if (!rid) return;
+      setTitle('');
+      setDetail('');
+      setField('');
+      setOpen(false);
+      navigate(`/requests/${rid}`);
+    };
+    if (SERVER) void Promise.resolve(made).then((rid) => done(rid ?? undefined));
+    else done(id);
   };
 
   return (
@@ -81,7 +88,7 @@ export const Requests: React.FC<{ m: Model }> = ({ m }) => {
             <Lightbulb className="w-5 h-5 text-[#e0a800]" aria-hidden="true" /> 이런 도구가 필요해요
           </h2>
           {!open && (
-            <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--nr-p1)] px-4 py-2.5 text-[14px] font-bold text-white hover:bg-[var(--nr-p3)]">
+            <button type="button" onClick={() => (!SERVER || needLogin()) && setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--nr-p1)] px-4 py-2.5 text-[14px] font-bold text-white hover:bg-[var(--nr-p3)]">
               <Plus className="w-4 h-4" aria-hidden="true" /> 요청 남기기
             </button>
           )}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { SERVER } from '../lib/edition';
 import { ArrowUpRight, CornerDownRight, Eye, MessageCircle, TrendingUp } from 'lucide-react';
 import { hrefMaker, hrefTool } from '../lib/route';
 import { addDays, n, shortDay, splitAuthor, type ToolStat } from '../lib/stats';
@@ -119,12 +120,12 @@ export const ToolCard: React.FC<{
         </Pill>
         <a
           href={t.url}
-          target="_blank"
+          target={SERVER ? undefined : '_blank'}
           rel="noreferrer"
           className="relative z-10 ml-auto inline-flex items-center gap-0.5 rounded-md bg-[var(--nr-p1)] px-3 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]"
         >
-          사용하기 <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
-          <span className="sr-only">(게시판 원글, 새 창)</span>
+          {SERVER ? '자세히' : '사용하기'} {!SERVER && <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />}
+          {!SERVER && <span className="sr-only">(게시판 원글, 새 창)</span>}
         </a>
       </div>
     </div>
@@ -213,12 +214,12 @@ export const ToolTable: React.FC<{
               <td className="py-3.5">
                 <a
                   href={t.url}
-                  target="_blank"
+                  target={SERVER ? undefined : '_blank'}
                   rel="noreferrer"
                   className="inline-flex items-center gap-0.5 rounded-md bg-[var(--nr-p1)] px-2.5 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]"
                 >
-                  사용하기 <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span className="sr-only">(새 창)</span>
+                  {SERVER ? '자세히' : '사용하기'} {!SERVER && <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />}
+                  {!SERVER && <span className="sr-only">(새 창)</span>}
                 </a>
               </td>
             </tr>

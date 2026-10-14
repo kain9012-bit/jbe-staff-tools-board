@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { Route } from './types';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
 import { Lnb, menuOf, PocBanner, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
 import { Requests } from './pages/Requests';
@@ -20,6 +21,32 @@ import { Makers } from './pages/Makers';
 import { Register } from './pages/Register';
 import { ToolDetail } from './pages/ToolDetail';
 import { PageTitle } from './components/Shell';
+import { SERVER } from './lib/edition';
+import { ReviewServer } from './pages/ReviewServer';
+import { Login } from './pages/Login';
+import { NOTICE_EV } from './lib/server';
+
+/** 짧은 알림 띠 — 저장·오류 안내 */
+const Notice: React.FC = () => {
+  const [n, setN] = useState<{ msg: string; tone: 'ok' | 'err'; k: number } | null>(null);
+  useEffect(() => {
+    let timer: number | undefined;
+    const on = (e: Event) => {
+      const d = (e as CustomEvent).detail as { msg: string; tone: 'ok' | 'err' };
+      setN({ ...d, k: Date.now() });
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setN(null), d.tone === 'err' ? 6000 : 3000);
+    };
+    window.addEventListener(NOTICE_EV, on);
+    return () => window.removeEventListener(NOTICE_EV, on);
+  }, []);
+  if (!n) return null;
+  return (
+    <div role={n.tone === 'err' ? 'alert' : 'status'} className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 jbe-noprint">
+      <p className={`max-w-lg rounded-xl px-5 py-3 text-[15px] font-bold shadow-lg ${n.tone === 'err' ? 'bg-[#b0123a] text-white' : 'bg-[var(--nr-p2)] text-white'}`}>{n.msg}</p>
+    </div>
+  );
+};
 
 /** 자료가 오기 전 빈 껍데기 — 숫자 자리를 회색 막대로만 둠 */
 const Skeleton = () => (
@@ -54,7 +81,9 @@ const SubTabs: React.FC<{ items: LnbSub[] }> = ({ items }) => (
 );
 
 export default function App() {
-  const route = useRoute();
+  const raw = useRoute();
+  /** 서버판 — 개편 안내·집계 기준 화면 없음. 옛 주소는 도구 찾기로 */
+  const route = SERVER && (raw.page === 'about' || raw.page === 'poc') ? ({ page: 'home' } as Route) : raw;
   const { state, reload } = useData();
   const [top, setTop] = useState(false);
 
@@ -66,14 +95,14 @@ export default function App() {
 
   const { ups } = useManage();
   /** 고도화로 전환된 도구 반영(PoC, 이 브라우저 기록) */
-  const m = useMemo(() => (state.status === 'ready' ? applyUpgrades(state.model, ups) : undefined), [state, ups]);
+  const m = useMemo(() => (state.status === 'ready' ? (SERVER ? state.model : applyUpgrades(state.model, ups)) : undefined), [state, ups]);
   const active: MenuKey = menuOf(route);
   const srcNow = route.page === 'home' || route.page === 'tools' ? route.src ?? '' : '';
 
   const toolNow = route.page === 'tool' && m ? allTools(m).find((x) => x.sid === route.sid) : undefined;
   const toolTitle = toolNow?.title;
   const toolBoard = toolNow ? toolNow.board ?? 'staff' : '';
-  const makerName = route.page === 'maker' ? route.name : route.page === 'request' ? '요청 글' : undefined;
+  const makerName = route.page === 'maker' ? route.name : route.page === 'request' ? '요청 글' : route.page === 'login' ? '로그인' : undefined;
 
   useEffect(() => {
     const t = toolTitle ?? makerName ?? (active !== 'find' ? MENU.find((x) => x.key === active)?.label : undefined);
@@ -87,10 +116,12 @@ export default function App() {
         { label: '등록 신청', href: '/register', on: route.page === 'register' },
         { label: '검수 현황', href: '/review', on: route.page === 'review' },
       ],
-      guide: [
-        { label: '개편 안내', href: '/poc', on: route.page === 'poc' },
-        { label: '집계 기준', href: '/about', on: route.page === 'about' },
-      ],
+      guide: SERVER
+        ? [{ label: '집계 기준', href: '/about', on: route.page === 'about' }]
+        : [
+            { label: '개편 안내', href: '/poc', on: route.page === 'poc' },
+            { label: '집계 기준', href: '/about', on: route.page === 'about' },
+          ],
     };
     if (!m) return fixed;
     const all = allTools(m);
@@ -130,8 +161,9 @@ export default function App() {
 
   let body: React.ReactNode;
   if (route.page === 'about') body = <About m={m} />;
-  else if (route.page === 'register') body = <Register key={locKey()} initialType={route.type} initialReq={route.req} />;
-  else if (route.page === 'review') body = <Review />;
+  else if (route.page === 'register') body = <Register key={locKey()} initialType={route.type} initialReq={route.req} m={m} edit={route.edit} />;
+  else if (route.page === 'review') body = SERVER ? <ReviewServer /> : <Review />;
+  else if (route.page === 'login' && SERVER) body = <Login next={route.next} />;
   else if (state.status === 'loading') body = <Skeleton />;
   else if (state.status === 'error')
     body = (
@@ -139,7 +171,7 @@ export default function App() {
         <EmptyState
           icon={<AlertTriangle className="w-5 h-5" aria-hidden="true" />}
           title="자료를 불러오지 못함"
-          desc={`수집 시트를 읽는 중 문제가 생겼습니다. (${state.message})`}
+          desc={SERVER ? `서버에서 자료를 받지 못했습니다. (${state.message})` : `수집 시트를 읽는 중 문제가 생겼습니다. (${state.message})`}
         />
         <div className="text-center">
           <button
@@ -172,7 +204,7 @@ export default function App() {
     else if (route.page === 'maker') body = <MakerDetail m={m} name={route.name} />;
     else if (route.page === 'requests') body = <Requests m={m} />;
     else if (route.page === 'request') body = <RequestDetail key={route.id} m={m} id={route.id} />;
-    else if (route.page === 'poc') body = <PocGuide m={m} />;
+    else if (route.page === 'poc') body = SERVER ? <About m={m} /> : <PocGuide m={m} />;
   }
   /** 휴대폰 하위 메뉴 — PC는 왼쪽 메뉴에 있음 */
   const mobileSubs = active !== 'find' && route.page !== 'maker' ? subs[active] : undefined;
@@ -203,6 +235,7 @@ export default function App() {
       </SubLayout>
 
       <SiteFooter />
+      {SERVER && <Notice />}
 
       {top && (
         <button

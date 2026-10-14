@@ -24,7 +24,7 @@ const SAMPLES: Submission[] = [
   { id: 's5', board: 'staff', title: '(예시) 교실 타이머', what: '전자칠판용 수업 타이머', purpose: '교육활동', run: '웹 접속', version: '1.0', at: '2026-09-29', stage: 3, checks: 6 },
 ];
 
-const STAGE_INFO = [
+export const STAGE_INFO = [
   { icon: ClipboardCheck, desc: '공통 양식 접수 · 필수 항목 확인' },
   { icon: FileSearch, desc: '보안 자가점검 6문항' },
   { icon: ShieldCheck, desc: '담당자가 외부 전송·개인정보·실행 파일 확인' },
@@ -38,14 +38,14 @@ const UPGRADES = [
   { id: 'u3', title: '(예시) 교직원 제작 물품 대장 정리기', maker: '○○중 행정실', stage: 2, note: '보안 보강 · 설치형 → 웹 전환' },
   { id: 'u4', title: '(예시) 교직원 제작 수신자 그룹 등록기', maker: '○○지원청 주무관', stage: 3, note: '교육청 배포 도구로 전환 · 후기·조회수 이어받음' },
 ];
-const UPGRADE_INFO = [
+export const UPGRADE_INFO = [
   { icon: Sparkles, desc: '사업부서 협의 · 업무 범위·지침 부합·유지보수 가능성 등 검토. 활용도 자료는 참고' },
   { icon: Handshake, desc: '제작자 동의 · 원작 표시 · 공동 개발 여부' },
   { icon: Wrench, desc: '정책기획과가 보안·기능 보강, 버전 올림' },
   { icon: Rocket, desc: '구분을 교육청 배포로 바꿈 · 같은 도구 화면 유지' },
 ];
 
-const CRITERIA = [
+export const CRITERIA = [
   ['개인정보', '도구가 개인정보를 저장·전송하지 않는지, 한다면 범위와 보관 기간이 밝혀져 있는지'],
   ['외부 전송', '외부 서버·해외 AI로 보내는 자료가 무엇인지, 끌 수 있는지'],
   ['실행 파일', '설치 프로그램·매크로 파일의 백신 검사, 출처·제작자 표기'],
@@ -54,7 +54,7 @@ const CRITERIA = [
   ['버전 표기', '버전과 바뀐 내용이 적혀 있어 사용자가 최신판을 구분할 수 있는지'],
 ];
 
-const Column: React.FC<{ icon: typeof Sparkles; no: number; name: string; desc: string; count: number; children: React.ReactNode }> = ({ icon: Icon, no, name, desc, count, children }) => (
+export const Column: React.FC<{ icon: typeof Sparkles; no: number; name: string; desc: string; count: number; children: React.ReactNode }> = ({ icon: Icon, no, name, desc, count, children }) => (
   <div className="flex flex-col rounded-[12px] bg-[#f5f7fa] p-3">
     <div className="px-1 pb-2">
       <h3 className="flex items-center gap-1.5 text-[16px] font-bold text-black">

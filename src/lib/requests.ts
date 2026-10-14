@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { usePocState, type Submission } from '../components/Poc';
 import { SAMPLE_REQUESTS, type ReqComment, type ReqStatus, type ToolRequest } from '../data/poc-requests';
 import { allTools, type Model, type ToolStat } from './stats';
+import { SERVER } from './edition';
+import { act, errMsg, needLogin, notice, useSrv } from './server';
 
 /**
  * 도구 요청 — 예시 요청 + 이 브라우저에서 남긴 요청·의견·손들기·연결을 합쳐 보여 줌.
@@ -19,6 +21,50 @@ export interface RequestView extends ToolRequest {
 }
 
 export function useRequests(m?: Model) {
+  return SERVER ? useRequestsServer(m) : useRequestsPoc(m);
+}
+
+/** 서버판 — 요청·공감·손들기·의견·연결을 서버에 저장. 화면은 PoC와 같은 함수를 부름 */
+function useRequestsServer(m?: Model) {
+  const S = useSrv();
+  const byId = useMemo(() => new Map((m ? allTools(m) : []).map((t) => [t.sid, t])), [m]);
+  const list: RequestView[] = S.requests.map((r) => {
+    const tools = (r.sids ?? []).map((s) => byId.get(s)).filter((t): t is ToolStat => Boolean(t));
+    const pending = S.submissions.filter((s) => s.reqId === r.id && s.status === 'pending');
+    const makers = r.making ?? [];
+    const status: ReqStatus = tools.length ? '해결' : makers.length || pending.length ? '만드는 중' : '의견 모으는 중';
+    return { ...r, status, tools, pending, makers, allComments: r.comments ?? [] };
+  });
+  const run = (method: string, path: string, body?: unknown, data = false) => {
+    if (!needLogin()) return;
+    void act(method, path, body, data).catch((e) => notice(errMsg(e), 'err'));
+  };
+  const enc = encodeURIComponent;
+  return {
+    list,
+    get: (id: string) => list.find((r) => r.id === id),
+    liked: S.myLikes,
+    toggleLike: (id: string) => run('POST', `/api/requests/${enc(id)}/like`),
+    addRequest: async (r: ToolRequest): Promise<string | undefined> => {
+      if (!needLogin()) return undefined;
+      try {
+        const x = await act<{ id: string }>('POST', '/api/requests', { title: r.title, detail: r.detail, field: r.field });
+        return x.id;
+      } catch (e) {
+        notice(errMsg(e), 'err');
+        return undefined;
+      }
+    },
+    toggleMaking: (id: string) => run('POST', `/api/requests/${enc(id)}/making`),
+    isMaking: (id: string) => S.myMaking.includes(id),
+    addComment: (id: string, c: ReqComment) => run('POST', `/api/requests/${enc(id)}/comments`, { text: c.text }),
+    link: (id: string, sid: string) => run('POST', `/api/requests/${enc(id)}/links`, { sid, on: true }),
+    unlink: (id: string, sid: string) => run('POST', `/api/requests/${enc(id)}/links`, { sid, on: false }),
+    linkedByOps: (id: string) => S.requests.find((r) => r.id === id)?.opsLinks ?? [],
+  };
+}
+
+function useRequestsPoc(m?: Model) {
   const [mine, setMine] = usePocState<ToolRequest[]>('requests', []);
   const [liked, setLiked] = usePocState<string[]>('liked', []);
   const [links, setLinks] = usePocState<Record<string, string[]>>('reqLinks', {});

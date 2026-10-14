@@ -6,6 +6,13 @@ import { WRITE_URL } from '../lib/board';
 import { sourceOf } from '../lib/sources';
 import { useRequests } from '../lib/requests';
 import { SourceTag } from '../components/Lists';
+import { SERVER } from '../lib/edition';
+import { api, errMsg, extraOf, goLogin, notice, refreshState, reloadData, uploadFile, useSrv } from '../lib/server';
+import { FilePicker } from '../components/ServerTool';
+import { allTools, type Model } from '../lib/stats';
+import { summaryOf } from '../lib/summaries';
+import { navigate } from '../lib/route';
+import { LogIn, Pencil } from 'lucide-react';
 
 /**
  * 도구 등록 — 개편 PoC. 게시판 자유 글쓰기 대신 정해진 양식으로 등록하고,
@@ -19,7 +26,7 @@ const TARGETS = ['유', '초', '중', '고', '특수', '기관'];
 const RUNS = ['웹 접속', 'HTML 파일', '브라우저 확장', '설치 프로그램', '북마크', '구글 시트', 'AI 챗봇', '기타'];
 
 /** 예·아니오로 답하는 자가점검 — 안전한 답 */
-const QUESTIONS: { q: string; safe: boolean; hint?: string }[] = [
+export const QUESTIONS: { q: string; safe: boolean; hint?: string }[] = [
   { q: '이름·연락처·주민번호 등 개인정보를 도구가 저장하나요?', safe: false },
   { q: '입력한 자료를 외부 서버나 해외 AI로 보내나요?', safe: false, hint: '보낸다면 무엇을 어디로 보내는지 설명란에 밝혀 주세요' },
   { q: '무료 클라우드 DB(구글 시트 등)에 업무 자료를 쌓나요?', safe: false },
@@ -100,26 +107,138 @@ const KINDS: { key: Kind; icon: typeof UserRound; title: string; who: string; bo
   { key: 'official', icon: Building2, title: '교육청 배포 도구', who: '정책기획과 빅데이터담당', body: '교육청이 만들거나 고도화해 배포하는 도구' },
 ];
 
-export const Register: React.FC<{ initialType?: string; initialReq?: string }> = ({ initialReq }) => {
+/** 서버판 글 수정 — 지금 내용을 양식에 채움 */
+function formOf(m: Model, sid: string): Form | null {
+  const t = allTools(m).find((x) => x.sid === sid);
+  if (!t) return null;
+  const s = summaryOf(sid);
+  const x = extraOf(sid);
+  const tg = t.target === '전체' ? TARGETS : t.target.split(',').map((v) => v.trim()).filter((v) => TARGETS.includes(v));
+  return {
+    ...EMPTY,
+    reqId: x?.reqId ?? '',
+    board: (t.board ?? 'staff') as Kind,
+    org: x?.org ?? '',
+    region: x?.region ?? '',
+    title: t.title,
+    what: s?.what ?? '',
+    why: s?.why ?? '',
+    purpose: t.purpose,
+    targets: tg,
+    run: s?.run ?? '',
+    features: (s?.features ?? []).join('\n'),
+    steps: (s?.steps ?? []).join('\n'),
+    deliver: x?.deliver === 'url' ? 'url' : 'file',
+    url: x?.link ?? '',
+    version: x?.version ?? '',
+    answers: QUESTIONS.map(() => false),
+  };
+}
+
+export const Register: React.FC<{ initialType?: string; initialReq?: string; m?: Model; edit?: string }> = ({ initialReq, m, edit }) => {
+  const S = useSrv();
+  if (SERVER && S.ready && !S.me)
+    return (
+      <>
+        <PageTitle desc="혼자 쓰던 업무도구, 동료와 나눠 주세요. 정해진 양식으로 등록하면 보안 검토를 거쳐 게시됩니다.">도구 등록</PageTitle>
+        <div className="mt-8 rounded-[14px] border border-[var(--nr-line)] bg-[var(--nr-bg)] p-8 text-center">
+          <p className="text-[16px] text-slate-700">도구 등록은 로그인한 교직원만 할 수 있습니다.</p>
+          <button type="button" onClick={goLogin} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--nr-p1)] px-5 py-3 text-[15px] font-bold text-white">
+            <LogIn className="w-4 h-4" aria-hidden="true" /> 로그인
+          </button>
+        </div>
+      </>
+    );
+  if (SERVER && edit) {
+    if (!m || !S.ready) return <p className="py-10 text-center text-slate-500">불러오는 중…</p>;
+    const init = formOf(m, edit);
+    if (!init || !S.editable.includes(edit)) return <p className="py-10 text-center text-slate-600">이 글을 고칠 권한이 없거나 없는 도구입니다.</p>;
+    return <RegisterForm initial={init} editSid={edit} />;
+  }
+  return <RegisterForm initial={{ ...EMPTY, board: 'staff', reqId: initialReq ?? '' }} />;
+};
+
+const RegisterForm: React.FC<{ initial: Form; editSid?: string }> = ({ initial, editSid }) => {
   const R = useRequests();
+  const S = useSrv();
   const [step, setStep] = useState(0);
-  const [f, setF] = useState<Form>({ ...EMPTY, board: 'staff', reqId: initialReq ?? '' });
+  const [f, setF] = useState<Form>(initial);
   /** 교육청 배포 도구는 운영 부서만 — PoC에서는 시연용으로 켤 수 있음 */
-  const [ops, setOps] = useState(false);
+  const [opsDemo, setOps] = useState(false);
+  const ops = SERVER ? !!S.me?.ops && !editSid : opsDemo;
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
   const [, setSubs] = usePocState<Submission[]>('submissions', []);
   const [sent, setSent] = useState<Submission | null>(null);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
 
   const ok = [
     f.board && (f.board !== 'external' || f.org.trim()) && f.title.trim() && f.what.trim() && f.purpose && f.targets.length && f.run,
-    lines(f.features).length > 0 && lines(f.steps).length > 0 && (f.deliver === 'file' || f.url.trim()),
-    f.answers.every((a) => a !== null),
+    lines(f.features).length > 0 && lines(f.steps).length > 0 && (f.deliver === 'file' ? !SERVER || !!editSid || files.length > 0 : /^https?:\/\/\S+/.test(f.url.trim())),
+    !!editSid || f.answers.every((a) => a !== null),
     true,
   ];
   const risky = f.answers.map((a, i) => a !== null && a !== QUESTIONS[i].safe);
   const riskCount = risky.filter(Boolean).length;
 
+  const body = () => ({
+    board: f.board || 'staff',
+    title: f.title.trim(),
+    what: f.what.trim(),
+    why: f.why.trim(),
+    purpose: f.purpose,
+    targets: f.targets,
+    run: f.run,
+    features: lines(f.features),
+    steps: lines(f.steps),
+    deliver: editSid && f.deliver === 'file' && extraOf(editSid)?.deliver === 'board' ? undefined : f.deliver,
+    url: f.url.trim(),
+    version: f.version.trim() || '1.0',
+    org: f.org.trim(),
+    region: f.region.trim(),
+    reqId: f.reqId,
+    answers: f.answers,
+  });
+
+  /** 서버판 — 신청(또는 수정) 저장, 파일 올리기 */
+  const submitServer = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (editSid) {
+        await api('PUT', `/api/tools/${encodeURIComponent(editSid)}`, body());
+        await refreshState();
+        reloadData();
+        notice('고친 내용을 저장함');
+        navigate(`/tool/${editSid}`);
+        return;
+      }
+      const r = await api<{ sid: string; versionId: number }>('POST', '/api/submissions', body());
+      if (f.deliver === 'file') for (const x of files) await uploadFile(r.sid, r.versionId, x);
+      await refreshState();
+      setSent({
+        id: r.sid,
+        title: f.title.trim(),
+        what: f.what.trim(),
+        purpose: f.purpose,
+        run: f.run,
+        version: f.version.trim() || '1.0',
+        at: todayKst(),
+        stage: 1,
+        checks: QUESTIONS.length - riskCount,
+        board: f.board || 'staff',
+        reqId: f.reqId || undefined,
+      });
+      window.scrollTo(0, 0);
+    } catch (e) {
+      notice(errMsg(e), 'err');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = () => {
+    if (SERVER) return void submitServer();
     const s: Submission = {
       id: `me-${Date.now()}`,
       title: f.title.trim(),
@@ -170,7 +289,8 @@ export const Register: React.FC<{ initialType?: string; initialReq?: string }> =
               type="button"
               onClick={() => {
                 setSent(null);
-                setF(EMPTY);
+                setF({ ...EMPTY, board: 'staff' });
+                setFiles([]);
                 setStep(0);
               }}
               className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-[15px] font-bold text-slate-700"
@@ -185,8 +305,14 @@ export const Register: React.FC<{ initialType?: string; initialReq?: string }> =
 
   return (
     <>
-      <PageTitle desc="혼자 쓰던 업무도구, 동료와 나눠 주세요. 정해진 양식으로 등록하면 보안 검토를 거쳐 게시되고, 등록한 내용이 그대로 도구 소개 화면이 됩니다.">
-        도구 등록
+      <PageTitle desc={editSid ? '도구 소개 내용을 고칩니다. 파일·버전은 도구 화면의 \'새 버전 올리기\'에서 올립니다.' : '혼자 쓰던 업무도구, 동료와 나눠 주세요. 정해진 양식으로 등록하면 보안 검토를 거쳐 게시되고, 등록한 내용이 그대로 도구 소개 화면이 됩니다.'}>
+        {editSid ? (
+          <span className="inline-flex items-center gap-2">
+            <Pencil className="w-7 h-7 text-[var(--nr-p1)]" aria-hidden="true" /> 글 수정
+          </span>
+        ) : (
+          '도구 등록'
+        )}
       </PageTitle>
       <PocNote className="mt-6">
         PoC 예시 화면입니다. 신청 내용은 이 브라우저에만 저장되고 실제로 게시되지 않습니다. 지금 도구를 올리려면{' '}
@@ -199,10 +325,11 @@ export const Register: React.FC<{ initialType?: string; initialReq?: string }> =
       </PocNote>
 
       {/* 운영 부서 화면 시연 — 일반 교직원 화면에는 교직원 제작 도구 등록만 보임 */}
+      {!SERVER && (
       <label className="mt-4 flex items-center justify-end gap-1.5 text-[13px] text-slate-500">
         <input
           type="checkbox"
-          checked={ops}
+          checked={opsDemo}
           onChange={(e) => {
             setOps(e.target.checked);
             if (!e.target.checked) set('board', 'staff');
@@ -211,6 +338,7 @@ export const Register: React.FC<{ initialType?: string; initialReq?: string }> =
         />
         운영 부서 계정으로 보기 (PoC 시연)
       </label>
+      )}
       {/* 단계 표시 */}
       <ol className="mt-2 grid grid-cols-4 gap-1.5" aria-label="등록 단계">
         {STEPS.map(({ t, icon: Icon }, i) => (
@@ -275,7 +403,7 @@ export const Register: React.FC<{ initialType?: string; initialReq?: string }> =
               </fieldset>
             ) : (
               <p className="flex items-center gap-2 rounded-[10px] bg-[var(--nr-bg)] px-4 py-3 text-[15px] font-bold text-[var(--nr-p2)]">
-                <UserRound className="w-5 h-5 text-[var(--nr-p1)]" aria-hidden="true" /> 교직원 제작 도구 등록
+                <UserRound className="w-5 h-5 text-[var(--nr-p1)]" aria-hidden="true" /> {editSid ? `${sourceOf(f.board || 'staff').name} 글 수정` : '교직원 제작 도구 등록'}
               </p>
             )}
             {f.board === 'external' && (
@@ -381,10 +509,20 @@ export const Register: React.FC<{ initialType?: string; initialReq?: string }> =
                 ))}
               </div>
               {f.deliver === 'file' ? (
+                SERVER ? (
+                  editSid ? (
+                    <p className="mt-2 rounded-lg bg-[#fafafa] px-4 py-3 text-[14px] text-slate-600">파일은 도구 화면의 '새 버전 올리기'에서 바꿉니다.</p>
+                  ) : (
+                    <div className="mt-2">
+                      <FilePicker files={files} onChange={setFiles} />
+                    </div>
+                  )
+                ) : (
                 <div className="mt-2 rounded-lg border-2 border-dashed border-slate-300 bg-[#fafafa] px-4 py-6 text-center text-[14px] text-slate-500">
                   <FileUp className="mx-auto mb-1 w-6 h-6" aria-hidden="true" />
                   파일을 끌어 놓거나 눌러서 선택 (PoC에서는 올라가지 않음)
                 </div>
+                )
               ) : (
                 <input aria-label="배포 주소" value={f.url} onChange={(e) => set('url', e.target.value)} className={`${input} mt-2`} placeholder="https://" />
               )}
@@ -392,13 +530,14 @@ export const Register: React.FC<{ initialType?: string; initialReq?: string }> =
             <Field id="f-ver" label="버전" hint="업데이트할 때마다 올리면 상세 화면에 버전 이력이 쌓이고, 알림 받기를 누른 사람에게 알림이 감">
               <div className="flex items-center gap-2">
                 <span className="text-[15px] font-bold text-slate-600">v</span>
-                <input id="f-ver" value={f.version} onChange={(e) => set('version', e.target.value)} maxLength={10} className={`${input} max-w-[8rem]`} />
+                <input id="f-ver" value={f.version} disabled={!!editSid} onChange={(e) => set('version', e.target.value)} maxLength={10} className={`${input} max-w-[8rem] disabled:bg-slate-100`} />
               </div>
             </Field>
           </div>
         )}
 
-        {step === 2 && (
+        {step === 2 && editSid && <p className="text-[15px] text-slate-700">보안 자가점검은 처음 등록할 때와 새 버전을 올릴 때 확인합니다. 글 내용만 고칠 때는 건너뜁니다.</p>}
+        {step === 2 && !editSid && (
           <div>
             <p className="text-[15px] text-slate-700">답에 따라 보안 검토에서 살필 부분이 정해집니다. '확인 필요' 답이 있어도 신청할 수 있습니다.</p>
             <ul className="mt-4 divide-y divide-slate-100 border-y border-slate-100">
@@ -501,8 +640,8 @@ export const Register: React.FC<{ initialType?: string; initialReq?: string }> =
               다음 <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </button>
           ) : (
-            <button type="button" onClick={submit} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--nr-p1)] px-5 py-2.5 text-[15px] font-bold text-white hover:bg-[var(--nr-p3)]">
-              <Send className="w-4 h-4" aria-hidden="true" /> 등록 신청
+            <button type="button" onClick={submit} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--nr-p1)] px-5 py-2.5 text-[15px] font-bold text-white hover:bg-[var(--nr-p3)] disabled:opacity-50">
+              <Send className="w-4 h-4" aria-hidden="true" /> {busy ? '보내는 중…' : editSid ? '고친 내용 저장' : '등록 신청'}
             </button>
           )}
         </div>

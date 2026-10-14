@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { SERVER } from '../lib/edition';
 import { CalendarDays, Eye, History, TrendingUp, Wrench } from 'lucide-react';
 import { ToolTable } from '../components/Lists';
 import { PageTitle } from '../components/Shell';
@@ -86,7 +87,7 @@ export const OfficialStats: React.FC<{ m: Model }> = ({ m }) => {
         <b className="rounded-md bg-[var(--nr-bg)] px-2 py-0.5 text-[var(--nr-p2)]">{periodText}</b>
         {ps.includesPre && ps.pre > 0 && (
           <span className="text-xs text-slate-500">
-            · 수집 시작({shortDay(om.start)}) 전 조회수 {n(ps.pre)}회 포함
+            · {SERVER ? '기록' : '수집'} 시작({shortDay(om.start)}) 전 조회수 {n(ps.pre)}회 포함
           </span>
         )}
       </p>

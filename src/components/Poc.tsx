@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
+import { SERVER } from '../lib/edition';
 
 /**
  * 데이터 도구실 개편 PoC 공통 — '예시' 표시와 이 브라우저에만 남는 저장소.
@@ -8,7 +9,9 @@ import { FlaskConical } from 'lucide-react';
  */
 
 /** 예시 기능 표시 — 실제 자료가 아니라는 것을 늘 함께 보여 줌 */
-export const PocTag: React.FC<{ className?: string; label?: string }> = ({ className = '', label = 'PoC 예시' }) => (
+export const PocTag: React.FC<{ className?: string; label?: string }> = ({ className = '', label = 'PoC 예시' }) => SERVER ? (
+  label === 'PoC 예시' ? null : <span className={`inline-flex shrink-0 items-center rounded-full bg-[var(--nr-bg)] px-2 py-0.5 text-[11px] font-bold text-[var(--nr-p3)] ${className}`}>{label}</span>
+) : (
   <span
     className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-[#f0c36a] bg-[#fff7e3] px-2 py-0.5 text-[11px] font-bold text-[#8a5300] ${className}`}
   >
@@ -18,7 +21,7 @@ export const PocTag: React.FC<{ className?: string; label?: string }> = ({ class
 );
 
 /** 예시 기능 안내 줄 */
-export const PocNote: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+export const PocNote: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => SERVER ? null : (
   <p className={`flex items-start gap-2 rounded-[10px] border border-[#f0d9a6] bg-[#fffaf0] px-4 py-3 text-[14px] text-[#6b4a00] ${className}`}>
     <FlaskConical className="mt-0.5 w-4 h-4 shrink-0" aria-hidden="true" />
     <span>{children}</span>

@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { SERVER } from '../lib/edition';
 import { CalendarDays, Eye, MessageCircle, Users, Wrench } from 'lucide-react';
 import { CommentItem, RankRow } from '../components/Lists';
 import { TrendChart } from '../components/TrendChart';
@@ -68,7 +69,7 @@ export const StatsOverview: React.FC<{ m: Model }> = ({ m }) => {
   return (
     <>
     <div className="mt-6 grid gap-3 grid-cols-2 lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
-      <Stat icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />} label="제작자" value={n(m.makers.length)} desc="게시판 작성자 기준" />
+      <Stat icon={<Users className="w-3.5 h-3.5" aria-hidden="true" />} label="제작자" value={n(m.makers.length)} desc={SERVER ? '등록자 기준' : '게시판 작성자 기준'} />
       <Stat icon={<Wrench className="w-3.5 h-3.5" aria-hidden="true" />} label="등록 도구" value={n(m.tools.length)} desc="게시중 글, 공지 제외" />
       <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(total)} desc="전체 도구 합계" />
       <Stat
@@ -90,7 +91,7 @@ export const StatsOverview: React.FC<{ m: Model }> = ({ m }) => {
         <b className="rounded-md bg-[var(--nr-bg)] px-2 py-0.5 text-[var(--nr-p2)]">{periodText}</b>
         {ps.includesPre && ps.pre > 0 && (
           <span className="text-xs text-slate-500">
-            · 수집 시작({shortDay(m.start)}) 전 조회수 {n(ps.pre)}회 포함
+            · {SERVER ? '기록' : '수집'} 시작({shortDay(m.start)}) 전 조회수 {n(ps.pre)}회 포함
           </span>
         )}
       </p>

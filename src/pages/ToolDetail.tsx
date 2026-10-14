@@ -9,19 +9,25 @@ import { summaryOf, type ToolSummary } from '../lib/summaries';
 import { ReactionPanel, TrustPanel, VersionPanel } from '../components/ToolPoc';
 import { ManagePanel } from '../components/ManagePanel';
 import { useRequests } from '../lib/requests';
+import { SERVER } from '../lib/edition';
+import { extraOf } from '../lib/server';
+import { SrvQnA, SrvReactionPanel, SrvTrustPanel, SrvVersionPanel, ToolActions, useCountView } from '../components/ServerTool';
 
 /** 한눈에 보기 — 원 게시글을 정해진 항목으로 짧게 정리한 요약. 본문 자체는 싣지 않음 */
 const SummaryBox: React.FC<{ s?: ToolSummary; url: string }> = ({ s, url }) => {
+  if (SERVER && !url) return <SummaryBody s={s} goPost={null} />;
+  return <SummaryBody s={s} goPost={
+    <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-[var(--nr-p3)] underline underline-offset-2">
+      원 게시글 보기 <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
+      <span className="sr-only">(새 창)</span>
+    </a>} />;
+};
+
+const SummaryBody: React.FC<{ s?: ToolSummary; goPost: React.ReactNode }> = ({ s, goPost }) => {
   const head = (
     <h2 className="nr-title flex items-center gap-2 text-[22px] text-black">
       <FileText className="w-5 h-5 text-[var(--nr-p1)]" aria-hidden="true" /> 한눈에 보기
     </h2>
-  );
-  const goPost = (
-    <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-[var(--nr-p3)] underline underline-offset-2">
-      원 게시글 보기 <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
-      <span className="sr-only">(새 창)</span>
-    </a>
   );
 
   if (!s || s.empty) {
@@ -30,7 +36,7 @@ const SummaryBox: React.FC<{ s?: ToolSummary; url: string }> = ({ s, url }) => {
         {head}
         <div className="mt-3 rounded-[10px] border border-dashed border-[var(--nr-line)] bg-[#fafafa] px-5 py-6 text-[15px] text-slate-600">
           <p>{s?.empty ? '원 게시글에 글도 그림 설명도 없어 요약할 내용이 없습니다.' : '아직 게시글 요약이 없습니다.'}</p>
-          <p className="mt-2">{goPost}</p>
+          {goPost && <p className="mt-2">{goPost}</p>}
         </div>
       </section>
     );
@@ -115,8 +121,14 @@ const SummaryBox: React.FC<{ s?: ToolSummary; url: string }> = ({ s, url }) => {
       </div>
       <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-slate-500">
         <Info className="w-3.5 h-3.5" aria-hidden="true" />
-        {s.thin ? '게시글 설명이 짧아 확인된 내용만 정리했습니다.' : `${basisText}을 바탕으로 정리했습니다.`} 자세한 내용은 {goPost}
-        <span className="tabular-nums">· {dayLabel(s.at)} 정리</span>
+        {SERVER && !goPost ? (
+          <span className="tabular-nums">제작자가 등록한 내용 · {dayLabel(s.at)} 작성</span>
+        ) : (
+          <>
+            {s.thin ? '게시글 설명이 짧아 확인된 내용만 정리했습니다.' : `${basisText}을 바탕으로 정리했습니다.`} 자세한 내용은 {goPost}
+            <span className="tabular-nums">· {dayLabel(s.at)} 정리</span>
+          </>
+        )}
       </p>
     </section>
   );
@@ -138,16 +150,29 @@ const ToolLinkList: React.FC<{ tools: ToolStat[] }> = ({ tools }) => (
   </ul>
 );
 
-export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
+export const ToolDetail: React.FC<{ m: Model; sid: string }> = (props) => {
+  // 서버판 — 화면을 열면 조회수 +1
+  if (SERVER) return <ServerCount sid={props.sid}><ToolDetailBody {...props} /></ServerCount>;
+  return <ToolDetailBody {...props} />;
+};
+
+const ServerCount: React.FC<{ sid: string; children: React.ReactNode }> = ({ sid, children }) => {
+  useCountView(sid);
+  return <>{children}</>;
+};
+
+const ToolDetailBody: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
   const solved = useRequests(m).list.filter((r) => r.tools.some((x) => x.sid === sid));
   const t = allTools(m).find((x) => x.sid === sid);
   /** 이 도구가 속한 게시판의 모델 — 교육청 배포 도구는 수집 시작일이 달라 따로 계산 */
   const bm = modelOf(m, sid) ?? m;
   const official = t?.board === 'official';
   /** 외부 공공업무 도구 — 조회수 추이·댓글이 없음 */
-  const external = t?.board === 'external';
+  const external = !SERVER && t?.board === 'external';
   /** 제작자가 게시판 운영자 한 사람인 게시판 */
-  const single = (official && !t?.origin) || external;
+  const single = !SERVER && ((official && !t?.origin) || external);
+  /** 외부 공공업무 도구 여부(표기용) — 서버판도 조회수는 셈 */
+  const isExt = t?.board === 'external';
   if (!t) {
     return (
       <EmptyState
@@ -188,13 +213,13 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
           </div>
           <h1 className="nr-title mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-snug">{t.title}</h1>
           <p className="mt-1 text-slate-600">
-            {external ? (
-              <b className="text-slate-800">외부 기관 제작{t.kind ? ` · ${t.kind}` : ''}</b>
+            {isExt ? (
+              <b className="text-slate-800">{SERVER && extraOf(t.sid)?.org ? extraOf(t.sid)!.org : '외부 기관 제작'}{t.kind ? ` · ${t.kind}` : ''}</b>
             ) : t.origin ? (
               <>
                 <b className="text-slate-800">{t.author}</b> · 원작 <MakerLink name={t.origin} />
               </>
-            ) : official ? (
+            ) : official || (SERVER && isExt) ? (
               <b className="text-slate-800">{t.author}</b>
             ) : (
               <MakerLink name={t.author} />
@@ -203,11 +228,11 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
             {!single && <> · 댓글 {n(t.comments)}개</>}
           </p>
         </div>
-        <UseToolLink url={t.url} />
+        {SERVER ? <ToolActions t={t} /> : <UseToolLink url={t.url} />}
       </div>
 
       {/* 2. 한눈에 보기 */}
-      <SummaryBox s={summaryOf(sid)} url={t.url} />
+      <SummaryBox s={summaryOf(sid)} url={SERVER ? extraOf(sid)?.legacyUrl ?? '' : t.url} />
       {solved.length > 0 && (
         <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[10px] bg-[#f3faf5] px-4 py-2.5 text-[14px] text-slate-700">
           <b className="text-[#1f7a3a]">해결한 요청</b>
@@ -216,10 +241,10 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
               {r.title}
             </a>
           ))}
-          <span className="text-[12px] text-slate-500">(PoC 예시 요청)</span>
+          {!SERVER && <span className="text-[12px] text-slate-500">(PoC 예시 요청)</span>}
         </p>
       )}
-      {external && t.site && (
+      {isExt && t.site && (
         <p className="mt-3 text-[14px] text-slate-600">
           제작 기관 누리집:{' '}
           <a href={t.site} target="_blank" rel="noreferrer" className="font-bold text-[var(--nr-p3)] underline underline-offset-2 break-all">
@@ -230,13 +255,15 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
 
       {/* 개편 PoC — 검수 정보·버전 */}
       <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TrustPanel t={t} s={summaryOf(sid)} />
-        <VersionPanel t={t} />
+        {SERVER ? <SrvTrustPanel t={t} s={summaryOf(sid)} /> : <TrustPanel t={t} s={summaryOf(sid)} />}
+        {SERVER ? <SrvVersionPanel t={t} /> : <VersionPanel t={t} />}
       </div>
-      <ReactionPanel t={t} />
+      {SERVER ? <SrvReactionPanel t={t} /> : <ReactionPanel t={t} />}
 
       {/* 3. 질문과 답변 — 교육청 배포 도구는 댓글을 모으지 않아 게시판으로 안내 */}
-      {single ? (
+      {SERVER ? (
+        <SrvQnA t={t} comments={comments} />
+      ) : single ? (
         <section className="mt-10">
           <h2 className="nr-title text-[22px] text-black">질문과 답변</h2>
           <Card className="mt-3">
@@ -297,7 +324,7 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
       <section className="mt-12 border-t border-[var(--nr-line)] pt-8">
         <h2 className="nr-title text-[22px] text-black">조회 현황</h2>
         <div className={`mt-3 grid gap-3 grid-cols-2 ${official ? 'lg:grid-cols-4' : 'lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1'}`}>
-          <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(t.views)} desc="게시판 표시값" />
+          <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(t.views)} desc={SERVER ? '같은 사람 하루 1회' : '게시판 표시값'} />
           <Stat icon={<TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />} label="최근 7일" value={`+${n(t.recent7)}`} desc="오늘 포함 7일" />
           <Stat icon={<CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />} label="이번 주" value={`+${n(t.thisWeek)}`} desc={`${dayLabel(bm.weekStart)}부터`} />
           {!official && (
@@ -305,9 +332,9 @@ export const ToolDetail: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
           )}
           <Stat
             icon={<History className="w-3.5 h-3.5" aria-hidden="true" />}
-            label="수집 전 누적"
+            label={SERVER ? '기록 전 누적' : '수집 전 누적'}
             value={n(t.pre)}
-            desc={t.pre ? `${dayLabel(bm.start)} 수집 시작 전` : '수집 시작 후 게시'}
+            desc={t.pre ? `${dayLabel(bm.start)} 기록 시작 전` : '기록 시작 후 게시'}
           />
         </div>
         <div className="mt-4">

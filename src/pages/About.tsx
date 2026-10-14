@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, SectionTitle } from '../components/Ui';
 import { dayLabel, type Model } from '../lib/stats';
+import { SERVER } from '../lib/edition';
 
 const Row: React.FC<{ term: string; children: React.ReactNode }> = ({ term, children }) => (
   <div className="grid gap-1 sm:grid-cols-[10rem_1fr] px-4 py-3 border-t border-slate-100 first:border-t-0">
@@ -9,7 +10,51 @@ const Row: React.FC<{ term: string; children: React.ReactNode }> = ({ term, chil
   </div>
 );
 
-export const About: React.FC<{ m?: Model }> = ({ m }) => (
+/** 서버판 집계 기준 — 수집기 없이 이 서버가 직접 셈 */
+const AboutServer: React.FC<{ m?: Model }> = ({ m }) => (
+  <div className="max-w-4xl">
+    <SectionTitle desc="숫자를 읽기 전에 확인할 것">집계 기준과 한계</SectionTitle>
+
+    <h3 className="mt-6 text-base font-bold text-slate-900">자료</h3>
+    <Card className="mt-2">
+      <dl>
+        <Row term="도구 글">이 서버에 등록·게시된 글. 교육청 배포·외부 공공은 정책기획과 빅데이터담당, 교직원 제작은 교직원 누구나 등록</Row>
+        <Row term="이관 자료">예전 누리집 게시판의 글·조회 이력·댓글은 처음 설치할 때 한 번 옮겨 옴. 이관 글의 파일은 원 게시글에서 받거나 새 버전으로 다시 올림</Row>
+        <Row term="기록 시작">{m ? dayLabel(m.start) : '-'} (이관한 조회 이력 포함)</Row>
+        <Row term="제작자">등록한 사람의 소속(이름)</Row>
+      </dl>
+    </Card>
+
+    <h3 className="mt-6 text-base font-bold text-slate-900">조회수</h3>
+    <Card className="mt-2">
+      <dl>
+        <Row term="조회 1회">도구 화면을 연 것. 같은 사람(같은 브라우저)이 같은 날 여러 번 열면 1회</Row>
+        <Row term="누적 조회수">이관 시점 조회수 + 이 서버가 센 조회수</Row>
+        <Row term="일별 조회수">그날 센 조회수. 이관 기간은 예전 수집값의 차이</Row>
+        <Row term="기록 전 누적">이관 자료의 기록 시작 전 조회수. 누적에는 포함, 추이 그래프에는 미포함</Row>
+        <Row term="내려받기">파일을 받은 횟수. 조회수와 따로 셈</Row>
+      </dl>
+    </Card>
+
+    <h3 className="mt-6 text-base font-bold text-slate-900">정렬·기간</h3>
+    <Card className="mt-2">
+      <dl>
+        <Row term="많이 찾는 순">도구 찾기의 기본 정렬. 오늘을 포함한 최근 30일 조회수 순</Row>
+        <Row term="최근 7일">오늘을 포함한 최근 7일 조회수</Row>
+        <Row term="이번 주">이번 주 월요일부터 지금까지 조회수</Row>
+      </dl>
+    </Card>
+
+    <h3 className="mt-6 text-base font-bold text-slate-900">한계</h3>
+    <ul className="mt-2 list-disc pl-5 space-y-1 text-slate-700">
+      <li>조회수는 도구 화면을 연 횟수. 실제 사용 횟수와 다름</li>
+      <li>브라우저를 바꾸거나 기록을 지우면 같은 날에도 다시 셈</li>
+      <li>이관 글 중 원 게시판 2쪽 이후 댓글은 옮겨 오지 못함</li>
+    </ul>
+  </div>
+);
+
+export const About: React.FC<{ m?: Model }> = ({ m }) => SERVER ? <AboutServer m={m} /> : (
   <div className="max-w-4xl">
     <SectionTitle desc="숫자를 읽기 전에 확인할 것">집계 기준과 한계</SectionTitle>
 

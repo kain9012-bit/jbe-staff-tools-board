@@ -7,6 +7,9 @@ import { useRequests } from '../lib/requests';
 import { navigate } from '../lib/route';
 import { allTools, dayLabel, n, type Model } from '../lib/stats';
 import { STATUS_STYLE } from './Requests';
+import { SERVER } from '../lib/edition';
+import { act, errMsg, needLogin, notice, useSrv } from '../lib/server';
+import { Trash2 } from 'lucide-react';
 
 /**
  * 요청 상세 — 요청 내용, 의견, '제가 해결해볼게요', 이 요청을 해결하는 도구(여러 개 가능).
@@ -16,7 +19,9 @@ export const RequestDetail: React.FC<{ m: Model; id: string }> = ({ m, id }) => 
   const R = useRequests(m);
   const r = R.get(id);
   const [text, setText] = useState('');
-  const [ops, setOps] = useState(false);
+  const [opsDemo, setOps] = useState(false);
+  const S = useSrv();
+  const ops = SERVER ? !!S.me?.ops : opsDemo;
   const [q, setQ] = useState('');
   const pool = useMemo(() => allTools(m), [m]);
 
@@ -93,7 +98,7 @@ export const RequestDetail: React.FC<{ m: Model; id: string }> = ({ m, id }) => 
                   <a href="/review" className="flex items-center gap-2 rounded-[10px] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:text-[var(--nr-p3)]">
                     <Clock className="w-4 h-4 shrink-0 text-[#c27b00]" aria-hidden="true" />
                     <span className="min-w-0 truncate font-bold text-slate-900">{s.title}</span>
-                    <span className="shrink-0 text-[12px] font-bold text-[#8a5300]">{s.stage >= 3 ? '게시됨' : '검수 중'} · 내 신청</span>
+                    <span className="shrink-0 text-[12px] font-bold text-[#8a5300]">{s.stage >= 3 ? '게시됨' : '검수 중'}{!SERVER && ' · 내 신청'}</span>
                     <ArrowRight className="ml-auto w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
                   </a>
                 </li>
@@ -119,6 +124,7 @@ export const RequestDetail: React.FC<{ m: Model; id: string }> = ({ m, id }) => 
         <button
           type="button"
           onClick={() => {
+            if (SERVER && !needLogin()) return;
             if (!making) R.toggleMaking(r.id);
             navigate(`/register?type=staff&req=${r.id}`);
           }}
@@ -141,6 +147,15 @@ export const RequestDetail: React.FC<{ m: Model; id: string }> = ({ m, id }) => 
                 <b className="text-slate-800">{c.who}</b>
                 {c.maker && <span className="rounded bg-[var(--nr-p2)] px-1.5 py-0.5 text-[11px] font-bold text-white">제작자</span>}
                 {dayLabel(c.at)}
+                {SERVER && 'id' in c && ((c as { mine?: boolean }).mine || ops) && (
+                  <button
+                    type="button"
+                    onClick={() => act('DELETE', `/api/request-comments/${(c as { id: number }).id}`).catch((e) => notice(errMsg(e), 'err'))}
+                    className="ml-auto inline-flex items-center gap-0.5 text-[12px] text-slate-400 hover:text-[#d61e49]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> 지우기
+                  </button>
+                )}
               </p>
               <p className="mt-1 text-[15px] text-slate-800">{c.text}</p>
             </li>
@@ -167,11 +182,23 @@ export const RequestDetail: React.FC<{ m: Model; id: string }> = ({ m, id }) => 
       </section>
 
       {/* 운영자 연결 */}
+      {(!SERVER || ops || (SERVER && r.mine)) && (
       <section className="mt-10 border-t border-[var(--nr-line)] pt-6">
+        {SERVER && (r.mine || ops) && (
+          <button
+            type="button"
+            onClick={() => act('DELETE', `/api/requests/${encodeURIComponent(r.id)}`).then(() => navigate('/requests')).catch((e) => notice(errMsg(e), 'err'))}
+            className="mb-3 inline-flex items-center gap-1 text-[13px] font-bold text-slate-500 hover:text-[#d61e49]"
+          >
+            <Trash2 className="w-4 h-4" aria-hidden="true" /> 요청 내리기
+          </button>
+        )}
+        {!SERVER && (
         <label className="inline-flex items-center gap-1.5 text-[13px] text-slate-500">
-          <input type="checkbox" checked={ops} onChange={(e) => setOps(e.target.checked)} className="accent-[var(--nr-p3)]" />
+          <input type="checkbox" checked={opsDemo} onChange={(e) => setOps(e.target.checked)} className="accent-[var(--nr-p3)]" />
           운영 부서 계정으로 보기 (PoC 시연)
         </label>
+        )}
         {ops && (
           <div className="mt-3 rounded-[12px] border border-[var(--nr-line)] bg-white p-5">
             <h2 className="flex items-center gap-2 text-[17px] font-bold text-black">
@@ -212,6 +239,7 @@ export const RequestDetail: React.FC<{ m: Model; id: string }> = ({ m, id }) => 
           </div>
         )}
       </section>
+      )}
       <PocNote className="mt-6">의견·손들기·연결은 이 브라우저에만 저장됩니다.</PocNote>
     </>
   );
