@@ -279,7 +279,7 @@ export const Find: React.FC<{
           </a>
         ))}
       </nav>
-      {srcOn && !ps && <SourceIntro src={srcOn} />}
+      {SERVER && srcOn && !ps && <SourceIntro src={srcOn} />}
 
       {/* 1. 검색 — 남색 바탕 큰 검색창(누리집 통합검색 상자 색) */}
       <section aria-label="도구 검색" className="mt-6 rounded-[20px] bg-[var(--nr-p2)] px-5 py-7 sm:px-10 sm:py-9 text-white">
