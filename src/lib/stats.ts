@@ -53,7 +53,9 @@ export interface Model {
   weekStart: string; // 이번 주 월요일
   /** 교육청 배포 도구 — 수집 시작일이 달라 따로 계산한 모델. 제작자 현황·기간 통계에는 넣지 않음 */
   official?: Model;
-  /** 외부 공공업무 도구 — 정적 목록. 조회수 추이 없음 */
+  /** 정적 목록(external-tools.json)으로 만든 모델 — 조회수 추이 없음 */
+  staticOnly?: boolean;
+  /** 외부 공공업무 도구 — 통합 수집기 시트에서 읽음. 시트를 못 읽으면 정적 목록 */
   external?: Model;
 }
 
@@ -95,7 +97,7 @@ export function buildModel(p: Payload): Model {
   const ext = (p as Payload & { external?: { asOf: string; tools: Tool[]; history: Payload['history'] } }).external;
   main.external = ext
     ? buildOne({ asOf: ext.asOf, fetchedAt: p.fetchedAt, tools: ext.tools, history: ext.history, comments: [], commentsOk: true })
-    : buildExternal();
+    : { ...buildExternal(), staticOnly: true };
   return main;
 }
 

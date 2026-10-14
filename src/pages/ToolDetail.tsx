@@ -167,8 +167,12 @@ const ToolDetailBody: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
   /** 이 도구가 속한 게시판의 모델 — 교육청 배포 도구는 수집 시작일이 달라 따로 계산 */
   const bm = modelOf(m, sid) ?? m;
   const official = t?.board === 'official';
-  /** 외부 공공업무 도구 — 조회수 추이·댓글이 없음 */
+  /** 외부 공공업무 도구 — 댓글이 없음 */
   const external = !SERVER && t?.board === 'external';
+  /** 시트를 못 읽어 정적 목록으로 보여 주는 외부 도구 — 조회수 추이도 없음 */
+  const extStatic = external && Boolean(bm.staticOnly);
+  /** 댓글 칸이 없는 게시판(교육청 배포·외부 공공) */
+  const noComments = official || external;
   /** 제작자가 게시판 운영자 한 사람인 게시판 */
   const single = !SERVER && ((official && !t?.origin) || external);
   /** 외부 공공업무 도구 여부(표기용) — 서버판도 조회수는 셈 */
@@ -315,19 +319,19 @@ const ToolDetailBody: React.FC<{ m: Model; sid: string }> = ({ m, sid }) => {
         </section>
       )}
 
-      {/* 5. 조회 현황 — 제작자용 통계는 맨 아래. 외부 공공업무 도구는 조회수 수집기가 없어 게시판 값만 */}
-      {external ? (
+      {/* 5. 조회 현황 — 제작자용 통계는 맨 아래. 외부 공공업무 도구는 시트를 못 읽었을 때만 게시판 값만 */}
+      {extStatic ? (
         <p className="mt-12 border-t border-[var(--nr-line)] pt-6 text-[14px] text-slate-500">
-          외부 공공업무 도구는 조회수를 매시간 모으지 않아 추이 그래프가 없습니다. 조회 {n(t.views)}회는 {dayLabel(bm.asOf.slice(0, 10))} 게시판 값
+          수집 자료를 읽지 못해 추이 그래프 없이 보여 줍니다. 조회 {n(t.views)}회는 {dayLabel(bm.asOf.slice(0, 10))} 게시판 값
         </p>
       ) : (
       <section className="mt-12 border-t border-[var(--nr-line)] pt-8">
         <h2 className="nr-title text-[22px] text-black">조회 현황</h2>
-        <div className={`mt-3 grid gap-3 grid-cols-2 ${official ? 'lg:grid-cols-4' : 'lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1'}`}>
+        <div className={`mt-3 grid gap-3 grid-cols-2 ${noComments ? 'lg:grid-cols-4' : 'lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1'}`}>
           <Stat icon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />} label="누적 조회수" value={n(t.views)} desc={SERVER ? '같은 사람 하루 1회' : '게시판 표시값'} />
           <Stat icon={<TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />} label="최근 7일" value={`+${n(t.recent7)}`} desc="오늘 포함 7일" />
           <Stat icon={<CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />} label="이번 주" value={`+${n(t.thisWeek)}`} desc={`${dayLabel(bm.weekStart)}부터`} />
-          {!official && (
+          {!noComments && (
             <Stat icon={<MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />} label="댓글" value={n(t.comments)} desc={t.makerReplies ? `제작자 답글 ${t.makerReplies}개 포함` : '제작자 답글 없음'} />
           )}
           <Stat
