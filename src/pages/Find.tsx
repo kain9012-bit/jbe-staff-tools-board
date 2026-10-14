@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { SERVER } from '../lib/edition';
 import { ArrowRight, LayoutGrid, List, PencilLine, Search, Sparkles, TrendingUp, X, Lightbulb } from 'lucide-react';
 import { isNewTool, SourceTag, ToolCard, ToolTable } from '../components/Lists';
 import { PageTitle, Pager } from '../components/Shell';
@@ -358,7 +359,7 @@ export const Find: React.FC<{
 
       {tab === 'work' && (
         <section id="panel-work" role="tabpanel" aria-labelledby="tab-work" className="mt-6">
-          <SectionHead id="by-work" title="업무별로 둘러보기" note="도구 이름과 요약에 든 낱말로 묶음" />
+          <SectionHead id="by-work" title="업무별로 둘러보기" note="도구별 업무 분류 기준 · 한 도구가 여러 업무에 들 수 있음" />
           <ul className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
             {tiles.map((c) => (
               <li key={c.label}>
@@ -429,8 +430,8 @@ export const Find: React.FC<{
                     ) : (
                       isNewTool(t, today) && <span className="shrink-0 rounded-md bg-[#d61e49] px-2 py-0.5 text-[12px] font-bold text-white">NEW</span>
                     )}
-                    <a href={t.url} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-[var(--nr-p1)] px-3.5 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]">
-                      사용하기<span className="sr-only">(새 창)</span>
+                    <a href={t.url} target={SERVER ? undefined : '_blank'} rel="noreferrer" className="shrink-0 rounded-full bg-[var(--nr-p1)] px-3.5 py-1.5 text-[13px] font-bold text-white hover:bg-[var(--nr-p3)]">
+                      {SERVER ? '자세히' : '사용하기'}{!SERVER && <span className="sr-only">(새 창)</span>}
                     </a>
                   </li>
                 ))}
