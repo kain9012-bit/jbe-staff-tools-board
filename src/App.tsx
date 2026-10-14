@@ -22,7 +22,6 @@ import { PageTitle } from './components/Shell';
 import { SERVER } from './lib/edition';
 import { ReviewServer } from './pages/ReviewServer';
 import { Login } from './pages/Login';
-import { BoardHome } from './pages/BoardHome';
 import { NOTICE_EV } from './lib/server';
 
 /** 짧은 알림 띠 — 저장·오류 안내 */
@@ -215,7 +214,6 @@ export default function App() {
     else if (route.page === 'maker') body = <MakerDetail m={m} name={route.name} />;
     else if (route.page === 'requests' && SERVER) body = <Requests m={m} />;
     else if (route.page === 'request' && SERVER) body = <RequestDetail key={route.id} m={m} id={route.id} />;
-    else if ((route.page as string) === 'board-home' && SERVER) body = <BoardHome m={m} />;
   }
   /** 휴대폰 하위 메뉴 — PC는 왼쪽 메뉴에 있음 */
   const mobileSubs = active !== 'find' && route.page !== 'maker' ? subs[active] : undefined;
