@@ -428,7 +428,7 @@ export const Find: React.FC<{
                         <SourceTag board={t.board} className="!px-1.5 !py-0 !text-[11px]" />
                         {kind === 'popular'
                           ? t.board === 'official'
-                            ? '교육청 배포'
+                            ? SERVER ? '교육청 배포' : ''
                             : t.board === 'external'
                               ? `외부 기관 · ${t.kind ?? ''}`
                               : `${splitAuthor(t.author).person} · ${splitAuthor(t.author).org}`
