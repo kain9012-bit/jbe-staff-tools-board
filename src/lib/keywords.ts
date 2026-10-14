@@ -1,4 +1,4 @@
-import { summaryOf } from './summaries';
+import { sheetCatsOf, summaryOf } from './summaries';
 
 /**
  * 도구 찾기의 '자주 찾는 업무' 칩.
@@ -11,31 +11,43 @@ export interface KeywordChip {
   words: string[];
 }
 
+// 업무 분류 16개 — 시트 「도구정보」 탭·게시판 공지·확장과 같은 이름
+// words는 시트에 분류가 없는 도구만 낱말로 임시 분류할 때 씀
 export const KEYWORD_CHIPS: KeywordChip[] = [
-  { label: '에듀파인·품의', words: ['에듀파인', '품의', '원인행위', '기안', '결재'] },
-  { label: '급여·4대보험', words: ['급여', '4대보험', '대보험', '초과근무', '임금', '인건비', '수납', '보험료', '산재보험', '고용보험'] },
-  { label: '계약·물품', words: ['물품', '계약', '견적', '하자', '비품', '장바구니', '입찰', '반출입', '교복', 'mas', '구매', '제안서'] },
   { label: '공문·문서', words: ['공문', '문서', '한글', 'hwp', 'pdf', '용량', '서식', '기록물', '보도자료', '수신자', '수신그룹'] },
   { label: '엑셀·데이터', words: ['엑셀', '데이터', '통계', '언피벗', '학교명'] },
+  { label: '에듀파인·품의', words: ['에듀파인', '품의', '원인행위', '기안', '결재'] },
+  { label: '계약·물품', words: ['물품', '계약', '견적', '하자', '비품', '장바구니', '입찰', '반출입', '교복', 'mas', '구매', '제안서'] },
   { label: '파일 정리', words: ['파일명', '파일 정리', '파일정리', '압축', '폴더', 'zip', '파일 꺼내기'] },
-  { label: '학교운영위원회', words: ['학운위', '학교운영위원회', '회의록'] },
-  { label: '교육공무직', words: ['교육공무직'] },
-  { label: '나이스·학사', words: ['나이스', '생기부', '시험', '수능', '학사', '등록부'] },
+  { label: '나이스·학사', words: ['나이스', '생기부', '학사', '등록부'] },
   { label: '수업·학급', words: ['수업', '학급', '교실', '칠판', '학년', '단원', '체험학습', '교과'] },
-  { label: '급식', words: ['급식', '식단'] },
+  { label: '복무·인사·일정', words: ['복무', '업무포털', '일정', '전보'] },
+  { label: '안내·검색·AI', words: ['길라잡이', '가이드', '안내서', '챗봇', '검색'] },
+  { label: '종합 도구 모음', words: ['도구 모음', '도구모음', '통합 프로그램'] },
+  { label: '급여·4대보험', words: ['급여', '4대보험', '대보험', '초과근무', '임금', '인건비', '수납', '보험료', '산재보험', '고용보험'] },
   { label: '학교회계', words: ['회계', '세입', '세출', '출납', '반납', '목적사업비'] },
+  { label: '학교운영위원회', words: ['학운위', '학교운영위원회'] },
+  { label: '급식', words: ['급식', '식단'] },
+  { label: '행사·시험', words: ['시험', '수능', '행사'] },
+  { label: '교육공무직', words: ['교육공무직'] },
 ];
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '');
 
+/**
+ * 칩에 걸리는지 판정. 첫 칸은 sid — 시트 「도구정보」에 업무분류가 있으면 그것만 보고,
+ * 없으면(새 도구·시트 못 읽음) 낱말로 판정
+ */
 export const chipMatcher = (chip: KeywordChip | undefined) => {
-  if (!chip) return () => true;
+  if (!chip) return (..._fields: string[]) => true;
   const ws = chip.words.map(norm);
-  return (...fields: string[]) => {
+  return (sid: string, ...fields: string[]) => {
+    const cats = sheetCatsOf(sid);
+    if (cats) return cats.includes(chip.label);
     const hay = norm(fields.join(' '));
     return ws.some((w) => hay.includes(w));
   };
 };
 
-/** 업무 묶음 판정에 쓰는 글 — 도구명·제작자·요약 한 줄 소개 */
-export const chipFields = (t: { sid: string; title: string; author: string }) => [t.title, t.author, summaryOf(t.sid)?.what ?? ''];
+/** 업무 묶음 판정에 쓰는 값 — sid, 도구명·제작자·요약 한 줄 소개 */
+export const chipFields = (t: { sid: string; title: string; author: string }): [string, string, string, string] => [t.sid, t.title, t.author, summaryOf(t.sid)?.what ?? ''];

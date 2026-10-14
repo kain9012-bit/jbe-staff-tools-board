@@ -1,7 +1,10 @@
+import { createRequire } from 'node:module';
+
 /**
  * 구글 시트(수집기가 쓰는 시트)를 CSV로 읽어 화면용 JSON으로 묶는다.
  *  - 교직원 제작 도구: 도구목록·조회이력·댓글목록
- *  - 교육청 배포 도구: 도구목록·조회이력 (별도 수집기·별도 시트, 댓글 수집 없음)
+ *  - 교육청 배포 도구: 배포_도구목록·배포_조회이력 (통합 수집기, 같은 시트, 댓글 수집 없음)
+ *  - 외부 공공업무 도구: 외부_도구목록·외부_조회이력 (통합 수집기, 같은 시트)
  *
  * gviz(시트 이름) 대신 export(gid)로 읽는다.
  * gviz는 열 형식을 다수결로 추정해서 소수 형식 값을 빈칸으로 버린다.
@@ -15,13 +18,38 @@ export const GIDS = {
   comments: process.env.GID_COMMENTS || '2087929200',
 };
 
-/** 교육청 배포 도구 게시판(BBS_0000649) 수집 시트 */
-export const OFFICIAL_SHEET_ID =
-  process.env.OFFICIAL_SHEET_ID || '1bEKHnr9wnqXZSyWRuz18mz76SGDaCuvyQf39er0OWbQ';
+/** 교육청 배포 도구 게시판(BBS_0000649) — 2026. 10. 14.부터 통합 수집기가 같은 시트의 배포_ 탭에 씀
+ *  (예전 별도 시트 1bEKHnr9…는 더 이상 갱신되지 않음) */
+export const OFFICIAL_SHEET_ID = process.env.OFFICIAL_SHEET_ID || SHEET_ID;
 export const OFFICIAL_GIDS = {
-  tools: process.env.OFFICIAL_GID_TOOLS || '1397113268',
-  history: process.env.OFFICIAL_GID_HISTORY || '1132088271',
+  tools: process.env.OFFICIAL_GID_TOOLS || '500435515', // 배포_도구목록
+  history: process.env.OFFICIAL_GID_HISTORY || '1433512595', // 배포_조회이력
 };
+
+/** 외부 공공업무 도구 게시판(BBS_0000684) — 통합 수집기가 같은 시트의 외부_ 탭에 씀 */
+export const EXTERNAL_GIDS = {
+  tools: process.env.EXTERNAL_GID_TOOLS || '1790824440', // 외부_도구목록
+  history: process.env.EXTERNAL_GID_HISTORY || '1265288292', // 외부_조회이력
+};
+
+/** 도구정보 탭 — 업무분류·한줄소개·실행방식 (통합 수집기가 새 도구를 AI로 채우고, 사람이 고침) */
+export const INFO_GID = process.env.INFO_GID || '1838979837';
+
+/** sid → { cats: 업무분류 배열 | null(빈칸=낱말로 분류), what, run } */
+export function buildInfo(rows) {
+  const info = {};
+  for (const g of byHeader(rows)) {
+    const sid = g('dataSid').replace(/[,\s]/g, '');
+    if (!/^\d+$/.test(sid)) continue;
+    const c = g('업무분류');
+    info[sid] = {
+      cats: !c ? null : c === '그 밖' ? [] : c.split(/[,\n]/).map((x) => x.trim()).filter(Boolean),
+      what: g('한줄소개'),
+      run: g('실행방식'),
+    };
+  }
+  return info;
+}
 
 const csvUrl = (gid, sheet = SHEET_ID) =>
   `https://docs.google.com/spreadsheets/d/${sheet}/export?format=csv&gid=${gid}`;
@@ -67,6 +95,15 @@ const byHeader = (rows) => {
     .map((r) => (key) => (idx[key] === undefined ? '' : (r[idx[key]] ?? '').trim()));
 };
 
+/** 외부 도구 바로가기 주소·사용목적·적용기관은 게시판 목록에 없어 정적 자료에서 보탬 */
+const EXTERNAL_META = Object.fromEntries(
+  createRequire(import.meta.url)('../../src/data/external-tools.json').items.map((e) => [e.sid, e]),
+);
+function withExternalMeta(t) {
+  const m = EXTERNAL_META[t.sid] || {};
+  return { ...t, author: '외부 기관', site: m.site || '', purpose: m.purpose || t.purpose, target: m.target || t.target, field: t.field || m.field || '', kind: t.kind || m.kind || '' };
+}
+
 async function fetchCsv(gid, sheet) {
   const res = await fetch(csvUrl(gid, sheet), { redirect: 'follow' });
   if (!res.ok) throw new Error(`시트 읽기 실패 (gid ${gid}, HTTP ${res.status})`);
@@ -92,6 +129,8 @@ export function buildPayload(toolsRows, historyRows, commentRows, board = 'staff
       target: g('적용기관'),
       firstSeen: day(g('최초수집일')),
       board,
+      // 외부 공공 도구 목록은 사용목적·적용기관 대신 업무분야·이용형태 칸이 있음
+      ...(board === 'external' ? { field: g('업무분야'), kind: g('이용형태') } : {}),
     }));
 
   const live = new Set(tools.map((t) => t.sid));
@@ -142,16 +181,30 @@ export async function loadPayload() {
     const o = buildPayload(ot, oh, null, 'official');
     payload.official = { asOf: o.asOf, tools: o.tools, history: o.history };
   }
+  // 외부 공공 도구 — 못 읽으면 화면이 예전처럼 정적 목록(external-tools.json)을 씀
+  // 도구정보 — 못 읽으면 화면이 예전처럼 요약 파일(summaries.json)과 낱말 분류를 씀
+  const [et, eh, inf] = await Promise.all([
+    fetchCsv(EXTERNAL_GIDS.tools).catch(() => null),
+    fetchCsv(EXTERNAL_GIDS.history).catch(() => null),
+    fetchCsv(INFO_GID).catch(() => null),
+  ]);
+  if (inf) payload.info = buildInfo(inf);
+  if (et && eh) {
+    const e = buildPayload(et, eh, null, 'external');
+    if (e.tools.length) payload.external = { asOf: e.asOf, tools: e.tools.map(withExternalMeta), history: e.history };
+  }
   return payload;
 }
 
 /** 도구 목록만 — 검색 엔진용 화면·사이트맵에서 씀(조회이력은 읽지 않아 가벼움) */
 export async function loadToolLists() {
-  const [t, ot] = await Promise.all([
+  const [t, ot, et] = await Promise.all([
     fetchCsv(GIDS.tools),
     fetchCsv(OFFICIAL_GIDS.tools, OFFICIAL_SHEET_ID).catch(() => null),
+    fetchCsv(EXTERNAL_GIDS.tools).catch(() => null),
   ]);
   const staff = buildPayload(t, [['dataSid']], null, 'staff').tools;
   const official = ot ? buildPayload(ot, [['dataSid']], null, 'official').tools : [];
-  return { staff, official };
+  const external = et ? buildPayload(et, [['dataSid']], null, 'external').tools.map(withExternalMeta) : [];
+  return { staff, official, external };
 }

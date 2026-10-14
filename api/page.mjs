@@ -134,8 +134,8 @@ export default async function handler(req, res) {
     return;
   }
   try {
-    const { staff, official } = await loadToolLists();
-    const all = [...staff, ...official, ...EXTERNAL_TOOLS].map(withMeta);
+    const { staff, official, external } = await loadToolLists();
+    const all = [...staff, ...official, ...(external.length ? external : EXTERNAL_TOOLS)].map(withMeta);
     const page = render(parts, all);
     const canonical = `${SITE_URL}/${parts.map(encodeURIComponent).join('/')}`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');

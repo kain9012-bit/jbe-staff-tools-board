@@ -41,7 +41,40 @@ export interface ToolSummary {
   at: string;
 }
 
-const items = (data as { items: Record<string, ToolSummary> }).items;
+let items = (data as { items: Record<string, ToolSummary> }).items;
+
+/** 서버판 — 요약은 서버 DB에서 옴(등록 양식 내용이 곧 요약) */
+export const setServerSummaries = (m?: Record<string, ToolSummary>) => {
+  if (m) items = m;
+};
+
+/** 시트 「도구정보」 탭 한 줄 — 업무분류(null이면 낱말로 분류)·한줄소개·실행방식 */
+export interface SheetInfo {
+  cats: string[] | null;
+  what: string;
+  run: string;
+}
+let sheetCats: Record<string, string[] | null> = {};
+
+/**
+ * 웹판 — 시트 「도구정보」 탭이 한 줄 소개·실행 방식의 기준.
+ * 요약 파일(summaries.json)의 나머지 항목(만든 이유·기능·사용 순서 등)은 그대로 두고,
+ * 시트에 값이 있으면 한 줄 소개·실행 방식만 시트 값으로 바꿈. 요약 파일에 없는 새 도구는 시트 값만으로 요약을 만듦
+ */
+export const setSheetInfo = (info?: Record<string, SheetInfo>) => {
+  if (!info) return;
+  const next: Record<string, ToolSummary> = { ...items };
+  for (const [sid, v] of Object.entries(info)) {
+    const run = (RUN_TYPES as readonly string[]).includes(v.run) ? (v.run as RunType) : undefined;
+    const base = next[sid] ?? { at: '' };
+    next[sid] = { ...base, ...(v.what ? { what: v.what } : {}), ...(run ? { run } : {}) };
+  }
+  items = next;
+  sheetCats = Object.fromEntries(Object.entries(info).map(([sid, v]) => [sid, v.cats]));
+};
+
+/** 시트에 정해 둔 업무분류. undefined = 시트에 줄이 없음, null = 칸이 비어 있음 → 둘 다 낱말로 분류 */
+export const sheetCatsOf = (sid: string): string[] | null | undefined => sheetCats[sid];
 
 export const summaryOf = (sid: string): ToolSummary | undefined => items[sid];
 
