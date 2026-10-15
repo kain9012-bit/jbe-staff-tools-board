@@ -12,11 +12,12 @@ let template = null;
 async function loadTemplate(req) {
   if (template) return template;
   try {
-    template = await readFile(path.join(process.cwd(), 'dist', 'index.html'), 'utf8');
+    // Vercel 빌드에서 index.html → app.html로 이름을 바꿔 둠(홈 주소도 이 함수를 거치게)
+    template = await readFile(path.join(process.cwd(), 'dist', 'app.html'), 'utf8');
   } catch {
     const host = req.headers['x-forwarded-host'] || req.headers.host;
-    const r = await fetch(`https://${host}/index.html`);
-    if (!r.ok) throw new Error(`index.html 읽기 실패 (HTTP ${r.status})`);
+    const r = await fetch(`https://${host}/app.html`);
+    if (!r.ok) throw new Error(`app.html 읽기 실패 (HTTP ${r.status})`);
     template = await r.text();
   }
   return template;
@@ -60,6 +61,24 @@ function toolPage(t) {
   return { title: `${t.title} · ${SITE}`, desc, body };
 }
 
+// 홈 — 사이트 소개 + 게시판별 도구 목록(이름·한 줄 요약)
+function homeBody(staff, official, external) {
+  const item = (t) => {
+    const s = SUMMARIES[t.sid];
+    const what = s && !s.empty && s.what ? ` — ${esc(s.what)}` : '';
+    return `<li><a href="/tool/${esc(t.sid)}">${esc(t.title)}</a>${what}</li>`;
+  };
+  const group = (title, href, tools) =>
+    tools.length ? `<h2><a href="${href}">${title}</a> (${tools.length}개)</h2><ul>${tools.map(item).join('')}</ul>` : '';
+  return `
+<h1>${SERVICE}</h1>
+<p>전북특별자치도교육청 교육데이터 허브 「데이터 도구실」에 올라온 업무도구를 한곳에서 찾는 화면. 교육청이 배포한 도구, 교직원이 직접 만든 도구, 다른 공공기관이 만든 업무도구를 업무별로 찾고 도구마다 주요 기능·사용 순서·조회수를 확인.</p>
+${group('교육청 배포 도구', '/official', official)}
+${group('교직원 제작 도구', '/makers', staff)}
+${group('외부 공공업무 도구', '/external', external)}
+<p><a href="/about">집계 기준</a></p>`;
+}
+
 function render(parts, all) {
   const [p, ...rest] = parts;
   const arg = decodeURIComponent(rest.join('/'));
@@ -99,7 +118,7 @@ function render(parts, all) {
       body: `<h1>외부 공공업무 도구</h1>${toolLinks(external)}`,
     };
   if (p === 'about') return { title: `집계 기준 · ${SITE}`, desc: DEFAULT_DESC, body: `<h1>집계 기준</h1>` };
-  if (p === 'tools' || !p) return { title: `${SERVICE} · ${SITE} · 전북특별자치도교육청`, desc: DEFAULT_DESC, body: `<h1>${SERVICE}</h1>${toolLinks(all)}` };
+  if (p === 'tools' || !p) return { title: `${SERVICE} · ${SITE} · 전북특별자치도교육청`, desc: DEFAULT_DESC, body: homeBody(staff, official, external) };
   return null;
 }
 
