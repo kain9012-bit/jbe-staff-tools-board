@@ -206,6 +206,9 @@ export interface Chibi {
   armR: THREE.Object3D | null;
   foreR: THREE.Object3D | null;
   hold: boolean;
+  /** 믹서가 마지막으로 정한 오른팔 자세(소품 들기 보정을 매번 새로 얹기 위함) */
+  armBase: THREE.Quaternion;
+  foreBase: THREE.Quaternion;
   phase: number;
   blinkT: number;
   wave: number;
@@ -281,7 +284,7 @@ export function makeChibi(o: ChibiOpt): Chibi {
     pr.position.y += 0.02;
     foreR.add(holder);
   }
-  return { root, model, mixer, act, faceMap, armR, foreR, hold: !!o.prop, phase: 0, blinkT: 1 + Math.random() * 3, wave: 0, talk: 0, hop: 0, waving: false };
+  return { root, model, mixer, act, faceMap, armR, foreR, hold: !!o.prop, armBase: armR ? armR.quaternion.clone() : new THREE.Quaternion(), foreBase: foreR ? foreR.quaternion.clone() : new THREE.Quaternion(), phase: 0, blinkT: 1 + Math.random() * 3, wave: 0, talk: 0, hop: 0, waving: false };
 }
 
 let BLOB: THREE.Texture | null = null;
@@ -305,7 +308,6 @@ export function blob(r = 0.42, op = 0.32) {
   return b;
 }
 
-/** 매 장면 몸짓 — 걷기·숨쉬기·눈 깜빡임·손 흔들기·말하기 */
 /** 매 장면 몸짓 — 서기·걷기 섞기, 손 흔들기, 말하기(입), 눈 깜빡임, 깡충 */
 export function animChibi(c: Chibi, dt: number, _t: number, speed: number) {
   const walk = Math.min(1, speed / 3);
@@ -324,11 +326,21 @@ export function animChibi(c: Chibi, dt: number, _t: number, speed: number) {
   A.idle?.setEffectiveWeight(Math.max(0.05, (1 - walk) * (waveW ? 0.15 : 1) * (talkW ? 0.4 : 1)));
   A.talk?.setEffectiveWeight(talkW * (1 - walk));
   A.wave?.setEffectiveWeight(waveW * 1.5);
+  // 믹서는 값이 바뀔 때만 뼈를 덮어쓰므로, 지난 장면의 보정을 먼저 걷어 냄(안 하면 팔이 계속 돎)
+  if (c.armR && c.foreR) {
+    c.armR.quaternion.copy(c.armBase);
+    c.foreR.quaternion.copy(c.foreBase);
+  }
   c.mixer.update(dt);
-  // 소품 든 오른팔은 앞으로
-  if (c.hold && c.armR && c.foreR && !walk) {
-    c.armR.rotateX(-0.75);
-    c.foreR.rotateX(-0.55);
+  if (c.armR && c.foreR) {
+    c.armBase.copy(c.armR.quaternion);
+    c.foreBase.copy(c.foreR.quaternion);
+    // 소품 든 오른팔은 앞으로(걸을수록 풀림)
+    const k = c.hold ? 1 - walk : 0;
+    if (k > 0) {
+      c.armR.rotateX(-0.75 * k);
+      c.foreR.rotateX(-0.55 * k);
+    }
   }
   // 깡충
   c.hop = Math.max(0, c.hop - dt * 2.5);

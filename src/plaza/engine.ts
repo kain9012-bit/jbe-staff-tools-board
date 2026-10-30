@@ -1341,10 +1341,11 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     hideCards();
     talking = -1;
     holo.tent = -1;
-    // 천막에서 한 걸음 물러나 마당 쪽을 봄
+    // 대화가 끝나면 카메라는 마당(트인 쪽)에서 내 캐릭터를 바라봄 — 천막·건물이 시야를 가리지 않게
     P.yaw = Math.atan2(t.f.x, t.f.z);
-    cam.yaw = Math.atan2(-t.f.x, -t.f.z);
-    cam.pitch = 0.42;
+    cam.yaw = Math.atan2(t.f.x, t.f.z) + 0.35;
+    cam.pitch = 0.32;
+    cam.dist = clamp(cam.dist, 7, 10);
     const fp = followPose();
     camTo('follow', fp.pos, fp.look);
     if (!silent) emit({ type: 'talk', tent: null });
