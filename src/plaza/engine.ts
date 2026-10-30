@@ -283,6 +283,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   // 청사 주변 동네(건물·도로·공원) — 청사 3D 지도 자료 + OpenStreetMap
   const SUR = makeSurround(scene, {
     shadows: high,
+    low: !high,
     // 가로수를 심지 않을 곳: 청사·광장·주차장·천막 마당
     avoid: (x, y) => BLOCKS.some((b) => inPoly([x, y], b)) || inPoly([x, y], SITE.plaza) || inPoly([x, y], SITE.parking) || Math.hypot(x - CS[0], y - CS[1]) < R + 9,
   });
@@ -1218,7 +1219,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     const p = [x, -z];
     if (world === 'in') return lobby!.blocked(x, z);
     if (BLOCK_NOW.some((b) => inPoly(p, b))) return true;
-    if (SUR.inBuilding(p[0], p[1], RAD)) return true;
+    if (SUR.inBuilding(p[0], p[1], RAD) || SUR.inWater(p[0], p[1])) return true;
     if (Math.hypot(p[0], p[1]) > WALK_R) return true;
     for (const c of canopyCols) if (Math.hypot(x - c.x, z - c.z) < 0.25 + RAD) return true;
     for (const t of TENTS) {
@@ -2131,7 +2132,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     speak: (on: boolean) => (speaking = on),
     near: () => near,
     shot: () => cv.toDataURL('image/png'),
-    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook, crowd },
+    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook, crowd, SUR },
     destroy() {
       cancelAnimationFrame(raf);
       crowd.clear();

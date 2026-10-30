@@ -39,6 +39,7 @@ def segd(p, a, b):
 def campus(p, pad=6):
     return inpoly(p, H) or min(segd(p, H[i], H[i - 1]) for i in range(len(H))) < pad
 r1 = lambda v: round(v, 1)
+DET = json.load(open('detail.json', encoding='utf-8'))
 
 # 1) 건물(VWorld, 3D 지도 자료)
 B = []
@@ -51,7 +52,11 @@ for r in B:
     cx = sum(p[0] for p in poly) / len(poly); cy = sum(p[1] for p in poly) / len(poly)
     if math.hypot(cx, cy) > RAD_B: continue
     if any(campus(p, 3) for p in poly): continue
-    bld.append([r[0], r1(r[2]), r[4], r[5], r[6], [r1(v) for xy in poly for v in xy]])
+    obb = [r1(v) for v in r[8]] if len(r) > 8 and r[8] else []
+    rt = r[6]
+    for hx, hy, k, _ in DET['hip']:
+        if math.hypot(cx - hx, cy - hy) < 6: rt = 'pyr'  # 손으로 정한 사모지붕
+    bld.append([r[0], r1(r[2]), r[4], r[5], rt, [r1(v) for xy in poly for v in xy], obb])
 
 # 2) 도로·땅 쓰임(OSM)
 d = json.load(open('osm.json', encoding='utf-8'))
@@ -78,8 +83,19 @@ for e in d['elements']:
     for (k, v), name in AREA.items():
         if t.get(k) == v and len(P) >= 4 and P[0] == P[-1]:
             if all(math.hypot(*p) > RAD_R * 1.4 for p in P): break
+            if name == 'pitch' and t.get('sport') == 'tennis': name = 'tennis'
             areas.append([name, [r1(v) for xy in P[:-1] for v in xy]])
             break
+
+# 2-2) 주차장(OSM)
+for e in json.load(open('osm2.json', encoding='utf-8'))['elements']:
+    t = e.get('tags', {}); g = e.get('geometry')
+    if t.get('amenity') == 'parking' and g and len(g) >= 4:
+        P = [((q['lon'] - LNG) * MG, (q['lat'] - LAT) * ML) for q in g]
+        if P[0] == P[-1] and min(math.hypot(*p) for p in P) < RAD_B and not all(campus(p, 0) for p in P):
+            areas.append(['parking', [r1(v) for xy in P[:-1] for v in xy]])
+# 2-3) 손으로 짚은 곳
+for k, f, _ in DET['areas']: areas.append([k, f])
 
 # 3) 운동장(3D 지도 fields.js)
 s = open(f'{MAP}/fields.js', encoding='utf-8').read()
@@ -93,8 +109,52 @@ for ft in fj['features']:
         if P[0] == P[-1]: P = P[:-1]
         areas.append(['f_' + ft['properties'].get('k', 'sand'), [r1(v) for xy in P for v in xy]])
 
-out = {'src': 'VWorld GIS건물통합정보(건물) · © OpenStreetMap 기여자(도로·땅 쓰임, ODbL)', 'b': bld, 'r': roads, 'a': areas}
+# 4) 나무: 항공사진 숲 판정(canopy.py → trees.json) + 손으로 짚은 숲 채우기
+import random
+random.seed(5)
+def pts(f): return [(f[i], f[i + 1]) for i in range(0, len(f), 2)]
+NOTREE = [pts(a[1]) for a in areas if a[0] in ('f_sand', 'f_turf', 'f_court', 'open', 'reed', 'pond', 'court', 'tennis', 'pitch', 'parking', 'water')] + [pts(b[5]) for b in bld]
+def free(x, y):
+    if campus((x, y), 4): return False
+    return not any(inpoly((x, y), P) for P in NOTREE if abs(P[0][0] - x) < 260 and abs(P[0][1] - y) < 260)
+tr = json.load(open('trees.json'))['t']
+trees = [(tr[i], tr[i + 1]) for i in range(0, len(tr), 2)]
+for f, _ in DET['woods']:
+    P = pts(f); xs = [p[0] for p in P]; ys = [p[1] for p in P]
+    x = min(xs)
+    while x < max(xs):
+        y = min(ys)
+        while y < max(ys):
+            q = (x + random.uniform(-1.8, 1.8), y + random.uniform(-1.8, 1.8))
+            if inpoly(q, P): trees.append(q)
+            y += 6.5
+        x += 6.5
+# 길 위·겹침 빼기
+RW = [(W[k] / 2 + 1.0, pts(f)) for k, f in roads if k not in ('footway', 'cycleway', 'path')] + [(2.6, pts(f)) for k, f in roads if k in ('footway', 'cycleway', 'path')] + [(1.8, pts(f)) for f, _ in DET['decks']]
+grid = {}
+for i, (w, L) in enumerate(RW):
+    for p in L: grid.setdefault((int(p[0] // 30), int(p[1] // 30)), set()).add(i)
+def onroad(x, y):
+    cand = set()
+    for a in (-1, 0, 1):
+        for b in (-1, 0, 1): cand |= grid.get((int(x // 30) + a, int(y // 30) + b), set())
+    for i in cand:
+        w, L = RW[i]
+        for j in range(len(L) - 1):
+            if segd((x, y), L[j], L[j + 1]) < w: return True
+    return False
+seen = set(); tout = []
+for x, y in trees:
+    key = (int(x // 4), int(y // 4))
+    if key in seen or not free(x, y) or onroad(x, y): continue
+    seen.add(key)
+    d = math.hypot(x, y); hsh = (int(x * 7) * 31 + int(y * 13)) % 6
+    if d > 320 and hsh % 2: continue          # 멀리는 성기게(화면 부담 줄이기)
+    if d > 520 and hsh % 3: continue
+    tout += [round(x), round(y)]
+out = {'src': 'VWorld GIS건물통합정보(건물) · © OpenStreetMap 기여자(도로·땅 쓰임, ODbL) · 나무·공원 세부는 항공사진(VWorld) 참고', 'b': bld, 'r': roads, 'a': areas, 't': tout,
+       'deck': [f for f, _ in DET['decks']], 'gz': [[g[0], g[1]] for g in DET['gazebos']], 'lines': [f for k, f in DET['lines']]}
 s = json.dumps(out, ensure_ascii=False, separators=(',', ':'))
 open('surround.json', 'w', encoding='utf-8').write(s)
 from collections import Counter
-print('bld', len(bld), 'roads', len(roads), Counter(r[0] for r in roads), 'areas', Counter(a[0] for a in areas), 'bytes', len(s.encode()))
+print('trees', len(tout), 'bld', len(bld), 'roads', len(roads), Counter(r[0] for r in roads), 'areas', Counter(a[0] for a in areas), 'bytes', len(s.encode()))
