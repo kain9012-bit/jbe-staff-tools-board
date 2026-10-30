@@ -144,19 +144,13 @@ background:linear-gradient(transparent,rgba(120,220,255,.12),transparent);animat
 .plaza-corner{position:absolute;width:var(--cl);height:var(--cl);border-color:#bff3ff;pointer-events:none;z-index:2;filter:drop-shadow(0 0 4px rgba(120,220,255,.8))}
 @keyframes plazaHoloIn{from{opacity:0;filter:brightness(1.8)}to{opacity:1;filter:none}}
 @keyframes plazaSweep{to{top:100%}}
-.pb-wrap{perspective:2200px}
 .pb-page{position:absolute;top:0;bottom:0;background:#fbf7ee;color:#1e2430;overflow:hidden}
 .pb-page.l{left:0;width:50%;border-radius:10px 0 0 10px;box-shadow:inset -26px 0 30px -22px rgba(60,40,10,.35)}
 .pb-page.r{right:0;width:50%;border-radius:0 10px 10px 0;box-shadow:inset 26px 0 30px -22px rgba(60,40,10,.35)}
-.pb-one .pb-page.r{width:100%;border-radius:10px;box-shadow:inset 18px 0 24px -20px rgba(60,40,10,.3)}
-.pb-leaf{position:absolute;top:0;bottom:0;width:50%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.45,.05,.25,1)}
-.pb-one .pb-leaf{width:100%}
 .pb-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
 .pb-face.back{transform:rotateY(180deg)}
-.pb-cover{transition:transform .95s cubic-bezier(.55,.05,.25,1),opacity .15s}
 @keyframes pbIn{from{opacity:0}to{opacity:1}}
-.pb-in{animation:pbIn .15s ease-out .42s both}
-.pb-ui{animation:pbIn .3s ease-out 1.3s both}
+
 .plaza-scroll{scrollbar-width:thin;scrollbar-color:rgba(120,220,255,.5) transparent}
 @media (prefers-reduced-motion:reduce){.plaza-holo,.plaza-holo::after{animation:none}}
 `;
@@ -333,14 +327,15 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
           doShow();
         }
       } else if (e.key === 'Escape') {
-        if (detail) closeDetail();
+        if (detail && focusKind === 'book') window.dispatchEvent(new Event(CLOSE_BOOK));
+        else if (detail) closeDetail();
         else if (sel) eng.current?.select(null);
         else if (talk !== null) doEnd();
       }
     };
     window.addEventListener('keydown', kd);
     return () => window.removeEventListener('keydown', kd);
-  }, [talk, near, step, sel, detail, doTalk, doShow, doEnd, closeDetail]);
+  }, [talk, near, step, sel, detail, focusKind, doTalk, doShow, doEnd, closeDetail]);
 
   const setDn = (md: Mode) => {
     setMode(md);
@@ -684,37 +679,38 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   );
 };
 
-/** 책 쪽 내용 — 한 쪽에 한 묶음 */
-function bookPages(tool: Tool, s?: ToolSummary) {
-  const pages: { key: string; body: React.ReactNode }[] = [];
-  const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-2.5 border-b border-[#d9cdb6] pb-1.5 text-[15px] font-bold text-[#7a5a3c]">{children}</h3>;
-  pages.push({
-    key: 'intro',
-    body: (
-      <>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${TAG_CLS[tool.board] ?? TAG_CLS.staff}`}>{tool.tag}</span>
-          {tool.run && <span className="rounded bg-[#efe6d4] px-2 py-0.5 text-[11px] font-bold text-[#6b4a33]">{tool.run}</span>}
+/** 펼친 책 두 쪽 — 왼쪽: 소개·만든 이유, 오른쪽: 기능·순서·필요한 것·유의사항·바로 쓰기 */
+function bookSides(tool: Tool, s?: ToolSummary) {
+  const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-2 border-b border-[#d9cdb6] pb-1 text-[14px] font-bold text-[#7a5a3c]">{children}</h3>;
+  const left = (
+    <>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${TAG_CLS[tool.board] ?? TAG_CLS.staff}`}>{tool.tag}</span>
+        {tool.run && <span className="rounded bg-[#efe6d4] px-2 py-0.5 text-[11px] font-bold text-[#6b4a33]">{tool.run}</span>}
+      </div>
+      <h2 className="nr-title mt-3 text-[22px] leading-snug text-[#1e2430]">{tool.title}</h2>
+      <p className="mt-1 text-[13px] text-[#8a7a66]">{tool.who}</p>
+      <p className="mt-4 text-[15px] leading-relaxed">{s?.what || tool.what || '아직 게시글 요약이 없습니다.'}</p>
+      {s?.why && (
+        <div className="mt-5">
+          <H>만든 이유</H>
+          <p className="text-[14px] leading-relaxed">{s.why}</p>
         </div>
-        <h2 className="nr-title mt-3 text-[22px] leading-snug text-[#1e2430]">{tool.title}</h2>
-        <p className="mt-1 text-[13px] text-[#8a7a66]">{tool.who}</p>
-        <p className="mt-4 text-[15px] leading-relaxed">{s?.what || tool.what || '아직 게시글 요약이 없습니다.'}</p>
-        {s?.why && (
-          <div className="mt-5">
-            <H>만든 이유</H>
-            <p className="text-[14px] leading-relaxed">{s.why}</p>
-          </div>
-        )}
-      </>
-    ),
-  });
-  if (s?.features?.length)
-    pages.push({
-      key: 'feat',
-      body: (
-        <>
+      )}
+      {!!s?.needs?.length && (
+        <div className="mt-5">
+          <H>필요한 것</H>
+          <p className="text-[14px] leading-relaxed">{s.needs.join(' · ')}</p>
+        </div>
+      )}
+    </>
+  );
+  const right = (
+    <>
+      {!!s?.features?.length && (
+        <div className="mb-4">
           <H>주요 기능</H>
-          <ul className="space-y-2 text-[14px] leading-relaxed">
+          <ul className="space-y-1.5 text-[14px] leading-relaxed">
             {s.features.map((f) => (
               <li key={f} className="flex gap-2">
                 <span className="mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#b88a58]" aria-hidden="true" />
@@ -722,210 +718,156 @@ function bookPages(tool: Tool, s?: ToolSummary) {
               </li>
             ))}
           </ul>
-        </>
-      ),
-    });
-  if (s?.steps?.length)
-    pages.push({
-      key: 'steps',
-      body: (
-        <>
+        </div>
+      )}
+      {!!s?.steps?.length && (
+        <div className="mb-4">
           <H>사용 순서</H>
-          <ol className="space-y-2.5 text-[14px] leading-relaxed">
+          <ol className="space-y-1.5 text-[14px] leading-relaxed">
             {s.steps.map((st, i) => (
-              <li key={st} className="flex gap-2.5">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#7a5a3c] text-[12px] font-bold text-white">{i + 1}</span>
-                <span className="pt-px">{st}</span>
+              <li key={st} className="flex gap-2">
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#7a5a3c] text-[11px] font-bold text-white">{i + 1}</span>
+                <span>{st}</span>
               </li>
             ))}
           </ol>
-        </>
-      ),
-    });
-  pages.push({
-    key: 'end',
-    body: (
-      <>
-        {!!s?.needs?.length && (
-          <div className="mb-5">
-            <H>필요한 것</H>
-            <p className="text-[14px] leading-relaxed">{s.needs.join(' · ')}</p>
-          </div>
-        )}
-        {!!s?.cautions?.length && (
-          <div className="mb-5">
-            <H>유의사항</H>
-            <ul className="space-y-1 text-[14px] leading-relaxed">
-              {s.cautions.map((c) => (
-                <li key={c}>· {c}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <H>바로 쓰기</H>
-        <div className="flex flex-wrap gap-2">
-          <a href={tool.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#3a457f] px-4 py-2 text-[14px] font-bold text-white hover:opacity-90">
-            사용하기 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="sr-only">(새 창)</span>
-          </a>
-          <a href={hrefTool(tool.sid)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-[14px] font-bold text-[#3a457f] ring-1 ring-[#3a457f]/40 hover:bg-[#3a457f]/5">
-            상세 화면 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="sr-only">(새 창)</span>
-          </a>
         </div>
-      </>
-    ),
-  });
-  return pages;
+      )}
+      {!!s?.cautions?.length && (
+        <div className="mb-4">
+          <H>유의사항</H>
+          <ul className="space-y-1 text-[14px] leading-relaxed">
+            {s.cautions.map((c) => (
+              <li key={c}>· {c}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 pt-1">
+        <a href={tool.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#3a457f] px-4 py-2 text-[14px] font-bold text-white hover:opacity-90">
+          사용하기 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only">(새 창)</span>
+        </a>
+        <a href={hrefTool(tool.sid)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-[14px] font-bold text-[#3a457f] ring-1 ring-[#3a457f]/40 hover:bg-[#3a457f]/5">
+          상세 화면 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only">(새 창)</span>
+        </a>
+      </div>
+    </>
+  );
+  return { left, right };
 }
 
-/** 서가 책 — 표지 그대로 다가와 커지고, 표지가 넘어가며 속 내용이 나옴. 쪽은 넘기기로 봄 */
+const CLOSE_BOOK = 'plaza:closebook';
+/**
+ * 서가 책 — 3D 책이 표지째 다가와 커진 자리에 같은 표지를 겹친 뒤, 표지가 등을 축으로 넘어가며 펼쳐짐.
+ * 책 덮기: 표지가 다시 덮이고, 덮인 책이 서가 제자리로 돌아감
+ */
 const BookView: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: number; w: number; h: number } | null; onClose: () => void }> = ({ tool, s, rect, onClose }) => {
-  const one = (rect?.w ?? 0) < (rect?.h ?? 1); // 세로 화면 — 한 쪽씩
-  const pages = useMemo(() => bookPages(tool, s), [tool, s]);
-  const per = one ? 1 : 2;
-  const spreads = Math.ceil(pages.length / per);
+  const one = (rect?.w ?? 0) < (rect?.h ?? 1); // 세로 화면 — 한 쪽
+  const sides = useMemo(() => bookSides(tool, s), [tool, s]);
+  // 0 덮임(표지 보임) → 1 펼침 → 2 덮는 중
+  const [arrived, setArrived] = useState(false);
   const [open, setOpen] = useState(false);
-  const [coverGone, setCoverGone] = useState(false);
-  const [sp, setSp] = useState(0);
-  const [turn, setTurn] = useState<null | { dir: 1 | -1; go: boolean }>(null);
+  const [closing, setClosing] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const timers = useRef<number[]>([]);
   useEffect(() => {
-    const t = window.setTimeout(() => setOpen(true), 750);
-    // 표지가 다 넘어가면 치움 — 표지 안쪽 면에 첫 쪽을 그려 두어 바뀌는 티가 안 남
-    const t2 = window.setTimeout(() => setCoverGone(true), 1800);
+    // 3D 책이 이 자리까지 커지는 동안(약 0.5초) 기다렸다가 표지를 넘김
+    timers.current.push(window.setTimeout(() => setArrived(true), 470));
+    timers.current.push(window.setTimeout(() => setOpen(true), 700));
     box.current?.focus();
-    return () => {
-      window.clearTimeout(t);
-      window.clearTimeout(t2);
-    };
+    const t = timers.current;
+    return () => t.forEach((x) => window.clearTimeout(x));
   }, []);
-  const flip = (dir: 1 | -1) => {
-    if (turn || sp + dir < 0 || sp + dir >= spreads) return;
-    setTurn({ dir, go: false });
-    requestAnimationFrame(() => requestAnimationFrame(() => setTurn({ dir, go: true })));
-    window.setTimeout(() => {
-      setSp((v) => v + dir);
-      setTurn(null);
-    }, 720);
-  };
+  const close = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    setOpen(false);
+    // 표지가 다 덮이면 3D 책으로 바꿔 서가로 돌려보냄
+    timers.current.push(window.setTimeout(onClose, 950));
+  }, [closing, onClose]);
   useEffect(() => {
-    const kd = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') flip(1);
-      else if (e.key === 'ArrowLeft') flip(-1);
-    };
-    window.addEventListener('keydown', kd);
-    return () => window.removeEventListener('keydown', kd);
-  });
-  const pg = (i: number) => {
-    const p = pages[i];
-    return (
-      <div className="flex h-full flex-col px-6 pb-4 pt-6 sm:px-8 sm:pt-8">
-        <div className="min-h-0 flex-1 overflow-y-auto plaza-scroll">{p ? p.body : null}</div>
-        {p && <p className="pt-2 text-center text-[11px] tabular-nums text-[#a8987f]">{i + 1}</p>}
-      </div>
-    );
-  };
-  const L = (k: number) => (one ? -1 : k * 2), Rr = (k: number) => (one ? k : k * 2 + 1);
-  // 넘기는 중: 바닥에는 다음(또는 이전) 쪽이 깔리고, 넘어가는 한 장이 위로 지나감
-  const base = turn ? (turn.dir > 0 ? { l: L(sp), r: Rr(sp + 1) } : { l: L(sp - 1), r: Rr(sp) }) : { l: L(sp), r: Rr(sp) };
-  const leaf = turn ? (turn.dir > 0 ? { front: Rr(sp), back: L(sp + 1) } : { front: L(sp), back: Rr(sp - 1) }) : null;
+    const on = () => close();
+    window.addEventListener(CLOSE_BOOK, on);
+    return () => window.removeEventListener(CLOSE_BOOK, on);
+  }, [close]);
   const bg = coverColor(tool.sid);
   const W = rect?.w ?? 600, Hh = rect?.h ?? 420;
+  const pageW = one ? W : W / 2;
+  const face = (body: React.ReactNode) => <div className="h-full overflow-y-auto px-6 py-6 sm:px-8 sm:py-7 plaza-scroll">{body}</div>;
+  const cover = (
+    <div className="pb-face rounded-[4px_10px_10px_4px] shadow-[0_18px_50px_rgba(0,0,0,.45)]" style={{ background: bg }}>
+      <div className="absolute inset-y-0 left-0 w-[5%] bg-black/15" />
+      <div className="absolute left-[5%] right-0 top-[4.5%] flex h-[11%] items-center px-[6%] text-white" style={{ background: TAG_BAND_COLOR(tool.tag), fontSize: Hh * 0.04 }}>
+        <b>{tool.tag}</b>
+      </div>
+      <div className="absolute rounded-full bg-white/[0.12]" style={{ width: Hh * 0.5, height: Hh * 0.5, right: -Hh * 0.08, bottom: -Hh * 0.06 }} />
+      <p className="absolute left-[10%] right-[8%] top-[21%] font-extrabold leading-[1.24] text-white" style={{ fontSize: Math.min(Hh * 0.075, pageW * 0.1) }}>
+        {tool.title.replace(/^[⭐★☆\s]+/, '')}
+      </p>
+      {tool.run && (
+        <p className="absolute bottom-[5%] left-[10%] text-white/80" style={{ fontSize: Hh * 0.04 }}>
+          {tool.run}
+        </p>
+      )}
+    </div>
+  );
   return (
-    <div className="absolute inset-0 z-30 bg-black/35" style={{ animation: 'pbIn .4s ease-out both' }} onClick={onClose}>
+    <div className="absolute inset-0 z-30 bg-black/35" style={{ animation: 'pbIn .4s ease-out both' }} onClick={close}>
       <div
         ref={box}
         tabIndex={-1}
         role="dialog"
         aria-label={`${tool.title} — 책`}
         onClick={(e) => e.stopPropagation()}
-        className={`pb-wrap absolute outline-none ${one ? 'pb-one' : ''}`}
-        style={{ left: rect?.x ?? 16, top: rect?.y ?? 16, width: W, height: Hh }}
+        className="absolute outline-none"
+        style={{ left: rect?.x ?? 16, top: rect?.y ?? 16, width: W, height: Hh, perspective: 2400, perspectiveOrigin: one ? '0% 50%' : '50% 50%', outline: 'none' }}
       >
-        {/* 펼친 쪽들(표지가 넘어가면 보임) */}
-        <div className="pb-in absolute inset-0">
-          {!one && <div className="pb-page l">{base.l >= 0 && pg(base.l)}</div>}
-          <div className="pb-page r">{pg(base.r)}</div>
-          {!one && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-[#d9cdb6]" />}
-        </div>
-        {/* 넘어가는 한 장 */}
-        {leaf && (
-          <div
-            className="pb-leaf"
-            style={{
-              left: one ? 0 : turn!.dir > 0 ? '50%' : 0,
-              transformOrigin: one ? 'left center' : turn!.dir > 0 ? 'left center' : 'right center',
-              transform: turn!.go ? `rotateY(${turn!.dir > 0 ? -180 : 180}deg)` : 'rotateY(0deg)',
-            }}
-          >
-            <div className={`pb-face pb-page ${one || turn!.dir > 0 ? 'r' : 'l'}`} style={{ width: '100%' }}>
-              {pg(leaf.front)}
-            </div>
-            <div className={`pb-face back pb-page ${one || turn!.dir > 0 ? 'l' : 'r'}`} style={{ width: '100%' }}>
-              {one ? null : pg(leaf.back)}
-            </div>
-          </div>
-        )}
-        {/* 표지 — 3D 책과 같은 그림. 등(왼쪽)을 축으로 넘어감 */}
-        {!coverGone && (
-        <div
-          className="pb-in absolute top-0 bottom-0"
-          style={{ left: one ? 0 : '50%', width: one ? '100%' : '50%', opacity: one && open ? 0 : 1, transition: 'opacity .5s .35s', pointerEvents: 'none' }}
-        >
-        <div
-          className="pb-cover absolute inset-0"
-          style={{
-            transformOrigin: 'left center',
-            transformStyle: 'preserve-3d',
-            transform: open ? `rotateY(-${one ? 100 : 180}deg)` : 'rotateY(0deg)',
-          }}
-        >
-          <div className="pb-face rounded-[4px_10px_10px_4px] shadow-[0_18px_50px_rgba(0,0,0,.45)]" style={{ background: bg }}>
-            <div className="absolute inset-y-0 left-0 w-[5%] bg-black/15" />
-            <div className="absolute left-[5%] right-0 top-[4.5%] flex h-[11%] items-center px-[6%] text-white" style={{ background: TAG_BAND_COLOR(tool.tag), fontSize: Hh * 0.04 }}>
-              <b>{tool.tag}</b>
-            </div>
-            <div className="absolute rounded-full bg-white/[0.12]" style={{ width: Hh * 0.5, height: Hh * 0.5, right: -Hh * 0.08, bottom: -Hh * 0.06 }} />
-            <p className="absolute left-[10%] right-[8%] top-[21%] font-extrabold leading-[1.24] text-white" style={{ fontSize: Hh * 0.075 }}>
-              {tool.title.replace(/^[⭐★☆\s]+/, '')}
-            </p>
-            {tool.run && (
-              <p className="absolute bottom-[5%] left-[10%] text-white/80" style={{ fontSize: Hh * 0.04 }}>
-                {tool.run}
-              </p>
+        {/* 속 쪽 — 표지가 넘어가면서 드러남(덮인 동안은 표지 밑에 있음) */}
+        <div className="absolute inset-0" style={{ opacity: open || closing ? 1 : 0, transition: 'opacity .2s' }}>
+          {!one && <div className="pb-page l">{face(sides.left)}</div>}
+          <div className="pb-page r" style={one ? { width: '100%', borderRadius: 10 } : undefined}>
+            {face(
+              one ? (
+                <>
+                  {sides.left}
+                  <div className="mt-5">{sides.right}</div>
+                </>
+              ) : (
+                sides.right
+              ),
             )}
           </div>
-          {!one && (
-            <div className="pb-face back pb-page l" style={{ width: '100%' }}>
-              {pg(0)}
-            </div>
-          )}
+          {!one && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-[#d9cdb6]" />}
         </div>
+        {/* 표지 — 바로 위(부모)에 원근이 걸려야 입체로 넘어감 */}
+        <div
+          className="absolute top-0 bottom-0"
+          style={{
+            left: one ? 0 : '50%',
+            width: pageW,
+            transformOrigin: 'left center',
+            transformStyle: 'preserve-3d',
+            transition: 'transform .9s cubic-bezier(.55,.05,.25,1)',
+            transform: open ? `rotateY(${one ? -165 : -180}deg)` : 'rotateY(0deg)',
+            pointerEvents: 'none',
+            zIndex: 2,
+            opacity: arrived ? 1 : 0,
+          }}
+        >
+          {cover}
+          {/* 표지 안쪽 = 왼쪽 첫 쪽과 같은 그림이라, 펼쳐진 뒤 바뀌는 티가 안 남 */}
+          <div className="pb-face back pb-page l" style={{ width: '100%' }}>
+            {!one && face(sides.left)}
+          </div>
         </div>
-        )}
-        {/* 넘기기·덮기 */}
-        <div className="pb-ui absolute -bottom-12 left-0 right-0 flex items-center justify-center gap-2">
-          <button type="button" onClick={() => flip(-1)} disabled={sp === 0} className="rounded-full bg-white/90 p-2 text-[#3a457f] shadow disabled:opacity-40" aria-label="앞 쪽">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <span className="rounded-full bg-black/45 px-3 py-1 text-[13px] tabular-nums text-white">
-            {sp + 1} / {spreads}
-          </span>
-          <button type="button" onClick={() => flip(1)} disabled={sp >= spreads - 1} className="rounded-full bg-white/90 p-2 text-[#3a457f] shadow disabled:opacity-40" aria-label="다음 쪽">
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button type="button" onClick={onClose} className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-2 text-[13px] font-bold text-[#3a457f] shadow">
+        {/* 덮기 */}
+        <div className="absolute -bottom-12 left-0 right-0 flex justify-center" style={{ opacity: open ? 1 : 0, transition: 'opacity .3s' }}>
+          <button type="button" onClick={close} className="inline-flex items-center gap-1 rounded-full bg-white/95 px-4 py-2 text-[13px] font-bold text-[#3a457f] shadow">
             <X className="h-4 w-4" aria-hidden="true" /> 책 덮기
           </button>
         </div>
-        {/* 쪽 모서리 눌러 넘기기 */}
-        {open && sp < spreads - 1 && (
-          <button type="button" onClick={() => flip(1)} aria-label="다음 쪽" className="absolute bottom-0 right-0 h-16 w-16 rounded-br-[10px] bg-[linear-gradient(135deg,transparent_50%,rgba(122,90,60,.18)_50%)]" />
-        )}
-        {open && sp > 0 && !one && (
-          <button type="button" onClick={() => flip(-1)} aria-label="앞 쪽" className="absolute bottom-0 left-0 h-16 w-16 rounded-bl-[10px] bg-[linear-gradient(225deg,transparent_50%,rgba(122,90,60,.18)_50%)]" />
-        )}
       </div>
     </div>
   );

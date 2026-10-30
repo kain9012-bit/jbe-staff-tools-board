@@ -1647,9 +1647,10 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       const o = [ENT.door[0] + ENT.nrm[0] * 2.4, ENT.door[1] + ENT.nrm[1] * 2.4];
       P.pos.copy(W(o[0], o[1]));
       P.yaw = Math.atan2(ENT.nrm[0], -ENT.nrm[1]);
-      cam.yaw = P.yaw + Math.PI;
-      cam.pitch = 0.42;
-      cam.dist = 13;
+      // 카메라는 광장 쪽에서 정문을 바라봄(뒤에서 따라가면 건물에 가려 아무것도 안 보임)
+      cam.yaw = P.yaw;
+      cam.pitch = 0.3;
+      cam.dist = 11;
       const fp = followPose();
       cam.pos.copy(fp.pos);
       cam.look.copy(fp.look);
@@ -1799,8 +1800,6 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         b.position.copy(u.home).add(tmp.copy(u.n).multiplyScalar(0.2 * u.pull));
         b.quaternion.copy(u.q);
         b.scale.setScalar(1);
-        // 화면의 책(표지·쪽)이 덮으면 3D 책은 숨김
-        b.visible = !(b === focusBook && u.fk > 0.95);
         if (u.fk > 0.002) {
           const e5 = ease(clamp(u.fk));
           b.position.lerp(bookPose.pos, e5);

@@ -2,7 +2,7 @@
 /*
  * 청사 1층 로비 — 호용님이 찍어 보낸 사진 기준(2026-10).
  * 책장 벽(여러 층 높이), 회색 문틀 + LED 시계, 나무 결 둥근 기둥, INFORMATION 안내 데스크,
- * 유리 난간 중층과 돌계단, 초록·흰 의자 쉼터.
+ * 유리 난간 중층, 초록·흰 의자 쉼터(계단은 시야를 가려 뺌).
  * 책장의 책 = 업무경감 도구. 서쪽 벽은 가나다순 「도구 서가」, 입구 양옆은 많이 찾는·새로 올라온 도구.
  * 좌표: x=동, z=남(입구 쪽), 원점 로비 가운데 바닥. 방 크기 32×26m, 높이 15.5m
  */
@@ -622,34 +622,6 @@ export function makeLobby(tools: LobbyTool[], popular: LobbyTool[], fresh: Lobby
   const upper = add(new T.Mesh(new T.PlaneGeometry(RX * 2, RH - MY), std('#e2ddd3', { roughness: 0.85 })));
   upper.position.set(0, MY + (RH - MY) / 2, -RZ + 0.01);
 
-  /* 돌계단(중층으로 올라가는 굵은 돌 계단) — 올라갈 수는 없음 */
-  const STX0 = -6.2, STX1 = -2.2, STZ0 = 2.0, STZ1 = MZ1;
-  {
-    const n = 18;
-    for (let i = 0; i < n; i++) {
-      const z = STZ0 - ((STZ0 - STZ1) * (i + 0.5)) / n, y = (MY * (i + 1)) / n;
-      const s = add(new T.Mesh(new T.BoxGeometry(STX1 - STX0, 0.12, (STZ0 - STZ1) / n + 0.02), stone));
-      s.position.set((STX0 + STX1) / 2, y - 0.06, z);
-    }
-    const len = Math.hypot(STZ0 - STZ1, MY);
-    for (const x of [STX0 - 0.2, STX1 + 0.2]) {
-      const sl = add(new T.Mesh(new T.BoxGeometry(0.4, 1.2, len), stone));
-      sl.position.set(x, MY / 2 - 0.2, (STZ0 + STZ1) / 2);
-      sl.rotation.x = Math.atan2(MY, STZ0 - STZ1);
-    }
-    const under = add(new T.Mesh(new T.BoxGeometry(STX1 - STX0 + 0.8, 0.5, len), std('#f0eeea')));
-    under.position.set((STX0 + STX1) / 2, MY / 2 - 0.55, (STZ0 + STZ1) / 2);
-    under.rotation.x = Math.atan2(MY, STZ0 - STZ1);
-    // 계단 밑 화단
-    const bed = add(new T.Mesh(new T.BoxGeometry(3.6, 0.35, 2.4), std('#5a3a22', { roughness: 1 })));
-    bed.position.set((STX0 + STX1) / 2, 0.18, -2.6);
-    const r = seeded(31);
-    for (let i = 0; i < 9; i++) {
-      const p = add(new T.Mesh(new T.IcosahedronGeometry(0.25 + r() * 0.15, 0), new T.MeshLambertMaterial({ color: ['#4f8a43', '#6aa84f', '#3d7a3a'][i % 3], flatShading: true })));
-      p.position.set(STX0 + 0.5 + r() * 3, 0.5, -3.5 + r() * 1.8);
-    }
-  }
-
   /* 쉼터: 초록·흰 둥근 의자, 긴 흰 소파, 낮은 탁자, 빨간 우체통 */
   {
     const green = toon('#9ccc3c'), white = toon('#f3efe6');
@@ -742,9 +714,7 @@ export function makeLobby(tools: LobbyTool[], popular: LobbyTool[], fresh: Lobby
     if (z > RZ - 0.6) return Math.abs(x) > DW - 0.4; // 문 쪽으로는 나가기 구역
     if (x > DX - 0.45 - RAD && z > DZ0 - 0.5 - RAD && z < DZ1 + 0.5 + RAD) return true;
     for (const [cx, cz] of COLS) if (Math.hypot(x - cx, z - cz) < 0.75 + RAD) return true;
-    if (x > STX0 - 0.45 - RAD && x < STX1 + 0.45 + RAD && z < STZ0 + RAD && z > -3.9 - RAD) return true;
     if (x > 5.8 - RAD && z < -7.6 + RAD && z > -RZ) return true; // 쉼터
-    if (z < MZ1 && x > STX0 - 1 && x < STX1 + 1) return true;
     return false;
   }
   const isExit = (x: number, z: number) => z > RZ - 0.5 && Math.abs(x) < DW;
