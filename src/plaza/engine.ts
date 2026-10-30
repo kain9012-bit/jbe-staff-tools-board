@@ -161,9 +161,15 @@ const SKINS = ['#ffdcc4', '#f9d2b4', '#ffe3cf', '#f3c9a8'];
 const HAIRS = ['#2b2320', '#3d2b22', '#5a3b28', '#1f1f28', '#6b4a33', '#2e2a3a'];
 const STYLES = ['short', 'bob', 'pony', 'side', 'bun', 'curly'] as const;
 const TOPS = ['#3a457f', '#4f8f5a', '#c0584a', '#2f6fb3', '#7a5ea8', '#b7863a', '#2fa39a', '#5b6575', '#d07a3a', '#3f6e8c'];
+/** 도구 구분 표 색 — 목록 화면의 구분 표(SourceTag)와 같게 */
+const TAG_COL: Record<string, { bg: string; fg: string; line?: string }> = {
+  '교직원 제작': { bg: '#dcefff', fg: '#0a62a8' },
+  '교육청 배포': { bg: '#2f3a73', fg: '#ffffff', line: 'rgba(200,215,255,.75)' },
+  '외부 공공': { bg: '#e3f5ee', fg: '#0b6b52' },
+};
 const LINES_TONE = ['#2f6fb3', '#e8554e', '#3a457f', '#4f8f5a', null, null];
 
-export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev) => void, opt: { quality: 'high' | 'low' }) {
+export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev) => void, opt: { quality: 'high' | 'low'; visited?: number[] }) {
   const T = THREE;
   const high = opt.quality === 'high';
   const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: !!(window as any).__plazaShot });
@@ -716,7 +722,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     const hit = [wall, roof, npc.root];
     hit.forEach((o) => o.traverse((m) => (m.userData.tent = i)));
     hitList.push(...hit);
-    TENTS.push({ pos, f, r: rr2, npc, npcPos, npcYaw, hit, mark, label, visited: false });
+    TENTS.push({ pos, f, r: rr2, npc, npcPos, npcYaw, hit, mark, label, visited: Boolean(opt.visited?.includes(i)) });
   });
 
   /* 꼬마전구 줄 — 이웃한 천막 지붕 끝을 잇는 고리 */
@@ -854,7 +860,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   const holoU = { time: { value: 0 } };
   const cardVS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }';
   const cardFS = `
-    uniform sampler2D map; uniform float time; uniform float appear; uniform float hover; uniform float sel; varying vec2 vUv;
+    uniform sampler2D map; uniform float time; uniform float appear; uniform float hover; uniform float sel; uniform float dim; varying vec2 vUv;
     void main(){
       float edge = appear * 1.12;
       if (vUv.y > edge) discard;
@@ -867,7 +873,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       c.rgb += vec3(0.6, 0.95, 1.0) * rim; c.a = max(c.a, rim * 0.9);
       c.rgb *= 1.0 + hover * 0.35 + sel * 0.25;
       float fl = appear < 1.0 ? 0.75 + 0.25 * step(0.4, fract(sin(time * 61.0) * 4375.5)) : 1.0;
-      gl_FragColor = vec4(c.rgb, c.a * fl * min(1.0, appear * 1.6));
+      gl_FragColor = vec4(c.rgb, c.a * fl * min(1.0, appear * 1.6) * (1.0 - 0.85 * dim));
       #include <colorspace_fragment>
     }`;
   const cards = Array.from({ length: 6 }, (_, k) => {
@@ -878,7 +884,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     tex.colorSpace = T.SRGBColorSpace;
     tex.anisotropy = 8;
     const mat = new T.ShaderMaterial({
-      uniforms: { map: { value: tex }, time: holoU.time, appear: { value: 0 }, hover: { value: 0 }, sel: { value: 0 } },
+      uniforms: { map: { value: tex }, time: holoU.time, appear: { value: 0 }, hover: { value: 0 }, sel: { value: 0 }, dim: { value: 0 } },
       vertexShader: cardVS,
       fragmentShader: cardFS,
       transparent: true,
@@ -891,7 +897,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     mesh.renderOrder = 10;
     mesh.userData.card = k;
     scene.add(mesh);
-    return { mesh, cvs, tex, mat, tool: null as PlazaTool | null, from: V(), to: V(), q: new T.Quaternion(), t0: 0, hide: 0, hover: 0 };
+    return { mesh, cvs, tex, mat, tool: null as PlazaTool | null, from: V(), to: V(), q: new T.Quaternion(), t0: 0, hide: 0, hover: 0, fk: 0 };
   });
   const drawCard = (c, tool: PlazaTool, col: string) => {
     const g = c.cvs.getContext('2d')!;
@@ -939,10 +945,16 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     // 구분 표 + 실행 방식
     g.font = `700 28px ${FONT}`;
     const tw = g.measureText(tool.tag).width + 34;
-    g.fillStyle = col;
+    const tc = TAG_COL[tool.tag] ?? { bg: col, fg: '#ffffff' };
+    g.fillStyle = tc.bg;
     rr(g, 52, 52, tw, 46, 23);
     g.fill();
-    g.fillStyle = '#ffffff';
+    if (tc.line) {
+      g.strokeStyle = tc.line;
+      g.lineWidth = 2.5;
+      g.stroke();
+    }
+    g.fillStyle = tc.fg;
     g.textBaseline = 'middle';
     g.fillText(tool.tag, 69, 76);
     if (tool.run) {
@@ -1230,6 +1242,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       c.mat.uniforms.appear.value = 0;
     });
     holo.sel = -1;
+    focus = -1;
     emit({ type: 'page', page: holo.page, pages, cards: list });
     emit({ type: 'select', tool: null, slot: null });
   }
@@ -1269,6 +1282,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     if (talking < 0) return;
     const t = TENTS[talking];
     holo.on = false;
+    focus = -1;
     cards.forEach((c) => (c.hide = c.mesh.visible ? now : 0));
     talking = -1;
     holo.tent = -1;
@@ -1320,7 +1334,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     pick(e);
     let cursor = 'grab';
     hoverCard = -1;
-    if (holo.on) {
+    if (holo.on && focus < 0) {
       const h = ray.intersectObjects(cards.filter((c) => c.mesh.visible).map((c) => c.mesh), false)[0];
       if (h) {
         hoverCard = h.object.userData.card;
@@ -1339,7 +1353,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     pick(e);
     if (holo.on) {
       const h = ray.intersectObjects(cards.filter((c) => c.mesh.visible).map((c) => c.mesh), false)[0];
-      if (h) select(h.object.userData.card);
+      if (h && focus < 0) select(h.object.userData.card);
       return;
     }
     if (cam.mode !== 'follow') return;
@@ -1372,13 +1386,13 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         else keys.delete(k);
         if (cam.mode === 'intro' && on) skipIntro();
         if (k.startsWith('arrow')) e.preventDefault();
-      } else if (on && holo.on && (k === 'arrowleft' || k === 'arrowright')) {
+      } else if (on && holo.on && focus < 0 && (k === 'arrowleft' || k === 'arrowright')) {
         showPage(holo.page + (k === 'arrowright' ? 1 : -1));
         e.preventDefault();
       }
     }
     if (!on) return;
-    if (holo.on && /^[1-6]$/.test(k)) select(+k - 1);
+    if (holo.on && focus < 0 && /^[1-6]$/.test(k)) select(+k - 1);
   };
   const kd = (e: KeyboardEvent) => onKey(e, true);
   const ku = (e: KeyboardEvent) => onKey(e, false);
@@ -1392,6 +1406,25 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   window.addEventListener('keyup', ku);
   window.addEventListener('blur', blur);
 
+  let focus = -1;
+  const focusPose = { pos: V(), q: new T.Quaternion(), s: 1 };
+  /** 고른 카드를 카메라 앞 가운데로 크게 */
+  function focusCard(n: number | null) {
+    if (n === null || !cards[n] || !cards[n].mesh.visible) {
+      focus = -1;
+      return;
+    }
+    const portrait = vw / vh < 0.95;
+    const d = 2.2, tv = Math.tan((camera.fov * Math.PI) / 360), th = tv * camera.aspect;
+    const s = Math.min((0.74 * 2 * d * tv) / CH, ((portrait ? 0.94 : 0.86) * 2 * d * th) / CW);
+    const dir = V();
+    camera.getWorldDirection(dir);
+    focusPose.pos.copy(camera.position).add(dir.multiplyScalar(d));
+    focusPose.q.copy(camera.quaternion);
+    focusPose.s = s;
+    focus = n;
+    hoverCard = -1;
+  }
   function select(n: number | null) {
     if (n === null || !cards[n] || !cards[n].mesh.visible || !cards[n].tool) {
       holo.sel = -1;
@@ -1596,7 +1629,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       c.mesh.position.lerpVectors(c.from, c.to, Math.min(1, e3));
       c.mesh.scale.setScalar(0.05 + 0.95 * clamp(e3, 0, 1.08));
       c.mat.uniforms.appear.value = clamp((t - c.t0 - 0.15) / 0.5, 0, 1);
-      const hv = n === hoverCard ? 1 : 0;
+      const hv = n === hoverCard && focus < 0 ? 1 : 0;
       c.hover += (hv - c.hover) * Math.min(1, dt * 12);
       c.mat.uniforms.hover.value = c.hover;
       if (k >= 1) {
@@ -1605,6 +1638,20 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         const push = (c.hover * 0.12 + (holo.sel === n ? 0.18 : 0));
         c.mesh.position.add(tmp.copy(holo.camPos).sub(c.to).normalize().multiplyScalar(push));
       }
+      // 자세히 보기: 고른 카드는 화면 가운데로 크게, 나머지는 흐리게
+      const fw = focus === n ? 1 : 0;
+      c.fk += (fw - c.fk) * Math.min(1, dt * 7);
+      if (c.fk > 0.001) {
+        const e4 = ease(clamp(c.fk));
+        c.mesh.position.lerp(focusPose.pos, e4);
+        c.mesh.quaternion.copy(c.q).slerp(focusPose.q, e4);
+        c.mesh.scale.multiplyScalar(1 + (focusPose.s - 1) * e4);
+        c.mesh.renderOrder = 12;
+      } else {
+        c.mesh.quaternion.copy(c.q);
+        c.mesh.renderOrder = 10;
+      }
+      c.mat.uniforms.dim.value += ((focus >= 0 && focus !== n ? 1 : 0) - c.mat.uniforms.dim.value) * Math.min(1, dt * 7);
     });
     if (talking >= 0) TENTS[talking].npc.talk = speaking ? 1 : 0;
 
@@ -1627,6 +1674,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     endTalk: () => endTalk(),
     page: (d: number) => holo.on && showPage(holo.page + d),
     select,
+    focus: (n: number | null) => focusCard(n),
     speak: (on: boolean) => (speaking = on),
     near: () => near,
     shot: () => cv.toDataURL('image/png'),

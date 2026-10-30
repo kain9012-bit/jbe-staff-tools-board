@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, ChevronDown, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X } from 'lucide-react';
 import { allTools, splitAuthor, type Model } from '../lib/stats';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
-import { summaryOf } from '../lib/summaries';
-import { hrefTool, navigate } from '../lib/route';
+import { summaryOf, type ToolSummary } from '../lib/summaries';
+import { hrefTool } from '../lib/route';
 import { createPlaza, type Ev, type Mode, type PlazaEngine, type PlazaTent, type PlazaTool } from '../plaza/engine';
 import suitUrl from '../fonts/SUIT-Variable.woff2';
 import eduUrl from '../fonts/GangwonEduPowerExtraBoldA.woff';
@@ -34,6 +34,30 @@ const LOOK: Record<string, { color: string; prop: string; line: string }> = {
   '교육공무직': { color: '#3f6e8c', prop: 'mug', line: '교육공무직 업무에 쓰는 도구들이에요.' },
 };
 const TAG: Record<string, string> = { staff: '교직원 제작', official: '교육청 배포', external: '외부 공공' };
+/** 구분 표 색 — 목록 화면의 구분 표와 같게 */
+const TAG_CLS: Record<string, string> = {
+  staff: 'bg-[#dcefff] text-[#0a62a8]',
+  official: 'bg-[#2f3a73] text-white ring-1 ring-inset ring-white/60',
+  external: 'bg-[#e3f5ee] text-[#0b6b52]',
+};
+
+/** 들른 천막 — 이 브라우저에만 기억(다시 들어와도 유지) */
+const VKEY = 'plaza:visited';
+const loadVisited = (): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(VKEY) || '[]');
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+const saveVisited = (labels: string[]) => {
+  try {
+    localStorage.setItem(VKEY, JSON.stringify(labels));
+  } catch {
+    /* 저장할 수 없는 브라우저 — 이번 방문 동안만 기억 */
+  }
+};
 const LINE2 = '이 업무에 쓸 수 있는 도구들이에요. 카드를 눌러 살펴보세요!';
 
 type Tool = PlazaTool & { url: string; board: string };
@@ -93,6 +117,20 @@ const hasWebGL = () => {
 
 const glass = 'bg-[rgba(12,22,48,0.78)] text-white backdrop-blur-md ring-1 ring-white/15 shadow-[0_8px_30px_rgba(0,0,0,0.25)]';
 
+const HOLO_CSS = `
+.plaza-holo{background:linear-gradient(135deg,rgba(14,64,130,.9),rgba(6,28,70,.92));border:2px solid rgba(120,220,255,.75);
+box-shadow:0 0 0 1px rgba(120,220,255,.15),0 0 40px rgba(60,180,255,.35),inset 0 0 60px rgba(60,180,255,.12);backdrop-filter:blur(6px);
+animation:plazaHoloIn .45s cubic-bezier(.2,.9,.3,1.2) .28s both;overflow:hidden}
+.plaza-holo::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+background:repeating-linear-gradient(0deg,rgba(150,225,255,.05) 0 1px,transparent 1px 4px),linear-gradient(rgba(120,220,255,.07) 1px,transparent 1px) 0 0/26px 26px,linear-gradient(90deg,rgba(120,220,255,.07) 1px,transparent 1px) 0 0/26px 26px}
+.plaza-holo::after{content:"";position:absolute;left:0;right:0;height:60px;top:-60px;pointer-events:none;
+background:linear-gradient(transparent,rgba(120,220,255,.12),transparent);animation:plazaSweep 4.5s linear .8s infinite}
+@keyframes plazaHoloIn{from{opacity:0;transform:scale(.92);filter:brightness(2)}to{opacity:1;transform:none;filter:none}}
+@keyframes plazaSweep{to{top:100%}}
+.plaza-scroll{scrollbar-width:thin;scrollbar-color:rgba(120,220,255,.5) transparent}
+@media (prefers-reduced-motion:reduce){.plaza-holo,.plaza-holo::after{animation:none}}
+`;
+
 export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const tents = useTents(m);
   const stage = useRef<HTMLDivElement>(null);
@@ -107,7 +145,14 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const [sel, setSel] = useState<Tool | null>(null);
   const [mode, setMode] = useState<Mode>('auto');
   const [clock, setClock] = useState({ text: '', night: false });
-  const [visited, setVisited] = useState<Set<number>>(() => new Set());
+  const [visited, setVisited] = useState<Set<number>>(() => {
+    const keep = loadVisited();
+    return new Set(tents.map((t, i) => (keep.includes(t.label) ? i : -1)).filter((i) => i >= 0));
+  });
+  const visitedRef = useRef(visited);
+  visitedRef.current = visited;
+  const [slot, setSlot] = useState<number | null>(null);
+  const [detail, setDetail] = useState<Tool | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [help, setHelp] = useState(() => !(window.matchMedia?.('(pointer: coarse)').matches ?? false));
   const [full, setFull] = useState(false);
@@ -142,15 +187,28 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         setTalk(e.tent);
         setStep('hello');
         setSel(null);
-        if (e.tent !== null) setVisited((v) => new Set(v).add(e.tent!));
-      } else if (e.type === 'page') setPage({ page: e.page, pages: e.pages, cards: e.cards });
-      else if (e.type === 'select') setSel(e.tool as Tool | null);
+        setDetail(null);
+        if (e.tent !== null)
+          setVisited((v) => {
+            const n = new Set(v).add(e.tent!);
+            saveVisited([...new Set([...loadVisited(), ...[...n].map((i) => tents[i]?.label).filter(Boolean)])]);
+            return n;
+          });
+      } else if (e.type === 'page') {
+        setPage({ page: e.page, pages: e.pages, cards: e.cards });
+        setDetail(null);
+      }
+      else if (e.type === 'select') {
+        setSel(e.tool as Tool | null);
+        setSlot(e.slot);
+        if (!e.tool) setDetail(null);
+      }
       else if (e.type === 'clock') setClock({ text: e.text, night: e.night });
     };
     void loadFonts().then(() => {
       if (dead || !host.current) return;
       try {
-        eng.current = createPlaza(host.current, tents, on, { quality });
+        eng.current = createPlaza(host.current, tents, on, { quality, visited: [...visitedRef.current] });
         (window as unknown as { __plaza?: PlazaEngine }).__plaza = eng.current;
       } catch {
         setFailed(true);
@@ -196,6 +254,16 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const doEnd = useCallback(() => {
     eng.current?.endTalk();
     setSel(null);
+    setDetail(null);
+  }, []);
+  const openDetail = useCallback(() => {
+    if (!sel || slot === null) return;
+    eng.current?.focus(slot);
+    setDetail(sel);
+  }, [sel, slot]);
+  const closeDetail = useCallback(() => {
+    eng.current?.focus(null);
+    setDetail(null);
   }, []);
 
   // 키보드: Space·Enter 말 걸기/다음, Esc 끝내기
@@ -212,13 +280,14 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
           doShow();
         }
       } else if (e.key === 'Escape') {
-        if (sel) eng.current?.select(null);
+        if (detail) closeDetail();
+        else if (sel) eng.current?.select(null);
         else if (talk !== null) doEnd();
       }
     };
     window.addEventListener('keydown', kd);
     return () => window.removeEventListener('keydown', kd);
-  }, [talk, near, step, sel, doTalk, doShow, doEnd]);
+  }, [talk, near, step, sel, detail, doTalk, doShow, doEnd, closeDetail]);
 
   const setDn = (md: Mode) => {
     setMode(md);
@@ -256,6 +325,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
       className="relative w-full overflow-hidden bg-[#0d1830] select-none"
       style={{ height: full ? '100vh' : h ?? '80vh' }}
     >
+      <style>{HOLO_CSS}</style>
       <h1 className="sr-only">3D 광장</h1>
       <p className="sr-only">
         전북교육청 청사 앞 잔디마당에 업무 분류별 천막이 있습니다. 왼쪽 위 「천막 바로 가기」에서 업무를 고르면 천막지기가 그 업무의 도구를 보여 줍니다.
@@ -287,7 +357,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
             </button>
           </div>
           {help && (
-            <ul className="mt-2 space-y-0.5 text-[13px] leading-relaxed text-white/80">
+            <ul className="mt-2 space-y-0.5 whitespace-nowrap text-[13px] leading-relaxed text-white/80">
               <li>업무별 천막의 천막지기에게 말을 걸어 보세요.</li>
               {touch ? (
                 <>
@@ -302,7 +372,8 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
                     <Kbd>S</Kbd>
                     <Kbd>D</Kbd>·방향키 걷기, <Kbd>Shift</Kbd> 달리기
                   </li>
-                  <li>· 땅을 누르면 걸어가기 · 끌어서 둘러보기 · 바퀴로 확대</li>
+                  <li>· 땅을 누르면 걸어가기</li>
+                  <li>· 끌어서 둘러보기, 바퀴로 확대</li>
                   <li>
                     · 가까이서 <Kbd>Space</Kbd> 말 걸기, <Kbd>Esc</Kbd> 끝내기
                   </li>
@@ -397,7 +468,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
       )}
 
       {/* 대화 상자 */}
-      {tent && (
+      {tent && !detail && (
         <div className="absolute inset-x-0 bottom-3 sm:bottom-5 z-20 flex justify-center px-3">
           <div role="dialog" aria-label={`${tent.label} 천막지기`} className={`relative w-full max-w-3xl rounded-2xl ${glass} px-5 pb-4 pt-6 sm:px-6`}>
             <span
@@ -412,24 +483,16 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
             {sel ? (
               <div aria-live="polite">
                 <div className="flex flex-wrap items-center gap-1.5 pr-8">
-                  <span className="rounded-md px-2 py-0.5 text-[12px] font-bold text-white" style={{ background: tent.color }}>{sel.tag}</span>
+                  <span className={`rounded-md px-2 py-0.5 text-[12px] font-bold ${TAG_CLS[sel.board] ?? TAG_CLS.staff}`}>{sel.tag}</span>
                   {sel.run && <span className="rounded-md bg-white/15 px-2 py-0.5 text-[12px] font-bold">{sel.run}</span>}
                   <span className="text-[13px] text-white/65">{sel.who}</span>
                 </div>
                 <h2 className="mt-2 text-[18px] sm:text-[19px] font-bold leading-snug">{sel.title}</h2>
                 <p className="mt-1 text-[15px] leading-relaxed text-white/85">{sel.what || '아직 게시글 요약이 없습니다.'}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a
-                    href={hrefTool(sel.sid)}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (document.fullscreenElement) void document.exitFullscreen().catch(() => null);
-                      navigate(hrefTool(sel.sid));
-                    }}
-                    className="rounded-full bg-[#4fd1ff] px-4 py-2 text-[14px] font-bold text-[#06213a] hover:bg-[#7fe0ff]"
-                  >
+                  <button type="button" onClick={openDetail} className="rounded-full bg-[#4fd1ff] px-4 py-2 text-[14px] font-bold text-[#06213a] hover:bg-[#7fe0ff]">
                     자세히 보기
-                  </a>
+                  </button>
                   <a href={sel.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-white/30 hover:bg-white/10">
                     사용하기 <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                     <span className="sr-only">(새 창)</span>
@@ -495,7 +558,102 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         </div>
       )}
 
+      {/* 자세히 보기 — 확대된 홀로그램 카드 위에 겹쳐 띄움 */}
+      {detail && <Detail tool={detail} s={summaryOf(detail.sid)} onClose={closeDetail} />}
     </section>
+  );
+};
+
+const Sec: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <section className="mt-5">
+    <h3 className="flex items-center gap-2 text-[13px] font-bold tracking-wide text-[#9be6ff]">
+      <span className="h-px w-4 bg-[#4fd1ff]" aria-hidden="true" />
+      {title}
+    </h3>
+    <div className="mt-2 text-[15px] leading-relaxed text-white/90">{children}</div>
+  </section>
+);
+
+const Detail: React.FC<{ tool: Tool; s?: ToolSummary; onClose: () => void }> = ({ tool, s, onClose }) => {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => box.current?.focus(), []);
+  const none = !s?.why && !s?.features?.length && !s?.steps?.length && !s?.needs?.length && !s?.cautions?.length;
+  return (
+    <div className="absolute inset-0 z-30 grid place-items-center p-3 sm:p-6 pointer-events-none">
+      <div
+        ref={box}
+        tabIndex={-1}
+        role="dialog"
+        aria-label={`${tool.title} 자세히 보기`}
+        className="plaza-holo pointer-events-auto relative flex max-h-[86%] w-full max-w-[760px] flex-col rounded-[22px] text-white outline-none"
+      >
+        <div className="flex items-start gap-2 px-6 pt-6 sm:px-8 sm:pt-7">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className={`rounded-md px-2 py-0.5 text-[12px] font-bold ${TAG_CLS[tool.board] ?? TAG_CLS.staff}`}>{tool.tag}</span>
+              {tool.run && <span className="rounded-md bg-white/12 px-2 py-0.5 text-[12px] font-bold text-[#bff3ff] ring-1 ring-inset ring-[#4fd1ff]/40">{tool.run}</span>}
+              <span className="text-[13px] text-white/60">{tool.who}</span>
+            </div>
+            <h2 className="mt-2.5 text-[22px] sm:text-[26px] font-bold leading-snug [text-shadow:0_0_14px_rgba(80,200,255,.6)]">{tool.title}</h2>
+            {(s?.what || tool.what) && <p className="mt-1.5 text-[16px] leading-relaxed text-[#cdeeff]">{s?.what || tool.what}</p>}
+          </div>
+          <button type="button" onClick={onClose} className="-mr-2 -mt-2 shrink-0 rounded-full p-2 text-white/70 hover:bg-white/10 hover:text-white" aria-label="닫기">
+            <X className="w-5 h-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-2 sm:px-8 plaza-scroll">
+          {s?.why && <Sec title="만든 이유">{s.why}</Sec>}
+          {!!s?.features?.length && (
+            <Sec title="주요 기능">
+              <ul className="space-y-1">
+                {s.features.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#4fd1ff]" aria-hidden="true" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </Sec>
+          )}
+          {!!s?.steps?.length && (
+            <Sec title="사용 순서">
+              <ol className="space-y-1.5">
+                {s.steps.map((st, i) => (
+                  <li key={st} className="flex gap-2.5">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#4fd1ff]/20 text-[12px] font-bold text-[#9be6ff] ring-1 ring-[#4fd1ff]/50">{i + 1}</span>
+                    <span className="pt-px">{st}</span>
+                  </li>
+                ))}
+              </ol>
+            </Sec>
+          )}
+          {!!s?.needs?.length && <Sec title="필요한 것">{s.needs.join(' · ')}</Sec>}
+          {!!s?.cautions?.length && (
+            <Sec title="유의사항">
+              <ul className="space-y-1">
+                {s.cautions.map((c) => (
+                  <li key={c}>· {c}</li>
+                ))}
+              </ul>
+            </Sec>
+          )}
+          {none && <p className="mt-5 text-[15px] text-white/70">아직 게시글 요약이 없습니다. 게시글에서 내용을 확인해 주세요.</p>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-[#4fd1ff]/25 px-6 py-4 sm:px-8">
+          <a href={tool.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#4fd1ff] px-5 py-2.5 text-[14px] font-bold text-[#06213a] hover:bg-[#7fe0ff]">
+            사용하기 <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+            <span className="sr-only">(새 창)</span>
+          </a>
+          <a href={hrefTool(tool.sid)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[14px] font-bold text-white/85 ring-1 ring-white/30 hover:bg-white/10">
+            상세 화면 <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+            <span className="sr-only">(새 창)</span>
+          </a>
+          <button type="button" onClick={onClose} className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-2.5 text-[14px] font-bold text-white/80 hover:text-white">
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 카드로 돌아가기
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
