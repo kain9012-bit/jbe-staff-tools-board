@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Volume2, VolumeX, ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X } from 'lucide-react';
+import { Volume2, VolumeX, ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X, Pencil, Shuffle, Users, Check } from 'lucide-react';
 import { allTools, splitAuthor, type Model } from '../lib/stats';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { summaryOf, summaryText, type ToolSummary } from '../lib/summaries';
@@ -8,6 +8,8 @@ import { matcher } from '../lib/search';
 import { hrefTool } from '../lib/route';
 import { coverColor, TAG_BAND_COLOR } from '../plaza/lobby';
 import { loadCharacters } from '../plaza/chibi';
+import { cleanLook, EMOTES, NAME_MAX, nameBad, randomLook, randomName, tidyName, type Emote, type Look } from '../plaza/crowd';
+import { netReady, startNet, type Net } from '../plaza/net';
 import { createPlaza, type Ev, type Mode, type PlazaEngine, type PlazaTent, type PlazaTool } from '../plaza/engine';
 import suitUrl from '../fonts/SUIT-Variable.woff2';
 import eduUrl from '../fonts/GangwonEduPowerExtraBoldA.woff';
@@ -47,6 +49,35 @@ const TAG_CLS: Record<string, string> = {
 
 /** 들른 천막 — 이 브라우저에만 기억(다시 들어와도 유지) */
 const VKEY = 'plaza:visited';
+/** 내 이름·모습 — 이 브라우저에 기억. 처음이면 임의로 */
+const MEKEY = 'plaza:me';
+function loadMe(): { name: string; look: Look } {
+  try {
+    const o = JSON.parse(localStorage.getItem(MEKEY) ?? 'null');
+    const name = tidyName(o?.name);
+    if (name && !nameBad(name) && o?.look) return { name, look: cleanLook(o.look) };
+  } catch {
+    /* 저장소를 못 쓰는 브라우저 */
+  }
+  const me = { name: randomName(), look: randomLook() };
+  saveMe(me);
+  return me;
+}
+function saveMe(me: { name: string; look: Look }) {
+  try {
+    localStorage.setItem(MEKEY, JSON.stringify(me));
+  } catch {
+    /* 무시 */
+  }
+}
+/** 이 창(탭)의 접속 번호 — 저장하지 않음 */
+const MY_ID = (() => {
+  try {
+    return crypto.randomUUID().slice(0, 18);
+  } catch {
+    return Math.random().toString(36).slice(2, 14);
+  }
+})();
 const loadVisited = (): string[] => {
   try {
     const v = JSON.parse(localStorage.getItem(VKEY) || '[]');
@@ -198,6 +229,16 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const [help, setHelp] = useState(() => !(window.matchMedia?.('(pointer: coarse)').matches ?? false));
   const [full, setFull] = useState(false);
   const [h, setH] = useState<number | null>(null);
+  // 함께 접속
+  const [me, setMe] = useState(loadMe);
+  const meRef = useRef(me);
+  meRef.current = me;
+  const net = useRef<Net | null>(null);
+  const [netState, setNetState] = useState<'off' | 'connecting' | 'on'>('off');
+  const [peers, setPeers] = useState<string[]>([]);
+  const [peersOpen, setPeersOpen] = useState(false);
+  const [nameEdit, setNameEdit] = useState<string | null>(null);
+  const [nameErr, setNameErr] = useState('');
   const [quality] = useState<'high' | 'low'>(() =>
     window.matchMedia?.('(pointer: coarse)').matches || (navigator.hardwareConcurrency ?? 8) <= 4 ? 'low' : 'high',
   );
@@ -259,18 +300,74 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
     void Promise.all([loadFonts(), loadCharacters()]).then(() => {
       if (dead || !host.current) return;
       try {
-        eng.current = createPlaza(host.current, tents, on, { quality, visited: [...visitedRef.current], lobby: { tools: data.all, popular: data.popular, fresh: data.fresh } });
-        (window as unknown as { __plaza?: PlazaEngine }).__plaza = eng.current;
+        const e = createPlaza(host.current, tents, on, { quality, visited: [...visitedRef.current], lobby: { tools: data.all, popular: data.popular, fresh: data.fresh }, me: meRef.current });
+        eng.current = e;
+        (window as unknown as { __plaza?: PlazaEngine }).__plaza = e;
+        // 함께 접속(설정이 있을 때만)
+        if (netReady()) {
+          const bump = () => {
+            const n = e.net.names().sort((a, b) => a.localeCompare(b, 'ko'));
+            setPeers((p) => (p.join('\n') === n.join('\n') ? p : n));
+          };
+          void startNet(
+            { id: MY_ID, ...meRef.current },
+            {
+              meta: (id, m) => (e.net.meta(id, m), bump()),
+              move: e.net.move,
+              leave: (id) => (e.net.leave(id), bump()),
+              emote: e.net.emote,
+              status: (st) => {
+                setNetState(st);
+                if (st !== 'on') (e.net.clear(), bump());
+              },
+            },
+            e.net.state,
+          ).then((n) => {
+            if (dead) n?.stop();
+            else net.current = n;
+          });
+        }
       } catch {
         setFailed(true);
       }
     });
+    // 창을 닫으면 바로 나감 알림
+    const bye = () => net.current?.stop();
+    window.addEventListener('pagehide', bye);
     return () => {
       dead = true;
+      window.removeEventListener('pagehide', bye);
+      net.current?.stop();
+      net.current = null;
       eng.current?.destroy();
       eng.current = null;
     };
   }, [tents, quality, data]);
+
+  // 내 이름·모습 바꾸기
+  const saveName = (raw: string) => {
+    const n = tidyName(raw);
+    if (!n) return setNameErr('이름을 적어 주세요.');
+    if (nameBad(n)) return setNameErr('이름에 쓸 수 없는 말이 들어 있어요.');
+    const next = { ...meRef.current, name: n };
+    setMe(next);
+    saveMe(next);
+    eng.current?.setName(n);
+    net.current?.setMeta(n, next.look);
+    setNameEdit(null);
+    setNameErr('');
+  };
+  const reroll = () => {
+    const next = { ...meRef.current, look: randomLook() };
+    setMe(next);
+    saveMe(next);
+    eng.current?.setLook(next.look);
+    net.current?.setMeta(next.name, next.look);
+  };
+  const doEmote = (k: Emote) => {
+    eng.current?.emote(k);
+    net.current?.emote(k);
+  };
 
   // 대사 한 글자씩
   const tent = typeof talk === 'number' ? tents[talk] : null;
@@ -413,6 +510,68 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
               <ChevronDown className={`w-4 h-4 transition ${help ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>
           </div>
+          {/* 나: 이름·모습, 함께 있는 사람 */}
+          {nameEdit === null ? (
+            <div className="mt-2 flex items-center gap-1 text-[13px]">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#4fd1ff]" aria-hidden="true" />
+              <span className="sr-only">내 이름</span>
+              <span className="min-w-0 truncate pl-1 font-bold">{me.name}</span>
+              <button type="button" onClick={() => (setNameEdit(me.name), setNameErr(''))} className="shrink-0 rounded p-1 text-white/70 hover:bg-white/10 hover:text-white" aria-label="이름 바꾸기" title="이름 바꾸기">
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              <button type="button" onClick={reroll} className="shrink-0 rounded p-1 text-white/70 hover:bg-white/10 hover:text-white" aria-label="모습 바꾸기" title="모습 바꾸기">
+                <Shuffle className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              {netState !== 'off' && (
+                <button
+                  type="button"
+                  onClick={() => setPeersOpen((v) => !v)}
+                  aria-expanded={peersOpen}
+                  className="ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-white/10 px-2 py-0.5 text-[12px] font-bold hover:bg-white/20"
+                  title="함께 있는 사람"
+                >
+                  <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                  {netState === 'on' ? `함께 ${peers.length + 1}명` : '연결 중'}
+                </button>
+              )}
+            </div>
+          ) : (
+            <form
+              className="mt-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveName(nameEdit);
+              }}
+            >
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={nameEdit}
+                  maxLength={NAME_MAX}
+                  onChange={(e) => (setNameEdit(e.target.value), setNameErr(''))}
+                  onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setNameEdit(null))}
+                  aria-label={`새 이름(${NAME_MAX}자까지)`}
+                  className="min-w-0 flex-1 rounded-md bg-white px-2 py-1 text-[13px] text-[#0d1830] outline-none ring-2 ring-[#4fd1ff]"
+                />
+                <button type="submit" className="shrink-0 rounded-md bg-[#4fd1ff] p-1.5 text-[#0d1830]" aria-label="이름 저장">
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+                <button type="button" onClick={() => setNameEdit(null)} className="shrink-0 rounded-md p-1.5 text-white/70 hover:bg-white/10" aria-label="취소">
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </div>
+              {nameErr && <p className="mt-1 text-[12px] text-[#ffb4a8]">{nameErr}</p>}
+            </form>
+          )}
+          {peersOpen && netState === 'on' && (
+            <ul className="mt-1.5 max-h-[22vh] overflow-y-auto rounded-lg bg-black/20 px-2 py-1.5 text-[12px] leading-relaxed text-white/85">
+              <li className="font-bold text-[#9be6ff]">{me.name} (나)</li>
+              {peers.map((n, i) => (
+                <li key={i} className="truncate">{n}</li>
+              ))}
+              {!peers.length && <li className="text-white/60">아직 혼자예요.</li>}
+            </ul>
+          )}
           {help && (
             <ul className="mt-2 space-y-0.5 whitespace-nowrap text-[13px] leading-relaxed text-white/80">
               {world === 'in' ? (
@@ -546,6 +705,24 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
             {near === 'desk' ? '안내 데스크에 말 걸기' : `${tents[near].label} 천막지기에게 말 걸기`}
             {!touch && <Kbd dark>Space</Kbd>}
           </button>
+        </div>
+      )}
+
+      {/* 몸짓 — 인사·좋아요·박수·반가워요(다른 사람에게도 보임) */}
+      {ready && talk === null && !detail && (
+        <div className={`absolute bottom-24 right-3 sm:bottom-6 sm:right-4 z-10 flex flex-col gap-1 rounded-full p-1 sm:flex-row ${glass}`} role="group" aria-label="몸짓">
+          {EMOTES.map((em) => (
+            <button
+              key={em.k}
+              type="button"
+              onClick={() => doEmote(em.k)}
+              className="grid h-9 w-9 place-items-center rounded-full text-[18px] hover:bg-white/15 focus-visible:bg-white/15"
+              aria-label={em.text}
+              title={em.text}
+            >
+              <span aria-hidden="true">{em.icon}</span>
+            </button>
+          ))}
         </div>
       )}
 

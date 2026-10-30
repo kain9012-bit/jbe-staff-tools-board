@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { makeHQ } from './hq';
 import { animChibi, blob, makeChibi, toon, toonGrad, type Chibi } from './chibi';
+import { bubble, disposeSprite, lookOpt, makeCrowd, nameTag, playEmote, type Emote, type Look } from './crowd';
 import { makeLobby, type Lobby } from './lobby';
 
 export interface PlazaTool {
@@ -172,7 +173,7 @@ const TAG_COL: Record<string, { bg: string; fg: string; line?: string }> = {
 };
 const LINES_TONE = ['#2f6fb3', '#e8554e', '#3a457f', '#4f8f5a', null, null];
 
-export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev) => void, opt: { quality: 'high' | 'low'; visited?: number[]; lobby: { tools: PlazaTool[]; popular: PlazaTool[]; fresh: PlazaTool[] } }) {
+export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev) => void, opt: { quality: 'high' | 'low'; visited?: number[]; lobby: { tools: PlazaTool[]; popular: PlazaTool[]; fresh: PlazaTool[] }; me?: { name: string; look: Look } }) {
   const T = THREE;
   const high = opt.quality === 'high';
   const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: !!(window as any).__plazaShot });
@@ -808,19 +809,31 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   }
 
   /* 나(플레이어) */
-  const me = makeChibi({ skin: '#ffe0c8', hair: '#2b2320', style: 'short', top: '#2fa39a', inner: '#ffffff', pants: '#3b4256', tie: null, hat: 'cap', capColor: '#1c64ac' });
+  let me = makeChibi(lookOpt(opt.me?.look ?? { sk: 0, h: 0, st: 0, tp: 0, pn: 0, gl: 0, ht: 1, cp: 0 }));
   scene.add(me.root);
   // 밤에 캐릭터가 까맣게 묻히지 않게 — 제 색으로 살짝 밝힘
   const charMats = new Set<THREE.MeshToonMaterial>();
-  [me.root, ...TENTS.map((t) => t.npc.root)].forEach((r) =>
+  const lift = (r: THREE.Object3D) =>
     r.traverse((o) => {
       const m = o.material;
-      if (m && m.isMeshToonMaterial && !m.emissiveMap && !m.map && m.emissive && m.emissive.getHex() === 0) {
-        m.emissive.copy(m.color);
+      if (m && m.isMeshToonMaterial && !m.emissiveMap && !m.map && m.emissive && (m.emissive.getHex() === 0 || charMats.has(m))) {
+        if (!charMats.has(m)) m.emissive.copy(m.color);
+        if (!charMats.has(m)) m.emissiveIntensity = lastDarkK * 0.32;
         charMats.add(m);
       }
-    }),
-  );
+    });
+  let lastDarkK = 0;
+  [me.root, ...TENTS.map((t) => t.npc.root)].forEach(lift);
+  // 내 이름표·말풍선
+  let myTag = nameTag(opt.me?.name ?? '나', true);
+  myTag.position.y = 1.78;
+  me.root.add(myTag);
+  let myBub: THREE.Sprite | null = null;
+  let myBubT = 0;
+  // 함께 접속한 사람들 — 광장·로비 따로
+  const crowdG = { out: new T.Group(), in: new T.Group() };
+  scene.add(crowdG.out);
+  const crowd = makeCrowd({ groups: crowdG, lift });
   const meRing = new T.Mesh(
     new T.RingGeometry(0.46, 0.56, 32),
     new T.MeshBasicMaterial({ color: '#4fd1ff', transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false }),
@@ -1119,6 +1132,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     HQ.LIT.value = lr;
     for (const [m, k] of NIGHT_MATS) m.emissiveIntensity = dark * k;
     for (const m of tentGlow) m.emissiveIntensity = dark * (m.userData.glowK ?? 0.5);
+    lastDarkK = dark;
     for (const m of charMats) m.emissiveIntensity = dark * 0.32;
     for (const m of doorGlow) m.color.copy(C3('#2a1c12', '#ffc070', dark));
     for (const m of bulbs) m.color.copy(m.userData.base).multiplyScalar(0.35 + 0.9 * dark);
@@ -1627,6 +1641,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       if (!lobby) {
         lobby = makeLobby(opt.lobby.tools, opt.lobby.popular, opt.lobby.fresh);
         lobby.setOutside(lastSky, lastDark);
+        lobby.scene.add(crowdG.in);
       }
       const L = lobby;
       movers().forEach((o) => L.scene.add(o));
@@ -1768,6 +1783,19 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     me.root.position.copy(P.pos);
     me.root.rotation.y = P.yaw;
     animChibi(me, dt, t, P.speed);
+    {
+      const hideTags = cam.mode === 'talk' || cam.mode === 'holo' || focus >= 0 || !!focusBook;
+      myTag.visible = !hideTags && cam.mode !== 'intro';
+      crowd.update(dt, t, camera.position, hideTags);
+      if (myBub) {
+        myBubT -= dt;
+        myBub.material.opacity = clamp(myBubT / 0.4);
+        if (myBubT <= 0) {
+          disposeSprite(myBub);
+          myBub = null;
+        }
+      }
+    }
     meRing.position.copy(P.pos).setY(0.08);
     meRing.material.opacity = 0.55 + 0.25 * Math.sin(t * 4);
     if (pin.material.opacity > 0) {
@@ -1955,6 +1983,47 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
 
   return {
     setMode,
+    /** 함께 접속 — 내 상태 읽기, 다른 사람 반영 */
+    net: {
+      state: () => ({ x: P.pos.x, z: P.pos.z, y: P.yaw, s: P.speed, w: world }),
+      meta: crowd.meta,
+      move: crowd.move,
+      leave: crowd.drop,
+      emote: crowd.emote,
+      count: crowd.count,
+      names: crowd.names,
+      clear: crowd.clear,
+    },
+    /** 내 몸짓 + 말풍선 */
+    emote: (k: Emote) => {
+      playEmote(me, k);
+      disposeSprite(myBub);
+      myBub = bubble(k);
+      myBub.position.y = 2.12;
+      me.root.add(myBub);
+      myBubT = 2.6;
+    },
+    setName: (n: string) => {
+      disposeSprite(myTag);
+      myTag = nameTag(n, true);
+      myTag.position.y = 1.78;
+      me.root.add(myTag);
+    },
+    setLook: (l: Look) => {
+      const old = me;
+      const parent = old.root.parent;
+      me = makeChibi(lookOpt(l));
+      lift(me.root);
+      me.root.add(myTag);
+      if (myBub) me.root.add(myBub);
+      me.root.position.copy(P.pos);
+      me.root.rotation.y = P.yaw;
+      parent?.add(me.root);
+      old.root.removeFromParent();
+      old.mixer.stopAllAction();
+      old.mixer.uncacheRoot(old.model);
+      me.hop = 1;
+    },
     talk: (i: number) => startTalk(i),
     walkTo: (i: number) => walkToTent(i),
     goLobby,
@@ -1980,6 +2049,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook },
     destroy() {
       cancelAnimationFrame(raf);
+      crowd.clear();
       ro.disconnect();
       window.removeEventListener('keydown', kd);
       window.removeEventListener('keyup', ku);

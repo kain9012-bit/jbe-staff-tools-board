@@ -9,3 +9,4 @@ data/tools.db*
 data/files/
 *.tar
 전달용/
+.env.local
