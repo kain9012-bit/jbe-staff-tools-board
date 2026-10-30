@@ -824,9 +824,8 @@ const BookView: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: nu
         className="absolute outline-none"
         style={{ left: rect?.x ?? 16, top: rect?.y ?? 16, width: W, height: Hh, perspective: 2400, perspectiveOrigin: one ? '0% 50%' : '50% 50%', outline: 'none' }}
       >
-        {/* 속 쪽 — 표지가 넘어가면서 드러남(덮인 동안은 표지 밑에 있음) */}
-        <div className="absolute inset-0" style={{ opacity: open || closing ? 1 : 0, transition: 'opacity .2s' }}>
-          {!one && <div className="pb-page l">{face(sides.left)}</div>}
+        {/* 오른쪽 쪽 — 덮인 표지 바로 밑. 왼쪽 쪽은 따로 없고, 넘어간 표지의 안쪽 면이 왼쪽 쪽이 됨 */}
+        <div className="absolute inset-0" style={{ opacity: arrived ? 1 : 0 }}>
           <div className="pb-page r" style={one ? { width: '100%', borderRadius: 10 } : undefined}>
             {face(
               one ? (
@@ -839,7 +838,6 @@ const BookView: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: nu
               ),
             )}
           </div>
-          {!one && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-[#d9cdb6]" />}
         </div>
         {/* 표지 — 바로 위(부모)에 원근이 걸려야 입체로 넘어감 */}
         <div
@@ -849,11 +847,16 @@ const BookView: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: nu
             width: pageW,
             transformOrigin: 'left center',
             transformStyle: 'preserve-3d',
-            transition: 'transform .9s cubic-bezier(.55,.05,.25,1)',
+            // 세로 화면(한 쪽)은 넘어간 표지가 화면 밖으로 나가므로 다 넘어갈 즈음 흐리게 지움
+            transition: one
+              ? open
+                ? 'transform .9s cubic-bezier(.55,.05,.25,1), opacity .3s .55s'
+                : 'transform .9s cubic-bezier(.55,.05,.25,1), opacity .15s'
+              : 'transform .9s cubic-bezier(.55,.05,.25,1)',
             transform: open ? `rotateY(${one ? -165 : -180}deg)` : 'rotateY(0deg)',
-            pointerEvents: 'none',
+            pointerEvents: open && !one ? 'auto' : 'none',
             zIndex: 2,
-            opacity: arrived ? 1 : 0,
+            opacity: !arrived || (one && open) ? 0 : 1,
           }}
         >
           {cover}
