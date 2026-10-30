@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { makeHQ } from './hq';
 import { animChibi, blob, makeChibi, toon, toonGrad, type Chibi } from './chibi';
+import { makeSurround } from './surround';
 import { bubble, disposeSprite, lookOpt, makeCrowd, nameTag, playEmote, type Emote, type Look } from './crowd';
 import { makeLobby, type Lobby } from './lobby';
 
@@ -193,7 +194,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
 
   const scene = new T.Scene();
   const camera = new T.PerspectiveCamera(50, 1, 0.3, 2400);
-  scene.fog = new T.Fog('#dfeaf3', 110, 520);
+  scene.fog = new T.Fog('#dfeaf3', 200, 1000);
 
   /* 빛 */
   const hemi = new T.HemisphereLight(0xeaf2ff, 0x8a8170, 1.6);
@@ -279,6 +280,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+  // 청사 주변 동네(건물·도로·공원) — 청사 3D 지도 자료 + OpenStreetMap
+  const SUR = makeSurround(scene, { shadows: high });
   const flat = (poly: number[][], mat: THREE.Material, y: number, uvSize = 0) => {
     const s = new T.Shape();
     s.moveTo(poly[0][0], poly[0][1]);
@@ -385,6 +388,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     const spots: number[][] = [];
     const ok = (p: number[]) => {
       if (BLOCKS.some((b) => inPoly(p, b)) || inPoly(p, SITE.plaza) || inPoly(p, SITE.parking)) return false;
+      if (SUR.inBuilding(p[0], p[1], 2.5) || SUR.onRoad(p[0], p[1], 1.2)) return false;
       const d = Math.hypot(p[0] - CS[0], p[1] - CS[1]);
       if (d < R + 7.5) return false;
       // 청사 앞 길·마당 입구는 비움
@@ -1134,6 +1138,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     for (const m of tentGlow) m.emissiveIntensity = dark * (m.userData.glowK ?? 0.5);
     lastDarkK = dark;
     for (const m of charMats) m.emissiveIntensity = dark * 0.32;
+    SUR.setDark(dark);
     for (const m of doorGlow) m.color.copy(C3('#2a1c12', '#ffc070', dark));
     for (const m of bulbs) m.color.copy(m.userData.base).multiplyScalar(0.35 + 0.9 * dark);
     for (const m of signs) m.color.copy(C3('#f4f1ea', '#d8c3a0', dark));
@@ -1186,6 +1191,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     const p = [x, -z];
     if (world === 'in') return lobby!.blocked(x, z);
     if (BLOCK_NOW.some((b) => inPoly(p, b))) return true;
+    if (SUR.inBuilding(p[0], p[1], RAD)) return true;
     if (Math.hypot(p[0] - CS[0], p[1] - CS[1]) > 95) return true;
     for (const c of canopyCols) if (Math.hypot(x - c.x, z - c.z) < 0.25 + RAD) return true;
     for (const t of TENTS) {
@@ -1384,13 +1390,36 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
   };
+  // 두 손가락 벌리기·오므리기로 확대·축소
+  const touchPts = new Map<number, { x: number; y: number }>();
+  let pinch: { d: number; dist: number } | null = null;
+  const pinchD = () => {
+    const [a, b] = [...touchPts.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y) || 1;
+  };
+  /** 가장 멀리 볼 수 있는 거리 — 광장은 청사 전체가 보이게, 로비는 방 안 */
+  const maxDist = () => (world === 'in' ? 26 : 120);
   const onDown = (e: PointerEvent) => {
     cv.setPointerCapture(e.pointerId);
+    if (e.pointerType === 'touch') {
+      touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touchPts.size === 2 && cam.mode === 'follow') {
+        pinch = { d: pinchD(), dist: cam.dist };
+        down = null;
+        dragged = true;
+        return;
+      }
+    }
     down = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch, id: e.pointerId };
     dragged = false;
     if (cam.mode === 'intro') skipIntro();
   };
   const onMove = (e: PointerEvent) => {
+    if (touchPts.has(e.pointerId)) touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touchPts.size >= 2) {
+      cam.dist = clamp((pinch.dist * pinch.d) / pinchD(), 4.5, maxDist());
+      return;
+    }
     if (down && down.id === e.pointerId) {
       const dx = e.clientX - down.x, dy = e.clientY - down.y;
       if (!dragged && Math.hypot(dx, dy) > 6) dragged = true;
@@ -1425,6 +1454,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     cv.style.cursor = cursor;
   };
   const onUp = (e: PointerEvent) => {
+    touchPts.delete(e.pointerId);
+    if (touchPts.size < 2) pinch = null;
     if (!down || down.id !== e.pointerId) return;
     down = null;
     if (dragged) return;
@@ -1471,7 +1502,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   const onWheel = (e: WheelEvent) => {
     if (cam.mode !== 'follow') return;
     e.preventDefault();
-    cam.dist = clamp(cam.dist * (1 + Math.sign(e.deltaY) * 0.1), 4.5, 26);
+    cam.dist = clamp(cam.dist * (1 + Math.sign(e.deltaY) * 0.1), 4.5, maxDist());
   };
   const onKey = (e: KeyboardEvent, on: boolean) => {
     const k = e.key.toLowerCase();
@@ -1497,7 +1528,11 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   cv.addEventListener('pointerdown', onDown);
   cv.addEventListener('pointermove', onMove);
   cv.addEventListener('pointerup', onUp);
-  cv.addEventListener('pointercancel', () => (down = null));
+  cv.addEventListener('pointercancel', (e) => {
+    down = null;
+    touchPts.delete(e.pointerId);
+    if (touchPts.size < 2) pinch = null;
+  });
   cv.addEventListener('wheel', onWheel, { passive: false });
   window.addEventListener('keydown', kd);
   window.addEventListener('keyup', ku);
@@ -1786,7 +1821,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     {
       const hideTags = cam.mode === 'talk' || cam.mode === 'holo' || focus >= 0 || !!focusBook;
       myTag.visible = !hideTags && cam.mode !== 'intro';
-      crowd.update(dt, t, camera.position, hideTags, world);
+      crowd.update(dt, t, camera.position, hideTags, world, P.pos);
       if (myBub) {
         myBubT -= dt;
         myBub.material.opacity = clamp(myBubT / 0.4);
@@ -2046,7 +2081,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     speak: (on: boolean) => (speaking = on),
     near: () => near,
     shot: () => cv.toDataURL('image/png'),
-    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook },
+    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook, crowd },
     destroy() {
       cancelAnimationFrame(raf);
       crowd.clear();

@@ -166,8 +166,9 @@ interface Peer {
   name: string;
   look: Look;
   w: World;
-  ch: Chibi;
-  tag: THREE.Sprite;
+  /** 캐릭터(가까운 SHOW명만 만듦) */
+  ch: Chibi | null;
+  tag: THREE.Sprite | null;
   bub: THREE.Sprite | null;
   bubT: number;
   pos: THREE.Vector3;
@@ -178,71 +179,96 @@ interface Peer {
   ts: number;
   age: number;
   speed: number;
+  /** 자리를 받은 적 있음 */
   placed: boolean;
 }
 const LEAD = 0.55; // 앞질러 그릴 수 있는 최대 시간(초) — 받는 간격 0.5초보다 조금 길게
-export const MAX_PEERS = 40;
+const SHOW = 40; // 캐릭터로 그리는 최대 인원(같은 곳에서 가까운 순)
+const KEEP = 46; // 이미 그린 사람은 46번째보다 멀어져야 지움(경계에서 깜빡임 방지)
+const PER_PICK = 6; // 한 번에 새로 만드는 캐릭터 수(한꺼번에 만들면 화면이 멈칫함)
+export const MAX_PEERS = 300; // 목록에 담는 최대 인원(서버 최대 200명)
 
 export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: THREE.Object3D) => void }) {
   const peers = new Map<string, Peer>();
   const tmp = new THREE.Vector3();
+  let pickT = 0;
   const build = (p: Peer) => {
     const ch = makeChibi(lookOpt(p.look));
     o.lift(ch.root);
     p.ch = ch;
+    p.tag = nameTag(p.name);
+    p.tag.position.y = 1.78;
     ch.root.add(p.tag);
+    ch.root.position.copy(p.pos);
+    ch.root.rotation.y = p.yaw;
     o.groups[p.w].add(ch.root);
+  };
+  const unbuild = (p: Peer) => {
+    disposeSprite(p.tag);
+    disposeSprite(p.bub);
+    p.tag = p.bub = null;
+    if (!p.ch) return;
+    p.ch.root.removeFromParent();
+    p.ch.mixer.stopAllAction();
+    p.ch.mixer.uncacheRoot(p.ch.model);
+    p.ch = null;
   };
   const drop = (id: string) => {
     const p = peers.get(id);
     if (!p) return;
-    disposeSprite(p.tag);
-    disposeSprite(p.bub);
-    p.ch.root.removeFromParent();
-    p.ch.mixer.stopAllAction();
-    p.ch.mixer.uncacheRoot(p.ch.model);
+    unbuild(p);
     peers.delete(id);
+  };
+  /** 같은 곳에서 가까운 SHOW명만 캐릭터로 */
+  const pick = (here: World, me: THREE.Vector3) => {
+    const near = [...peers.values()].filter((p) => p.placed && p.w === here).sort((a, b) => a.pos.distanceToSquared(me) - b.pos.distanceToSquared(me));
+    const rank = new Map(near.map((p, i) => [p.id, i]));
+    for (const p of peers.values()) {
+      if (!p.ch) continue;
+      const r = rank.get(p.id);
+      if (r === undefined || r >= KEEP) unbuild(p);
+    }
+    let made = 0;
+    for (const p of near.slice(0, SHOW)) {
+      if (p.ch) continue;
+      if (made++ >= PER_PICK) break;
+      build(p);
+    }
   };
   return {
     peers,
+    /** 함께 있는 사람(나 빼고) */
     count: () => peers.size,
-    /** 함께 있는 사람(이름·있는 곳) */
+    /** 함께 있는 사람(이름·있는 곳) — 그리지 않는 사람도 모두 */
     roster: () => [...peers.values()].map((p) => ({ name: p.name, w: p.w })),
     /** 들어옴·이름/모습/있는 곳 바뀜 */
     meta(id: string, m: PeerMeta) {
       let p = peers.get(id);
       if (!p) {
         if (peers.size >= MAX_PEERS) return;
-        p = { id, name: m.name, look: m.look, w: m.w, ch: null as unknown as Chibi, tag: nameTag(m.name), bub: null, bubT: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), yaw: 0, tyaw: 0, ts: 0, age: 0, speed: 0, placed: false };
-        p.tag.position.y = 1.78;
+        p = { id, name: m.name, look: m.look, w: m.w, ch: null, tag: null, bub: null, bubT: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), yaw: 0, tyaw: 0, ts: 0, age: 0, speed: 0, placed: false };
         peers.set(id, p);
-        build(p);
-        p.ch.root.visible = false; // 위치를 받기 전에는 숨김
+        pickT = 0;
         return;
       }
       if (m.name !== p.name) {
-        disposeSprite(p.tag);
         p.name = m.name;
-        p.tag = nameTag(m.name);
-        p.tag.position.y = 1.78;
-        p.ch.root.add(p.tag);
+        if (p.ch) {
+          disposeSprite(p.tag);
+          p.tag = nameTag(m.name);
+          p.tag.position.y = 1.78;
+          p.ch.root.add(p.tag);
+        }
       }
       if (!sameLook(m.look, p.look)) {
         p.look = m.look;
-        const vis = p.ch.root.visible;
-        p.tag.removeFromParent();
-        const bub = p.bub;
-        bub?.removeFromParent();
-        p.ch.root.removeFromParent();
-        p.ch.mixer.stopAllAction();
-        build(p);
-        if (bub) p.ch.root.add(bub);
-        p.ch.root.visible = vis;
+        if (p.ch) (unbuild(p), build(p));
       }
       if (m.w !== p.w) {
         p.w = m.w;
-        o.groups[p.w].add(p.ch.root);
         p.placed = false;
+        unbuild(p);
+        pickT = 0;
       }
     },
     /** 받은 자리 반영. 있는 곳(광장/로비)이 바뀌었으면 true */
@@ -252,8 +278,9 @@ export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: 
       const moved = m.w !== p.w;
       if (moved) {
         p.w = m.w;
-        o.groups[p.w].add(p.ch.root);
         p.placed = false;
+        unbuild(p);
+        pickT = 0;
       }
       p.tgt.set(m.x, 0, m.z);
       p.tyaw = m.y;
@@ -263,15 +290,16 @@ export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: 
       if (!p.placed || p.pos.distanceTo(p.tgt) > 9) {
         p.pos.copy(p.tgt);
         p.yaw = p.tyaw;
+        if (!p.placed) pickT = 0;
         p.placed = true;
+        p.ch?.root.position.copy(p.pos);
       }
-      p.ch.root.visible = true;
       return moved;
     },
     drop,
     emote(id: string, k: Emote) {
       const p = peers.get(id);
-      if (!p) return;
+      if (!p?.ch) return; // 그리지 않는(먼) 사람은 안 보이니 생략
       disposeSprite(p.bub);
       p.bub = bubble(k);
       p.bub.position.y = 2.12;
@@ -279,15 +307,22 @@ export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: 
       p.bubT = 2.6;
       playEmote(p.ch, k);
     },
-    update(dt: number, t: number, camPos: THREE.Vector3, hideTags: boolean, here: World) {
+    /** 매 장면. here: 내가 있는 곳, me: 내 자리 */
+    update(dt: number, t: number, camPos: THREE.Vector3, hideTags: boolean, here: World, me: THREE.Vector3) {
+      pickT -= dt;
+      if (pickT <= 0) {
+        pickT = 0.5;
+        pick(here, me);
+      }
       for (const p of peers.values()) {
-        if (!p.ch.root.visible || p.w !== here) continue; // 다른 곳(광장/로비)에 있는 사람은 그리지 않음
+        if (!p.placed) continue;
         const bx = p.pos.x, bz = p.pos.z;
         // 받은 자리 + 받은 빠르기로 걸어간 만큼(최대 LEAD초) → 그쪽으로 부드럽게
         p.age += dt;
         const lead = p.ts > 0 ? Math.min(p.age, LEAD) * p.ts : 0;
         tmp.set(p.tgt.x + Math.sin(p.tyaw) * lead, 0, p.tgt.z + Math.cos(p.tyaw) * lead);
         p.pos.lerp(tmp, Math.min(1, dt * 6));
+        if (!p.ch || p.w !== here) continue; // 그리지 않는 사람은 자리만 따라감
         const moved = Math.hypot(p.pos.x - bx, p.pos.z - bz);
         const sp = dt > 0 ? moved / dt : 0;
         p.speed += (sp - p.speed) * Math.min(1, dt * 8);
@@ -299,10 +334,12 @@ export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: 
         p.ch.root.rotation.y = p.yaw;
         animChibi(p.ch, dt, t, p.speed);
         // 이름표: 멀면 흐려짐, 대화 중에는 숨김
-        const d = camPos.distanceTo(p.pos);
-        const op = hideTags ? 0 : Math.max(0, Math.min(1, (34 - d) / 10));
-        p.tag.material.opacity = op;
-        p.tag.visible = op > 0.01;
+        if (p.tag) {
+          const d = camPos.distanceTo(p.pos);
+          const op = hideTags ? 0 : Math.max(0, Math.min(1, (34 - d) / 10));
+          p.tag.material.opacity = op;
+          p.tag.visible = op > 0.01;
+        }
         if (p.bub) {
           p.bubT -= dt;
           p.bub.material.opacity = Math.max(0, Math.min(1, p.bubT / 0.4));
