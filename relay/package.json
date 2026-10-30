@@ -1,0 +1,12 @@
+{
+  "name": "jbe-plaza-relay",
+  "private": true,
+  "description": "3D 광장 함께 접속 중계 서버(Cloudflare Workers)",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.153.0"
+  }
+}

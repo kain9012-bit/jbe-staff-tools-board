@@ -1,0 +1,18 @@
+# 3D 광장 함께 접속 — 중계 서버(Cloudflare Workers 무료 플랜)
+# 올리기: relay 폴더에서  npm install → npx wrangler login → npx wrangler deploy
+name = "jbe-plaza-relay"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# 이 주소에서 연 화면만 접속 허용(쉼표로 여러 개). 내 PC(localhost)는 따로 허용
+ALLOWED_ORIGINS = "https://jbe-staff-tools-board.vercel.app"
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "PlazaRoom"
+
+# 무료 플랜은 SQLite 방식 Durable Object만 쓸 수 있음
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PlazaRoom"]

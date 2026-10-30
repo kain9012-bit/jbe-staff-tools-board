@@ -157,6 +157,8 @@ export interface PeerMove {
   x: number;
   z: number;
   y: number;
+  /** 걷는 빠르기(m/s) — 다음 소식이 올 때까지 이 빠르기로 이어 그림 */
+  s: number;
   w: World;
 }
 interface Peer {
@@ -172,9 +174,13 @@ interface Peer {
   tgt: THREE.Vector3;
   yaw: number;
   tyaw: number;
+  /** 받은 빠르기·받은 뒤 지난 시간 */
+  ts: number;
+  age: number;
   speed: number;
   placed: boolean;
 }
+const LEAD = 0.55; // 앞질러 그릴 수 있는 최대 시간(초) — 받는 간격 0.5초보다 조금 길게
 export const MAX_PEERS = 40;
 
 export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: THREE.Object3D) => void }) {
@@ -200,13 +206,14 @@ export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: 
   return {
     peers,
     count: () => peers.size,
-    names: () => [...peers.values()].map((p) => p.name),
+    /** 함께 있는 사람(이름·있는 곳) */
+    roster: () => [...peers.values()].map((p) => ({ name: p.name, w: p.w })),
     /** 들어옴·이름/모습/있는 곳 바뀜 */
     meta(id: string, m: PeerMeta) {
       let p = peers.get(id);
       if (!p) {
         if (peers.size >= MAX_PEERS) return;
-        p = { id, name: m.name, look: m.look, w: m.w, ch: null as unknown as Chibi, tag: nameTag(m.name), bub: null, bubT: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), yaw: 0, tyaw: 0, speed: 0, placed: false };
+        p = { id, name: m.name, look: m.look, w: m.w, ch: null as unknown as Chibi, tag: nameTag(m.name), bub: null, bubT: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), yaw: 0, tyaw: 0, ts: 0, age: 0, speed: 0, placed: false };
         p.tag.position.y = 1.78;
         peers.set(id, p);
         build(p);
@@ -238,16 +245,20 @@ export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: 
         p.placed = false;
       }
     },
-    move(id: string, m: PeerMove) {
+    /** 받은 자리 반영. 있는 곳(광장/로비)이 바뀌었으면 true */
+    move(id: string, m: PeerMove): boolean {
       const p = peers.get(id);
-      if (!p) return;
-      if (m.w !== p.w) {
+      if (!p) return false;
+      const moved = m.w !== p.w;
+      if (moved) {
         p.w = m.w;
         o.groups[p.w].add(p.ch.root);
         p.placed = false;
       }
       p.tgt.set(m.x, 0, m.z);
       p.tyaw = m.y;
+      p.ts = m.s;
+      p.age = 0;
       // 처음이거나 멀리 건너뛰면(문 드나듦) 바로 그 자리로
       if (!p.placed || p.pos.distanceTo(p.tgt) > 9) {
         p.pos.copy(p.tgt);
@@ -255,6 +266,7 @@ export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: 
         p.placed = true;
       }
       p.ch.root.visible = true;
+      return moved;
     },
     drop,
     emote(id: string, k: Emote) {
@@ -267,17 +279,19 @@ export function makeCrowd(o: { groups: Record<World, THREE.Group>; lift: (root: 
       p.bubT = 2.6;
       playEmote(p.ch, k);
     },
-    update(dt: number, t: number, camPos: THREE.Vector3, hideTags: boolean) {
+    update(dt: number, t: number, camPos: THREE.Vector3, hideTags: boolean, here: World) {
       for (const p of peers.values()) {
-        if (!p.ch.root.visible) continue;
-        const before = tmp.copy(p.pos);
-        const bx = before.x, bz = before.z;
-        // 받은 자리로 부드럽게(받는 간격 ≈ 0.33초)
-        p.pos.lerp(p.tgt, Math.min(1, dt * 7));
+        if (!p.ch.root.visible || p.w !== here) continue; // 다른 곳(광장/로비)에 있는 사람은 그리지 않음
+        const bx = p.pos.x, bz = p.pos.z;
+        // 받은 자리 + 받은 빠르기로 걸어간 만큼(최대 LEAD초) → 그쪽으로 부드럽게
+        p.age += dt;
+        const lead = p.ts > 0 ? Math.min(p.age, LEAD) * p.ts : 0;
+        tmp.set(p.tgt.x + Math.sin(p.tyaw) * lead, 0, p.tgt.z + Math.cos(p.tyaw) * lead);
+        p.pos.lerp(tmp, Math.min(1, dt * 6));
         const moved = Math.hypot(p.pos.x - bx, p.pos.z - bz);
         const sp = dt > 0 ? moved / dt : 0;
         p.speed += (sp - p.speed) * Math.min(1, dt * 8);
-        if (p.speed < 0.25 && p.pos.distanceTo(p.tgt) < 0.05) p.speed = 0;
+        if (p.speed < 0.25 && p.pos.distanceTo(tmp) < 0.05) p.speed = 0;
         let dy = p.tyaw - p.yaw;
         dy = Math.atan2(Math.sin(dy), Math.cos(dy));
         p.yaw += dy * Math.min(1, dt * 10);

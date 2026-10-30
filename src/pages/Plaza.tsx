@@ -70,14 +70,7 @@ function saveMe(me: { name: string; look: Look }) {
     /* 무시 */
   }
 }
-/** 이 창(탭)의 접속 번호 — 저장하지 않음 */
-const MY_ID = (() => {
-  try {
-    return crypto.randomUUID().slice(0, 18);
-  } catch {
-    return Math.random().toString(36).slice(2, 14);
-  }
-})();
+
 const loadVisited = (): string[] => {
   try {
     const v = JSON.parse(localStorage.getItem(VKEY) || '[]');
@@ -235,7 +228,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   meRef.current = me;
   const net = useRef<Net | null>(null);
   const [netState, setNetState] = useState<'off' | 'connecting' | 'on'>('off');
-  const [peers, setPeers] = useState<string[]>([]);
+  const [peers, setPeers] = useState<{ name: string; w: 'out' | 'in' }[]>([]);
   const [peersOpen, setPeersOpen] = useState(false);
   const [nameEdit, setNameEdit] = useState<string | null>(null);
   const [nameErr, setNameErr] = useState('');
@@ -306,16 +299,20 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         // 함께 접속(설정이 있을 때만)
         if (netReady()) {
           const bump = () => {
-            const n = e.net.names().sort((a, b) => a.localeCompare(b, 'ko'));
-            setPeers((p) => (p.join('\n') === n.join('\n') ? p : n));
+            const n = e.net.roster().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+            const key = (l: typeof n) => l.map((x) => x.name + x.w).join('\n');
+            setPeers((p) => (key(p) === key(n) ? p : n));
           };
           void startNet(
-            { id: MY_ID, ...meRef.current },
+            { ...meRef.current },
             {
               meta: (id, m) => (e.net.meta(id, m), bump()),
-              move: e.net.move,
+              move: (id, m) => {
+                if (e.net.move(id, m)) bump(); // 광장↔로비 옮김을 목록에 반영
+              },
               leave: (id) => (e.net.leave(id), bump()),
               emote: e.net.emote,
+              reset: () => (e.net.clear(), bump()),
               status: (st) => {
                 setNetState(st);
                 if (st !== 'on') (e.net.clear(), bump());
@@ -565,9 +562,15 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
           )}
           {peersOpen && netState === 'on' && (
             <ul className="mt-1.5 max-h-[22vh] overflow-y-auto rounded-lg bg-black/20 px-2 py-1.5 text-[12px] leading-relaxed text-white/85">
-              <li className="font-bold text-[#9be6ff]">{me.name} (나)</li>
-              {peers.map((n, i) => (
-                <li key={i} className="truncate">{n}</li>
+              <li className="flex gap-2 font-bold text-[#9be6ff]">
+                <span className="truncate">{me.name} (나)</span>
+                <span className="ml-auto shrink-0 font-normal text-white/60">{world === 'in' ? '로비' : '광장'}</span>
+              </li>
+              {peers.map((p, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="truncate">{p.name}</span>
+                  <span className="ml-auto shrink-0 text-white/60">{p.w === 'in' ? '로비' : '광장'}</span>
+                </li>
               ))}
               {!peers.length && <li className="text-white/60">아직 혼자예요.</li>}
             </ul>

@@ -1786,7 +1786,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     {
       const hideTags = cam.mode === 'talk' || cam.mode === 'holo' || focus >= 0 || !!focusBook;
       myTag.visible = !hideTags && cam.mode !== 'intro';
-      crowd.update(dt, t, camera.position, hideTags);
+      crowd.update(dt, t, camera.position, hideTags, world);
       if (myBub) {
         myBubT -= dt;
         myBub.material.opacity = clamp(myBubT / 0.4);
@@ -1991,7 +1991,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       leave: crowd.drop,
       emote: crowd.emote,
       count: crowd.count,
-      names: crowd.names,
+      roster: crowd.roster,
       clear: crowd.clear,
     },
     /** 내 몸짓 + 말풍선 */
