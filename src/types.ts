@@ -62,6 +62,7 @@ export type Route =
   | { page: 'request'; id: string }
   | { page: 'review' }
   | { page: 'poc' }
+  | { page: 'plaza' }
   | { page: 'tool'; sid: string }
   | { page: 'maker'; name: string };
 

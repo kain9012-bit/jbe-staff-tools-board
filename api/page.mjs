@@ -118,6 +118,12 @@ function render(parts, all) {
       body: `<h1>외부 공공업무 도구</h1>${toolLinks(external)}`,
     };
   if (p === 'about') return { title: `집계 기준 · ${SITE}`, desc: DEFAULT_DESC, body: `<h1>집계 기준</h1>` };
+  if (p === 'plaza')
+    return {
+      title: `3D 광장 · ${SITE}`,
+      desc: '전북교육청 청사 앞 광장의 업무별 천막에서 천막지기에게 말을 걸어 업무경감 도구를 찾아보는 3D 시범 화면.',
+      body: `<h1>3D 광장</h1><p>업무별 천막에서 업무경감 도구를 찾아보는 3D 시범 화면입니다. <a href="/">업무별로 둘러보기</a></p>`,
+    };
   if (p === 'tools' || !p) return { title: `${SERVICE} · ${SITE} · 전북특별자치도교육청`, desc: DEFAULT_DESC, body: homeBody(staff, official, external) };
   return null;
 }

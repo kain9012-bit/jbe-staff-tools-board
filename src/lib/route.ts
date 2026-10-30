@@ -8,6 +8,7 @@ import type { Route } from '../types';
  *  /tool/<번호> /makers /maker/<작성자> /register /about
  *  /official     제작자 현황 > 교육청 배포 도구
  *  /external     제작자 현황 > 외부 공공업무 도구
+ *  /plaza        3D 광장(웹판 시범 화면)
  * 예전 해시 주소(#/tool/123)로 들어오면 경로 주소로 바꿔 줌
  */
 export function parseLoc(pathname: string, search: string): Route {
@@ -34,6 +35,7 @@ export function parseLoc(pathname: string, search: string): Route {
   if (p === 'requests') return { page: 'requests' };
   if (p === 'review') return { page: 'review' };
   if (p === 'poc') return { page: 'poc' };
+  if (p === 'plaza') return { page: 'plaza' };
   if (p === 'board-home') return { page: 'board-home' } as unknown as Route;
   if (p === 'login') return { page: 'login', next: sp.get('next') || undefined };
   if (p === 'tool' && arg) return { page: 'tool', sid: arg };

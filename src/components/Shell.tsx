@@ -13,7 +13,7 @@ import { api, goLogin, refreshState, reloadData, useSrv } from '../lib/server';
  * 휴대폰에서는 왼쪽 메뉴를 가로 메뉴로 바꿈.
  */
 
-export type MenuKey = 'find' | 'requests' | 'register' | 'makers' | 'guide';
+export type MenuKey = 'find' | 'requests' | 'register' | 'makers' | 'guide' | 'plaza';
 
 /** ext: 누리집 게시판 글로 가는 메뉴(새 창) */
 export const MENU: { key: MenuKey; label: string; href: string; ext?: boolean }[] = SERVER
@@ -26,6 +26,7 @@ export const MENU: { key: MenuKey; label: string; href: string; ext?: boolean }[
   : [
       { key: 'find', label: '도구 찾기', href: '/' },
       { key: 'makers', label: '제작자 현황', href: '/makers' },
+      { key: 'plaza', label: '3D 광장', href: '/plaza' },
       { key: 'guide', label: '등록 안내', href: GUIDE_URL, ext: true },
       { key: 'register', label: '도구 등록', href: WRITE_URL, ext: true },
     ];
@@ -68,6 +69,8 @@ export const UserBox: React.FC<{ compact?: boolean }> = ({ compact }) => {
 export const menuOf = (r: Route): MenuKey =>
   !SERVER && r.page === 'about'
     ? 'makers'
+    : !SERVER && r.page === 'plaza'
+    ? 'plaza'
     : r.page === 'tool' || r.page === 'tools' || r.page === 'home' || r.page === 'login'
     ? 'find'
     : r.page === 'maker' || r.page === 'official' || r.page === 'external' || r.page === 'makers'

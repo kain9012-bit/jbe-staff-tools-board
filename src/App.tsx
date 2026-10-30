@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { Route } from './types';
 import { AlertTriangle, ArrowUp, RotateCw } from 'lucide-react';
 import { Lnb, menuOf, SiteFooter, SiteHeader, SubLayout, MENU, type LnbSub, type MenuKey } from './components/Shell';
@@ -59,6 +59,9 @@ const Skeleton = () => (
 
 const SERVICE = '업무경감 도구 모음';
 
+/** 3D 광장 — 웹판 시범 화면. three.js가 커서 이 화면에 들어올 때만 받음 */
+const Plaza = SERVER ? () => null : lazy(() => import('./pages/Plaza'));
+
 /** 모바일 하위 메뉴 — PC는 왼쪽 메뉴에 있으므로 좁은 화면에서만 보임 */
 const SubTabs: React.FC<{ items: LnbSub[] }> = ({ items }) => (
   <nav aria-label="하위 메뉴" className="lg:hidden mb-5 grid grid-flow-col auto-cols-fr rounded-[10px] bg-[var(--nr-bg)] p-1">
@@ -84,7 +87,7 @@ export default function App() {
    *  웹판 — 도구 찾기·제작자 현황·집계 기준만. 요청·등록·검수·개편 안내 등 옛 주소는 도구 찾기로 */
   const WEB_GONE = ['poc', 'requests', 'request', 'register', 'review', 'login', 'board-home'];
   const route = SERVER
-    ? raw.page === 'about' || raw.page === 'poc'
+    ? raw.page === 'about' || raw.page === 'poc' || raw.page === 'plaza'
       ? ({ page: 'home' } as Route)
       : raw
     : WEB_GONE.includes(raw.page as string)
@@ -215,6 +218,23 @@ export default function App() {
     else if (route.page === 'requests' && SERVER) body = <Requests m={m} />;
     else if (route.page === 'request' && SERVER) body = <RequestDetail key={route.id} m={m} id={route.id} />;
   }
+  /** 3D 광장 — 왼쪽 메뉴·위치 띠 없이 머리말 아래를 화면 가득 씀 */
+  if (route.page === 'plaza' && !SERVER)
+    return (
+      <div className="min-h-screen overflow-x-clip bg-white text-[var(--nr-text)] font-sans antialiased flex flex-col">
+        <SiteHeader active={active} asOf={m?.asOf} />
+        <main id="container" tabIndex={-1} className="flex-1 outline-none">
+          {m ? (
+            <Suspense fallback={<div className="h-[80vh] bg-[#0d1830]" aria-busy="true" />}>
+              <Plaza m={m} />
+            </Suspense>
+          ) : (
+            <div className="px-4 py-6">{body}</div>
+          )}
+        </main>
+      </div>
+    );
+
   /** 휴대폰 하위 메뉴 — PC는 왼쪽 메뉴에 있음 */
   const mobileSubs = active !== 'find' && route.page !== 'maker' ? subs[active] : undefined;
   if (body && mobileSubs && mobileSubs.length > 1)
