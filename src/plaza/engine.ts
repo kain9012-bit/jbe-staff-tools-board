@@ -29,7 +29,7 @@ export type Ev =
   | { type: 'near'; tent: number | 'desk' | null }
   | { type: 'talk'; tent: number | 'desk' | null }
   | { type: 'world'; world: 'out' | 'in' }
-  | { type: 'focus'; rect: { x: number; y: number; w: number; h: number } | null; kind?: 'card' | 'book' }
+  | { type: 'focus'; rect: { x: number; y: number; w: number; h: number } | null; kind?: 'card' | 'book'; from?: { x: number; y: number; w: number; h: number } }
   | { type: 'page'; page: number; pages: number; cards: PlazaTool[] }
   | { type: 'hover'; tool: PlazaTool | null }
   | { type: 'select'; tool: PlazaTool | null; slot: number | null }
@@ -1513,13 +1513,22 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       focus = -1;
       return;
     }
+    // 모핑: 3D 카드는 바로 숨기고, 화면의 같은 자리에 같은 모양의 카드(DOM)를 띄워 자세히 화면으로 바꿈
     const rect = detailRect();
-    const { ww, wh } = poseFor(rect, 2.2, focusPose);
-    focusPose.sx = ww / CW;
-    focusPose.sy = wh / CH;
+    const m = cards[n].mesh;
+    m.updateMatrixWorld();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [cx, cy] of [[-CW / 2, -CH / 2], [CW / 2, -CH / 2], [CW / 2, CH / 2], [-CW / 2, CH / 2]]) {
+      const v = V(cx, cy, 0).applyMatrix4(m.matrixWorld).project(camera);
+      const sx = ((v.x + 1) / 2) * vw, sy = ((1 - v.y) / 2) * vh;
+      x0 = Math.min(x0, sx);
+      x1 = Math.max(x1, sx);
+      y0 = Math.min(y0, sy);
+      y1 = Math.max(y1, sy);
+    }
     focus = n;
     hoverCard = -1;
-    emit({ type: 'focus', rect, kind: 'card' });
+    emit({ type: 'focus', rect, kind: 'card', from: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } });
   }
   function select(n: number | null) {
     if (n === null || !cards[n] || !cards[n].mesh.visible || !cards[n].tool) {
@@ -1910,7 +1919,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         c.mesh.position.add(tmp.copy(holo.camPos).sub(c.to).normalize().multiplyScalar(push));
       }
       // 자세히 보기: 고른 카드는 화면 가운데로 크게, 나머지는 흐리게
-      const fw = focus === n ? 1 : 0;
+      const fw = 0; // 확대는 화면(DOM) 모핑이 맡음
       c.fk += (fw - c.fk) * Math.min(1, dt * 7);
       if (c.fk > 0.001) {
         const e4 = ease(clamp(c.fk));
@@ -1924,7 +1933,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         c.mesh.renderOrder = 10;
       }
       c.mat.uniforms.dim.value += ((focus >= 0 && focus !== n ? 1 : 0) - c.mat.uniforms.dim.value) * Math.min(1, dt * 7);
-      c.mat.uniforms.gone.value = focus === n ? clamp((c.fk - 0.82) / 0.15) : clamp((c.fk - 0.82) / 0.15) * 0;
+      c.mat.uniforms.gone.value = focus === n ? 1 : 0;
     });
     if (talking !== -1) anchorOf(talking).npc.talk = speaking ? 1 : 0;
 

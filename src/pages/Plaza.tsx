@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Volume2, VolumeX, ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X } from 'lucide-react';
 import { allTools, splitAuthor, type Model } from '../lib/stats';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
@@ -144,6 +145,12 @@ background:linear-gradient(transparent,rgba(120,220,255,.12),transparent);animat
 .plaza-corner{position:absolute;width:var(--cl);height:var(--cl);border-color:#bff3ff;pointer-events:none;z-index:2;filter:drop-shadow(0 0 4px rgba(120,220,255,.8))}
 @keyframes plazaHoloIn{from{opacity:0;filter:brightness(1.8)}to{opacity:1;filter:none}}
 @keyframes plazaSweep{to{top:100%}}
+::view-transition-group(*){animation-duration:.6s;animation-timing-function:cubic-bezier(.3,.75,.2,1)}
+::view-transition-old(root){display:none}
+::view-transition-new(root){animation:none}
+@keyframes pzFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.pz-new{animation:pzFade .35s ease-out .42s both}
+.pz-card{background:linear-gradient(135deg,rgba(14,64,130,.82),rgba(6,28,70,.78));border:solid rgba(120,220,255,.85);box-shadow:0 0 30px rgba(60,180,255,.25)}
 .pb-page{position:absolute;top:0;bottom:0;background:#fbf7ee;color:#1e2430;overflow:hidden}
 .pb-page.l{left:0;width:50%;border-radius:10px 0 0 10px;box-shadow:inset -26px 0 30px -22px rgba(60,40,10,.35)}
 .pb-page.r{right:0;width:50%;border-radius:0 10px 10px 0;box-shadow:inset 26px 0 30px -22px rgba(60,40,10,.35)}
@@ -185,6 +192,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const [detail, setDetail] = useState<Tool | null>(null);
   const [rect, setRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [focusKind, setFocusKind] = useState<'card' | 'book'>('card');
+  const [from, setFrom] = useState<Rect | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [help, setHelp] = useState(() => !(window.matchMedia?.('(pointer: coarse)').matches ?? false));
   const [full, setFull] = useState(false);
@@ -243,6 +251,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
       } else if (e.type === 'hover') setHoverTool(e.tool);
       else if (e.type === 'focus') {
         setRect(e.rect);
+        setFrom(e.from ?? null);
         if (e.kind) setFocusKind(e.kind);
       }
     };
@@ -327,7 +336,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
           doShow();
         }
       } else if (e.key === 'Escape') {
-        if (detail && focusKind === 'book') window.dispatchEvent(new Event(CLOSE_BOOK));
+        if (detail) window.dispatchEvent(new Event(focusKind === 'book' ? CLOSE_BOOK : CLOSE_CARD));
         else if (detail) closeDetail();
         else if (sel) eng.current?.select(null);
         else if (talk !== null) doEnd();
@@ -673,7 +682,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         (focusKind === 'book' ? (
           <BookView key={detail.sid} tool={detail} s={summaryOf(detail.sid)} rect={rect} onClose={closeDetail} />
         ) : (
-          <Detail tool={detail} s={summaryOf(detail.sid)} rect={rect} onClose={closeDetail} />
+          <Detail key={detail.sid} tool={detail} s={summaryOf(detail.sid)} rect={rect} from={from} onClose={closeDetail} />
         ))}
     </section>
   );
@@ -886,9 +895,96 @@ const Sec: React.FC<{ title: string; children: React.ReactNode }> = ({ title, ch
   </section>
 );
 
-const Detail: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: number; w: number; h: number } | null; onClose: () => void }> = ({ tool, s, rect, onClose }) => {
+/** 3D 카드와 같은 그림의 카드(캔버스 800×500 기준 비율 그대로) — 모핑의 처음·끝 모습 */
+const CardFace: React.FC<{ tool: Tool; r: Rect }> = ({ tool, r }) => {
+  const k = r.w / 800;
+  const px = (v: number) => `${v * k}px`;
+  const corner = (pos: React.CSSProperties) => (
+    <span aria-hidden="true" style={{ position: 'absolute', width: px(46), height: px(46), borderColor: '#bff3ff', ...pos }} />
+  );
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30">
+      <div className="pz-card absolute overflow-hidden text-white" style={{ ...vtn('pz-frame'), left: r.x, top: r.y, width: r.w, height: r.h, borderRadius: px(30), borderWidth: px(4) }}>
+        {corner({ left: px(18), top: px(18), borderLeftWidth: px(7), borderTopWidth: px(7) })}
+        {corner({ right: px(18), top: px(18), borderRightWidth: px(7), borderTopWidth: px(7) })}
+        {corner({ left: px(18), bottom: px(18), borderLeftWidth: px(7), borderBottomWidth: px(7) })}
+        {corner({ right: px(18), bottom: px(18), borderRightWidth: px(7), borderBottomWidth: px(7) })}
+        <span
+          style={{ ...vtn('pz-tag'), position: 'absolute', left: px(48), top: px(48), height: px(46), padding: `0 ${px(17)}`, borderRadius: px(23), fontSize: px(28), lineHeight: px(46) }}
+          className={`font-bold ${TAG_CLS[tool.board] ?? TAG_CLS.staff}`}
+        >
+          {tool.tag}
+        </span>
+        {tool.run && (
+          <span style={{ ...vtn('pz-run'), position: 'absolute', right: px(56), top: px(58), fontSize: px(26), lineHeight: px(36) }} className="font-semibold text-[#aae6ff]">
+            {tool.run}
+          </span>
+        )}
+        <div style={{ position: 'absolute', left: px(54), right: px(56), top: px(124) }}>
+          <h2 style={{ ...vtn('pz-title'), fontSize: px(46), lineHeight: px(58), textShadow: '0 0 14px rgba(80,200,255,.8)' }} className="line-clamp-2 font-extrabold">
+            {tool.title}
+          </h2>
+          {tool.what && (
+            <p style={{ ...vtn('pz-what'), marginTop: px(8), fontSize: px(29), lineHeight: px(40) }} className="line-clamp-2 font-medium text-[#c8eeff]">
+              {tool.what}
+            </p>
+          )}
+        </div>
+        <span style={{ ...vtn('pz-who'), position: 'absolute', left: px(54), bottom: px(38), fontSize: px(26), lineHeight: px(36) }} className="font-semibold text-[#aae6ff]">
+          {tool.who}
+        </span>
+        <span style={{ position: 'absolute', right: px(56), bottom: px(38), fontSize: px(28), lineHeight: px(36) }} className="font-extrabold">
+          눌러서 보기 ▸
+        </span>
+      </div>
+    </div>
+  );
+};
+
+type Rect = { x: number; y: number; w: number; h: number };
+const CLOSE_CARD = 'plaza:closecard';
+const vtn = (n: string) => ({ viewTransitionName: n }) as React.CSSProperties;
+/** 화면 바꾸기 — 브라우저가 지원하면 같은 이름 요소끼리 모핑(위치·크기·글자) */
+function morph(fn: () => void): Promise<void> {
+  const d = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
+  if (!d.startViewTransition || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    fn();
+    return Promise.resolve();
+  }
+  return d.startViewTransition(() => flushSync(fn)).finished.catch(() => undefined);
+}
+
+/**
+ * 도구 카드 → 자세히. 3D 카드가 있던 자리에 같은 모양의 카드를 띄운 뒤,
+ * 구분 표·실행 방식·이름·한 줄 소개·제작자는 같은 글끼리 모핑되고, 카드에 없던 내용만 새로 나타남
+ */
+const Detail: React.FC<{ tool: Tool; s?: ToolSummary; rect: Rect | null; from: Rect | null; onClose: () => void }> = ({ tool, s, rect, from, onClose }) => {
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => box.current?.focus(), []);
+  const [phase, setPhase] = useState<'card' | 'detail'>(from ? 'card' : 'detail');
+  const busy = useRef(false);
+  useLayoutEffect(() => {
+    if (!from) return;
+    const id = requestAnimationFrame(() => {
+      busy.current = true;
+      void morph(() => setPhase('detail')).then(() => {
+        busy.current = false;
+        box.current?.focus({ preventScroll: true });
+      });
+    });
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const close = useCallback(() => {
+    if (busy.current) return;
+    if (!from) return onClose();
+    busy.current = true;
+    void morph(() => setPhase('card')).then(onClose);
+  }, [from, onClose]);
+  useEffect(() => {
+    window.addEventListener(CLOSE_CARD, close);
+    return () => window.removeEventListener(CLOSE_CARD, close);
+  }, [close]);
+  if (phase === 'card' && from) return <CardFace tool={tool} r={from} />;
   const none = !s?.why && !s?.features?.length && !s?.steps?.length && !s?.needs?.length && !s?.cautions?.length;
   return (
     <div className="pointer-events-none absolute inset-0 z-30">
@@ -900,6 +996,7 @@ const Detail: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: numb
         // 확대된 카드 자리 그대로 — 카드 그림과 같은 테두리·모서리 꺾쇠
         style={
           {
+            ...vtn('pz-frame'),
             left: rect?.x ?? 16,
             top: rect?.y ?? 16,
             width: rect?.w ?? 'calc(100% - 32px)',
@@ -908,7 +1005,7 @@ const Detail: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: numb
             '--cl': `${Math.round((rect?.w ?? 760) * 0.058)}px`,
           } as React.CSSProperties
         }
-        className="plaza-holo plaza-scroll pointer-events-auto absolute block text-white outline-none sm:flex sm:flex-col"
+        className={`plaza-holo plaza-scroll pointer-events-auto absolute block text-white outline-none sm:flex sm:flex-col ${from ? '!animate-none' : ''}`}
       >
         {(['top-[2.7%] left-[1.9%] border-t-[3px] border-l-[3px]', 'top-[2.7%] right-[1.9%] border-t-[3px] border-r-[3px]', 'bottom-[2.7%] left-[1.9%] border-b-[3px] border-l-[3px]', 'bottom-[2.7%] right-[1.9%] border-b-[3px] border-r-[3px]'] as const).map((c) => (
           <span key={c} className={`plaza-corner ${c}`} aria-hidden="true" />
@@ -916,18 +1013,18 @@ const Detail: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: numb
         <div className="flex items-start gap-2 px-5 pt-5 sm:px-8 sm:pt-7">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className={`rounded-md px-2 py-0.5 text-[12px] font-bold ${TAG_CLS[tool.board] ?? TAG_CLS.staff}`}>{tool.tag}</span>
-              {tool.run && <span className="rounded-md bg-white/12 px-2 py-0.5 text-[12px] font-bold text-[#bff3ff] ring-1 ring-inset ring-[#4fd1ff]/40">{tool.run}</span>}
-              <span className="text-[13px] text-white/60">{tool.who}</span>
+              <span style={vtn('pz-tag')} className={`rounded-md px-2 py-0.5 text-[12px] font-bold ${TAG_CLS[tool.board] ?? TAG_CLS.staff}`}>{tool.tag}</span>
+              {tool.run && <span style={vtn('pz-run')} className="rounded-md bg-white/12 px-2 py-0.5 text-[12px] font-bold text-[#bff3ff] ring-1 ring-inset ring-[#4fd1ff]/40">{tool.run}</span>}
+              <span style={vtn('pz-who')} className="text-[13px] text-white/60">{tool.who}</span>
             </div>
-            <h2 className="mt-2.5 text-[22px] sm:text-[26px] font-bold leading-snug [text-shadow:0_0_14px_rgba(80,200,255,.6)]">{tool.title}</h2>
-            {(s?.what || tool.what) && <p className="mt-1.5 text-[16px] leading-relaxed text-[#cdeeff]">{s?.what || tool.what}</p>}
+            <h2 style={vtn('pz-title')} className="mt-2.5 text-[22px] sm:text-[26px] font-bold leading-snug [text-shadow:0_0_14px_rgba(80,200,255,.6)]">{tool.title}</h2>
+            {(s?.what || tool.what) && <p style={vtn('pz-what')} className="mt-1.5 text-[16px] leading-relaxed text-[#cdeeff]">{s?.what || tool.what}</p>}
           </div>
-          <button type="button" onClick={onClose} className="-mr-2 -mt-2 shrink-0 rounded-full p-2 text-white/70 hover:bg-white/10 hover:text-white" aria-label="닫기">
+          <button type="button" onClick={close} className="-mr-2 -mt-2 shrink-0 rounded-full p-2 text-white/70 hover:bg-white/10 hover:text-white" aria-label="닫기">
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
-        <div className="px-5 pb-2 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:px-8 plaza-scroll">
+        <div className={`px-5 pb-2 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:px-8 plaza-scroll ${from ? 'pz-new' : ''}`}>
           {s?.why && <Sec title="만든 이유">{s.why}</Sec>}
           {!!s?.features?.length && (
             <Sec title="주요 기능">
@@ -965,7 +1062,7 @@ const Detail: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: numb
           )}
           {none && <p className="mt-5 text-[15px] text-white/70">아직 게시글 요약이 없습니다. 게시글에서 내용을 확인해 주세요.</p>}
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-[#4fd1ff]/25 px-5 py-4 sm:px-8">
+        <div className={`flex flex-wrap items-center gap-2 border-t border-[#4fd1ff]/25 px-5 py-4 sm:px-8 ${from ? 'pz-new' : ''}`}>
           <a href={tool.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#4fd1ff] px-5 py-2.5 text-[14px] font-bold text-[#06213a] hover:bg-[#7fe0ff]">
             사용하기 <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
             <span className="sr-only">(새 창)</span>
@@ -974,7 +1071,7 @@ const Detail: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: numb
             상세 화면 <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
             <span className="sr-only">(새 창)</span>
           </a>
-          <button type="button" onClick={onClose} className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-2.5 text-[14px] font-bold text-white/80 hover:text-white">
+          <button type="button" onClick={close} className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-2.5 text-[14px] font-bold text-white/80 hover:text-white">
             <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 카드로 돌아가기
           </button>
         </div>
