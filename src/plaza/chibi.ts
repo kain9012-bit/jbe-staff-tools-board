@@ -1,8 +1,11 @@
 // @ts-nocheck
-/* 귀여운 교직원 캐릭터(2.5등신) — 큰 머리, 짧은 팔다리, 목걸이 공무원증.
- * 블렌더 모델 없이 기본 도형으로 만들어 가볍게 둠. 앞쪽이 +z
+/* 귀여운 교직원 캐릭터(2.5등신) — 블렌더로 만든 모델(chibi.glb — 만드는 스크립트는 tools/plaza_chibi/) + 손에 드는 소품.
+ * 앞쪽이 +z
  */
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import chibiUrl from './chibi.glb?url';
 
 export interface ChibiOpt {
   skin: string;
@@ -181,181 +184,104 @@ function prop(kind: string) {
   return g;
 }
 
+/* ── 블렌더로 만든 캐릭터(chibi.glb) — 몸·머리 6종·얼굴 그림·뼈대·동작(idle·walk·wave·talk) ── */
+let TPL: { scene: THREE.Group; clips: THREE.AnimationClip[]; face: THREE.Texture | null } | null = null;
+/** 3D 광장을 만들기 전에 한 번 불러 둠 */
+export async function loadCharacters() {
+  if (TPL) return;
+  const g = await new GLTFLoader().loadAsync(chibiUrl);
+  let face: THREE.Texture | null = null;
+  g.scene.traverse((o: any) => {
+    if (o.isMesh && o.material?.name === 'Face') face = o.material.map;
+  });
+  TPL = { scene: g.scene, clips: g.animations, face };
+}
+
 export interface Chibi {
   root: THREE.Group;
-  head: THREE.Group;
-  body: THREE.Mesh;
-  eyes: THREE.Mesh[];
-  mouth: THREE.Mesh;
-  armL: THREE.Group;
-  armR: THREE.Group;
-  legL: THREE.Group;
-  legR: THREE.Group;
-  /** 걸음 위상 */
+  model: THREE.Object3D;
+  mixer: THREE.AnimationMixer;
+  act: Record<string, THREE.AnimationAction>;
+  faceMap: THREE.Texture | null;
+  armR: THREE.Object3D | null;
+  foreR: THREE.Object3D | null;
+  hold: boolean;
   phase: number;
   blinkT: number;
   wave: number;
   talk: number;
   hop: number;
+  waving: boolean;
 }
 
-export function makeChibi(o: ChibiOpt): Chibi {
-  const root = new THREE.Group();
-  const skin = toon(o.skin), hairM = toon(o.hair), top = toon(o.top), pants = toon(o.pants);
-  const inner = toon(o.inner ?? '#ffffff');
-  // 다리
-  const leg = (x: number) => {
-    const p = new THREE.Group();
-    p.position.set(x, 0.3, 0);
-    p.add(m(new THREE.CapsuleGeometry(0.072, 0.12, 4, 10), pants, 0, -0.12, 0));
-    const shoe = m(S(0.085, 14, 10), toon('#3b3f4a'), 0, -0.255, 0.03);
-    shoe.scale.set(1, 0.6, 1.35);
-    p.add(shoe);
-    root.add(p);
-    return p;
-  };
-  const legL = leg(0.095), legR = leg(-0.095);
-  // 몸통
-  const body = m(new THREE.CapsuleGeometry(0.2, 0.2, 6, 16), top, 0, 0.53, 0);
-  body.scale.set(1, 1, 0.86);
-  root.add(body);
-  root.add(m(new THREE.CylinderGeometry(0.2, 0.185, 0.13, 18), pants, 0, 0.33, 0));
-  // 깃·속옷 (앞섶)
-  const shirt = m(S(0.11, 14, 10), inner, 0, 0.73, 0.12);
-  shirt.scale.set(1, 0.55, 0.5);
-  root.add(shirt);
-  const placket = m(new THREE.BoxGeometry(0.07, 0.36, 0.02), inner, 0, 0.55, 0.168);
-  placket.rotation.x = -0.05;
-  root.add(placket);
-  if (o.tie) {
-    const tie = m(new THREE.BoxGeometry(0.04, 0.15, 0.015), toon(o.tie), 0, 0.62, 0.185);
-    root.add(tie);
-    const knot = m(S(0.022, 8, 6), toon(o.tie), 0, 0.705, 0.18);
-    root.add(knot);
-  }
-  // 목걸이 공무원증
-  const strap = toon('#2f6fb3');
-  for (const s of [-1, 1]) {
-    const c = m(new THREE.CylinderGeometry(0.008, 0.008, 0.2, 5), strap, s * 0.055, 0.7, 0.165);
-    c.rotation.z = s * 0.38;
-    c.rotation.x = -0.25;
-    root.add(c);
-  }
-  root.add(m(new THREE.BoxGeometry(0.1, 0.13, 0.012), toon('#ffffff'), 0, 0.565, 0.2));
-  root.add(m(new THREE.BoxGeometry(0.1, 0.034, 0.014), toon('#3480cc'), 0, 0.615, 0.2));
-  root.add(m(new THREE.BoxGeometry(0.035, 0.042, 0.014), toon('#ffd9b8'), -0.022, 0.565, 0.202));
+const HAIR_OF: Record<string, string> = { short: 'short', bob: 'bob', pony: 'pony', bun: 'bun', curly: 'curly', side: 'side' };
 
-  // 머리
-  const head = new THREE.Group();
-  head.position.y = 0.8;
-  root.add(head);
-  const HC = 0.37;
-  head.add(m(S(0.36, 32, 24), skin, 0, HC, 0));
-  for (const s of [-1, 1]) head.add(m(S(0.055, 10, 8), skin, s * 0.352, HC - 0.03, 0));
-  // 머리카락
-  const cap = m(new THREE.SphereGeometry(0.382, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.52), hairM, 0, HC, 0);
-  cap.rotation.x = -0.42;
-  head.add(cap);
-  const back = m(S(0.37, 24, 16), hairM, 0, HC + 0.01, -0.06);
-  back.scale.set(1.0, 0.95, 0.9);
-  head.add(back);
-  if (o.style === 'side') {
-    const b = m(S(0.2, 16, 10), hairM, 0.12, HC + 0.24, 0.22);
-    b.scale.set(1.4, 0.5, 0.7);
-    b.rotation.z = -0.35;
-    head.add(b);
-  } else if (o.style !== 'curly') {
-    for (const x of [-0.15, 0, 0.15]) {
-      const b = m(S(0.12, 14, 10), hairM, x, HC + 0.22 - Math.abs(x) * 0.25, 0.25 - Math.abs(x) * 0.25);
-      b.scale.set(1.1, 0.55, 0.65);
-      head.add(b);
-    }
-  }
-  if (o.style === 'bob') {
-    for (const s of [-1, 1]) {
-      const b = m(S(0.2, 16, 12), hairM, s * 0.29, HC - 0.06, -0.04);
-      b.scale.set(0.62, 1.15, 0.95);
-      head.add(b);
-    }
-  }
-  if (o.style === 'pony') {
-    head.add(m(S(0.11, 12, 8), toon('#e8554e'), 0, HC + 0.04, -0.37));
-    const tail = m(S(0.12, 14, 10), hairM, 0, HC - 0.16, -0.42);
-    tail.scale.set(0.85, 1.7, 0.8);
-    head.add(tail);
-  }
-  if (o.style === 'bun') head.add(m(S(0.15, 16, 12), hairM, 0, HC + 0.34, -0.12));
-  if (o.style === 'curly') {
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      head.add(m(S(0.1, 10, 8), hairM, Math.cos(a) * 0.28, HC + 0.25 + Math.sin(i * 1.7) * 0.02, Math.sin(a) * 0.24 - 0.03));
-    }
-    head.add(m(S(0.14, 12, 8), hairM, 0, HC + 0.36, 0));
-  }
-  // 얼굴
-  const eyeM = toon('#1f2430');
-  const eyes: THREE.Mesh[] = [];
-  for (const s of [-1, 1]) {
-    const e = m(S(0.045, 14, 10), eyeM, s * 0.125, HC - 0.02, 0.322);
-    e.scale.set(1, 1.35, 0.6);
-    head.add(e);
-    eyes.push(e);
-    const hl = m(S(0.015, 8, 6), toon('#ffffff', { emissive: '#ffffff', emissiveIntensity: 0.4 }), s * 0.125 + 0.016, HC + 0.012, 0.36);
-    hl.castShadow = false;
-    e.userData.hl = hl;
-    head.add(hl);
-    const brow = m(new THREE.BoxGeometry(0.07, 0.014, 0.01), hairM, s * 0.125, HC + 0.085, 0.335);
-    brow.rotation.z = s * -0.12;
-    head.add(brow);
-    const blush = new THREE.Mesh(new THREE.CircleGeometry(0.05, 16), new THREE.MeshBasicMaterial({ color: '#ff8fa0', transparent: true, opacity: 0.5, depthWrite: false }));
-    blush.position.set(s * 0.215, HC - 0.095, 0.29);
-    blush.lookAt(blush.position.clone().multiplyScalar(2).setY(HC - 0.095 + 0.0));
-    blush.position.y += 0;
-    head.add(blush);
-  }
-  const mouth = m(new THREE.TorusGeometry(0.034, 0.009, 6, 16, Math.PI), toon('#8a3b3b'), 0, HC - 0.115, 0.344);
-  mouth.rotation.z = Math.PI;
-  head.add(mouth);
-  if (o.glasses) {
-    const gm = toon('#2b2f3a');
-    for (const s of [-1, 1]) head.add(m(new THREE.TorusGeometry(0.068, 0.009, 6, 20), gm, s * 0.125, HC - 0.015, 0.352));
-    head.add(m(new THREE.BoxGeometry(0.06, 0.01, 0.01), gm, 0, HC - 0.005, 0.36));
-  }
-  if (o.hat === 'chef') {
-    head.add(m(new THREE.CylinderGeometry(0.25, 0.27, 0.16, 20), toon('#ffffff'), 0, HC + 0.36, -0.02));
-    const puff = m(S(0.27, 18, 12), toon('#ffffff'), 0, HC + 0.5, -0.02);
-    puff.scale.set(1.05, 0.7, 1.05);
-    head.add(puff);
-  }
-  if (o.hat === 'cap') {
-    const c = m(new THREE.SphereGeometry(0.39, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.45), toon(o.capColor ?? '#2f6fb3'), 0, HC + 0.03, 0);
-    c.rotation.x = -0.2;
-    head.add(c);
-    const brim = m(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 20, 1, false, -Math.PI / 2, Math.PI), toon(o.capColor ?? '#2f6fb3'), 0, HC + 0.17, 0.25);
-    brim.scale.set(1.2, 1, 0.9);
-    head.add(brim);
-  }
-  // 팔
-  const arm = (s: number) => {
-    const p = new THREE.Group();
-    p.position.set(s * 0.215, 0.73, 0);
-    p.add(m(new THREE.CapsuleGeometry(0.06, 0.16, 4, 10), top, 0, -0.13, 0));
-    p.add(m(S(0.062, 12, 10), skin, 0, -0.27, 0.01));
-    p.rotation.z = s * 0.18;
-    root.add(p);
-    return p;
+export function makeChibi(o: ChibiOpt): Chibi {
+  if (!TPL) throw new Error('캐릭터를 먼저 불러야 함');
+  const root = new THREE.Group();
+  const model = cloneSkinned(TPL.scene);
+  const colors: Record<string, string> = {
+    Skin: o.skin, Top: o.top, Inner: o.inner ?? '#ffffff', Pants: o.pants, Shoes: '#3b3f4a', Hair: o.hair, Tie: o.tie ?? o.top,
+    Strap: '#2f6fb3', Card: '#ffffff', CardBand: '#3480cc', Glasses: '#2b2f3a', HatChef: '#ffffff', Cap: o.capColor ?? '#1c64ac', HairTie: '#e8554e',
   };
-  const armL = arm(1), armR = arm(-1);
-  if (o.prop) {
-    const pr = prop(o.prop);
-    pr.position.y += -0.3;
-    armR.add(pr);
-    armR.rotation.x = -0.75;
-    armR.userData.hold = true;
-  }
-  // 발밑 그림자(그림자 끄기에서도 붙어 보이게)
+  let faceMap: THREE.Texture | null = null;
+  const hair = 'Hair_' + (HAIR_OF[o.style] ?? 'short');
+  model.traverse((m: any) => {
+    const nm: string = m.name || '';
+    if (nm.startsWith('Hair_')) m.visible = nm.startsWith(hair) && !(o.hat === 'cap' && false);
+    if (nm.startsWith('Glasses')) m.visible = !!o.glasses;
+    if (nm.startsWith('Hat_chef')) m.visible = o.hat === 'chef';
+    if (nm.startsWith('Hat_cap')) m.visible = o.hat === 'cap';
+    if (nm.startsWith('Tie')) m.visible = !!o.tie;
+    if (!m.isMesh) return;
+    m.castShadow = true;
+    m.frustumCulled = false;
+    const mn: string = m.material?.name ?? '';
+    if (mn === 'Face') {
+      faceMap = TPL!.face!.clone();
+      faceMap.colorSpace = THREE.SRGBColorSpace;
+      faceMap.needsUpdate = true;
+      m.material = new THREE.MeshBasicMaterial({ map: faceMap, transparent: true, depthWrite: false, toneMapped: false });
+      m.castShadow = false;
+      m.renderOrder = 2;
+      return;
+    }
+    m.material = toon(colors[mn] ?? '#cccccc');
+  });
+  root.add(model);
   root.add(blob());
-  return { root, head, body, eyes, mouth, armL, armR, legL, legR, phase: 0, blinkT: 1 + Math.random() * 3, wave: 0, talk: 0, hop: 0 };
+  const mixer = new THREE.AnimationMixer(model);
+  const act: Record<string, THREE.AnimationAction> = {};
+  for (const c of TPL.clips) {
+    const a = mixer.clipAction(c);
+    a.enabled = true;
+    a.setEffectiveWeight(0);
+    a.play();
+    act[c.name] = a;
+  }
+  act.idle?.setEffectiveWeight(1);
+  act.idle && (act.idle.time = Math.random() * 2);
+  if (act.wave) {
+    act.wave.setLoop(THREE.LoopOnce, 1);
+    act.wave.clampWhenFinished = false;
+    act.wave.stop();
+  }
+  const armR = model.getObjectByName('upper_armR') ?? null;
+  const foreR = model.getObjectByName('forearmR') ?? null;
+  if (o.prop && foreR) {
+    const pr = prop(o.prop);
+    // 소품은 손끝(아래팔 끝)에 — 캐릭터 기준 방향을 유지하도록 뼈의 쉬는 자세 회전을 되돌려 둠
+    model.updateMatrixWorld(true);
+    const holder = new THREE.Group();
+    holder.position.set(0, 0.23, 0);
+    const q = new THREE.Quaternion();
+    foreR.getWorldQuaternion(q);
+    holder.quaternion.copy(q.invert());
+    holder.add(pr);
+    pr.position.y += 0.02;
+    foreR.add(holder);
+  }
+  return { root, model, mixer, act, faceMap, armR, foreR, hold: !!o.prop, phase: 0, blinkT: 1 + Math.random() * 3, wave: 0, talk: 0, hop: 0, waving: false };
 }
 
 let BLOB: THREE.Texture | null = null;
@@ -380,36 +306,40 @@ export function blob(r = 0.42, op = 0.32) {
 }
 
 /** 매 장면 몸짓 — 걷기·숨쉬기·눈 깜빡임·손 흔들기·말하기 */
-export function animChibi(c: Chibi, dt: number, t: number, speed: number) {
+/** 매 장면 몸짓 — 서기·걷기 섞기, 손 흔들기, 말하기(입), 눈 깜빡임, 깡충 */
+export function animChibi(c: Chibi, dt: number, _t: number, speed: number) {
   const walk = Math.min(1, speed / 3);
-  c.phase += dt * (4 + speed * 2.2);
-  const sw = Math.sin(c.phase) * 0.7 * walk;
-  c.legL.rotation.x = sw;
-  c.legR.rotation.x = -sw;
-  c.armL.rotation.x = -sw * 0.8;
-  if (!c.armR.userData.hold) c.armR.rotation.x = sw * 0.8;
-  const bob = Math.abs(Math.sin(c.phase)) * 0.05 * walk + Math.sin(t * 2.2) * 0.008 * (1 - walk);
+  const A = c.act;
+  // 손 흔들기 — 한 번 재생
+  if (c.wave > 0 && !c.waving && A.wave) {
+    c.waving = true;
+    A.wave.reset().play();
+  }
+  if (c.wave > 0) c.wave = Math.max(0, c.wave - dt);
+  const waveW = c.waving && A.wave && A.wave.isRunning() ? 1 : 0;
+  if (c.waving && !waveW) c.waving = false;
+  const talkW = c.talk > 0 ? 0.8 : 0;
+  A.walk?.setEffectiveWeight(walk);
+  if (A.walk) A.walk.timeScale = 0.6 + speed / 4.6;
+  A.idle?.setEffectiveWeight(Math.max(0.05, (1 - walk) * (waveW ? 0.15 : 1) * (talkW ? 0.4 : 1)));
+  A.talk?.setEffectiveWeight(talkW * (1 - walk));
+  A.wave?.setEffectiveWeight(waveW * 1.5);
+  c.mixer.update(dt);
+  // 소품 든 오른팔은 앞으로
+  if (c.hold && c.armR && c.foreR && !walk) {
+    c.armR.rotateX(-0.75);
+    c.foreR.rotateX(-0.55);
+  }
+  // 깡충
   c.hop = Math.max(0, c.hop - dt * 2.5);
-  const hop = Math.sin(Math.min(1, 1 - c.hop) * Math.PI) * (c.hop > 0 ? 0.18 : 0);
-  c.body.position.y = 0.53 + bob;
-  c.head.position.y = 0.8 + bob * 1.1 + hop;
-  c.root.children.forEach(() => 0);
-  c.head.rotation.z = Math.sin(t * 1.3 + c.blinkT) * 0.04 * (1 - walk);
-  // 손 흔들기
-  if (c.wave > 0) {
-    c.wave = Math.max(0, c.wave - dt);
-    c.armL.rotation.z = 2.4 + Math.sin(t * 14) * 0.35;
-    c.armL.rotation.x = 0;
-  } else c.armL.rotation.z += (0.18 - c.armL.rotation.z) * Math.min(1, dt * 8);
-  // 말하기 — 입 벌렸다 닫기
-  const talk = c.talk > 0 ? 0.5 + 0.5 * Math.abs(Math.sin(t * 13)) : 0;
-  c.mouth.scale.set(1, 1 + talk * 1.6, 1);
-  // 깜빡임
+  c.model.position.y = c.hop > 0 ? Math.sin((1 - c.hop) * Math.PI) * 0.18 : 0;
+  // 얼굴: 눈 깜빡임·말할 때 입
   c.blinkT -= dt;
   const closed = c.blinkT < 0.12 && c.blinkT > 0;
   if (c.blinkT <= 0) c.blinkT = 2 + Math.random() * 3.5;
-  for (const e of c.eyes) {
-    e.scale.y = closed ? 0.15 : 1.35;
-    e.userData.hl.visible = !closed;
+  if (c.faceMap) {
+    c.phase += dt;
+    const mouth = c.talk > 0 && Math.sin(c.phase * 22) > 0;
+    c.faceMap.offset.x = closed ? 1 / 3 : mouth ? 2 / 3 : 0;
   }
 }

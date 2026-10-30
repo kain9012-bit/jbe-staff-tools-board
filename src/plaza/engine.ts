@@ -419,49 +419,12 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     scene.add(trunk);
   }
 
-  /* 천막(게르) */
+  /* 천막(행사용 고깔 천막) */
   const N = tents.length;
   const gapDir = Math.atan2(-FN[1], -FN[0]);
   const fullArc = Math.PI * 2 - (2 * 46 * Math.PI) / 180;
   const arc = Math.min(fullArc, N > 1 ? ((N - 1) * 8.4) / R : 0);
   const a0 = gapDir + Math.PI - arc / 2;
-  const latticeTex = canvasTex(256, 128, (g, w, h) => {
-    g.fillStyle = '#fbf6ec';
-    g.fillRect(0, 0, w, h);
-    g.strokeStyle = 'rgba(160,130,95,.16)';
-    g.lineWidth = 3;
-    for (let i = -8; i < 16; i++) {
-      g.beginPath();
-      g.moveTo(i * 24, 0);
-      g.lineTo(i * 24 + h, h);
-      g.stroke();
-      g.beginPath();
-      g.moveTo(i * 24 + h, 0);
-      g.lineTo(i * 24, h);
-      g.stroke();
-    }
-  });
-  // 밤에 천막 안 불빛이 펠트에 비치는 무늬
-  const glowTex = canvasTex(256, 128, (g, w, h) => {
-    const gr = g.createLinearGradient(0, 0, 0, h);
-    gr.addColorStop(0, '#5a3a1a');
-    gr.addColorStop(0.5, '#ffb35c');
-    gr.addColorStop(1, '#ffcf8a');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, w, h);
-    g.strokeStyle = 'rgba(60,30,10,.75)';
-    g.lineWidth = 5;
-    for (let i = -8; i < 16; i++) {
-      g.beginPath();
-      g.moveTo(i * 24, 0);
-      g.lineTo(i * 24 + h, h);
-      g.stroke();
-      g.beginPath();
-      g.moveTo(i * 24 + h, 0);
-      g.lineTo(i * 24, h);
-      g.stroke();
-    }
-  });
   const bandTex = (col: string) =>
     canvasTex(512, 64, (g, w, h) => {
       g.fillStyle = col;
@@ -563,7 +526,43 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   }
   const TENTS: TentObj[] = [];
   const hitList: THREE.Object3D[] = [];
-  const RW = 2.9, WH = 1.75;
+  // 행사용 고깔 천막(흔히 '몽골텐트') — 정사각 바닥, 은색 기둥, 뾰족한 흰 지붕, 흰 벽 + 아래 색 띠, 앞은 열림
+  const S = 2.5, EH = 2.3, RH2 = 2.5; // 반폭, 처마 높이, 지붕 높이
+  const RW = S; // 다른 곳(꼬마전구 등)에서 쓰는 천막 반폭
+  const WH = EH;
+  const canvasWall = (col: string) =>
+    canvasTex(256, 256, (g, w, h) => {
+      g.fillStyle = '#fbfbf8';
+      g.fillRect(0, 0, w, h);
+      // 천 주름
+      for (let x = 0; x < w; x += 32) {
+        const gr = g.createLinearGradient(x, 0, x + 32, 0);
+        gr.addColorStop(0, 'rgba(0,0,0,0)');
+        gr.addColorStop(0.5, 'rgba(120,120,110,.08)');
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr;
+        g.fillRect(x, 0, 32, h);
+      }
+      g.fillStyle = col;
+      g.fillRect(0, h * 0.82, w, h * 0.18);
+      g.fillStyle = 'rgba(255,255,255,.55)';
+      g.fillRect(0, h * 0.82, w, 3);
+    }, false);
+  const roofGeo = (() => {
+    // 네모 뿔 지붕 — 처마에서는 완만, 꼭대기로 갈수록 가파른 오목한 곡면(파고다)
+    const pts: THREE.Vector2[] = [];
+    const n = 14;
+    for (let k = 0; k <= n; k++) {
+      const v = k / n;
+      const rad = (S + 0.12) * Math.SQRT2 * (1 - v) + 0.05 * v;
+      pts.push(new T.Vector2(rad, EH + RH2 * Math.pow(v, 2.1)));
+    }
+    pts.reverse();
+    const g0 = new T.LatheGeometry(pts, 4, Math.PI / 4).toNonIndexed();
+    g0.computeVertexNormals();
+    return g0;
+  })();
+  const poleM = new T.MeshStandardMaterial({ color: '#d7dbe0', metalness: 0.7, roughness: 0.3 });
   tents.forEach((tc, i) => {
     const ang = N > 1 ? a0 + (arc * i) / (N - 1) : a0;
     const sx = CS[0] + Math.cos(ang) * R, sy = CS[1] + Math.sin(ang) * R;
@@ -575,102 +574,106 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     g.rotation.y = Math.atan2(f.x, f.z);
     scene.add(g);
     const col = tc.color;
-    const lat = latticeTex.clone();
-    lat.repeat.set(6, 1);
-    lat.needsUpdate = true;
-    const gl = glowTex.clone();
-    gl.repeat.set(6, 1);
-    gl.needsUpdate = true;
-    const wallM = new T.MeshToonMaterial({ color: '#ffffff', map: lat, gradientMap: toonGrad(), emissive: '#ffffff', emissiveMap: gl, emissiveIntensity: 0, side: T.DoubleSide });
+    const wt = canvasWall(col);
+    // 벽: 뒤·왼쪽·오른쪽 (앞은 열어 둠). 밤에는 안쪽 불빛이 천에 비침
+    const wallM = new T.MeshToonMaterial({ color: '#ffffff', map: wt, gradientMap: toonGrad(), emissive: '#ffe2b8', emissiveMap: wt, emissiveIntensity: 0, side: T.DoubleSide });
+    wallM.userData.glowK = 0.7;
     tentGlow.push(wallM);
-    // 벽 (문 자리는 비움)
-    const doorA = 0.42;
-    const wall = new T.Mesh(new T.CylinderGeometry(RW, RW, WH, 48, 1, true, doorA / 2, Math.PI * 2 - doorA), wallM);
-    wall.position.y = WH / 2;
-    wall.castShadow = wall.receiveShadow = true;
+    const wall = new T.Group();
+    for (const [x, z, ry] of [[0, -S, 0], [-S, 0, Math.PI / 2], [S, 0, -Math.PI / 2]] as const) {
+      const pl = new T.Mesh(new T.PlaneGeometry(S * 2, EH - 0.05), wallM);
+      pl.position.set(x, (EH - 0.05) / 2, z);
+      pl.rotation.y = ry;
+      pl.castShadow = pl.receiveShadow = true;
+      wall.add(pl);
+    }
     g.add(wall);
-    // 위아래 띠
-    const bt = bandTex(col);
-    bt.repeat.set(8, 1);
-    for (const [y, h] of [[0.16, 0.3], [WH - 0.2, 0.26]]) {
-      const b = new T.Mesh(new T.CylinderGeometry(RW + 0.02, RW + 0.02, h, 48, 1, true, doorA / 2, Math.PI * 2 - doorA), new T.MeshToonMaterial({ map: bt, gradientMap: toonGrad(), side: T.DoubleSide }));
-      b.position.y = y;
-      g.add(b);
+    // 앞 양옆: 걷어 묶은 천
+    for (const sd of [-1, 1]) {
+      const fold = new T.Mesh(new T.CylinderGeometry(0.16, 0.22, EH - 0.1, 10), wallM);
+      fold.position.set(sd * (S - 0.2), (EH - 0.1) / 2, S - 0.08);
+      g.add(fold);
+      const tie = new T.Mesh(new T.TorusGeometry(0.2, 0.025, 6, 16), toon(col));
+      tie.rotation.x = Math.PI / 2;
+      tie.position.set(sd * (S - 0.2), 1.2, S - 0.08);
+      g.add(tie);
     }
-    // 동여맨 끈
-    for (const y of [0.7, 1.15]) {
-      const tr = new T.Mesh(new T.CylinderGeometry(RW + 0.035, RW + 0.035, 0.05, 48, 1, true, doorA / 2, Math.PI * 2 - doorA), toon('#6b4a33', { side: T.DoubleSide }));
-      tr.position.y = y;
-      g.add(tr);
+    // 기둥 4개
+    for (const [x, z] of [[-S, -S], [S, -S], [S, S], [-S, S]]) {
+      const pl = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, EH, 8), poleM);
+      pl.position.set(x, EH / 2, z);
+      pl.castShadow = true;
+      g.add(pl);
+      const foot = new T.Mesh(new T.BoxGeometry(0.28, 0.12, 0.28), toon('#3b3f46'));
+      foot.position.set(x, 0.06, z);
+      g.add(foot);
     }
-    // 지붕: 완만한 원뿔(살짝 볼록)
-    const pts: THREE.Vector2[] = [];
-    for (let k = 0; k <= 12; k++) {
-      const t = k / 12;
-      pts.push(new T.Vector2(0.62 + (RW + 0.18 - 0.62) * t, WH + 1.25 * (1 - t) + 0.12 * Math.sin(t * Math.PI)));
-    }
-    pts.reverse();
-    const rt = roofTex(col);
-    const roof = new T.Mesh(new T.LatheGeometry(pts, 48), new T.MeshToonMaterial({ map: rt, gradientMap: toonGrad(), side: T.DoubleSide, emissive: '#ffd7a8', emissiveMap: rt, emissiveIntensity: 0 }));
+    // 지붕
+    const roofM = new T.MeshToonMaterial({ color: '#fdfdfb', gradientMap: toonGrad(), side: T.DoubleSide, emissive: '#ffe2b8', emissiveIntensity: 0 });
+    roofM.userData.glowK = 0.35;
+    tentGlow.push(roofM);
+    const roof = new T.Mesh(roofGeo, roofM);
     roof.castShadow = roof.receiveShadow = true;
-    tentGlow.push(roof.material);
     g.add(roof);
-    // 지붕 꼭대기 둥근 창(토노)
-    const crown = new T.Mesh(new T.CylinderGeometry(0.66, 0.66, 0.12, 24), toon(col));
-    crown.position.y = WH + 1.3;
-    g.add(crown);
-    const cap = new T.Mesh(new T.SphereGeometry(0.5, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), toon('#fbf8f1'));
-    cap.scale.y = 0.45;
-    cap.position.y = WH + 1.36;
-    g.add(cap);
-    // 문: 칠한 나무문(활짝 열림) + 문틀
-    const doorW = RW * 2 * Math.sin(doorA / 2), dz = RW * Math.cos(doorA / 2);
-    const frameM = toon(col);
-    const fr = (w: number, h: number, x: number, y: number) => {
-      const o = new T.Mesh(new T.BoxGeometry(w, h, 0.14), frameM);
-      o.position.set(x, y, dz + 0.02);
-      o.castShadow = true;
-      g.add(o);
-    };
-    fr(0.14, 1.62, -doorW / 2 - 0.02, 0.81);
-    fr(0.14, 1.62, doorW / 2 + 0.02, 0.81);
-    fr(doorW + 0.32, 0.18, 0, 1.66);
-    const leaf = new T.Mesh(new T.BoxGeometry(doorW * 0.95, 1.5, 0.06), toon('#e09a3a'));
-    leaf.geometry.translate((doorW * 0.95) / 2, 0, 0);
-    leaf.position.set(doorW / 2, 0.76, dz + 0.04);
-    leaf.rotation.y = -1.25;
-    g.add(leaf);
-    const inside = new T.MeshBasicMaterial({ color: '#2a1c12' });
-    doorGlow.push(inside);
-    const dark = new T.Mesh(new T.PlaneGeometry(doorW, 1.5), inside);
-    dark.position.set(0, 0.76, dz - 0.25);
-    g.add(dark);
-    // 문 앞 깔개
-    const mat = new T.Mesh(new T.CircleGeometry(1.3, 24, 0, Math.PI), toon(col));
+    const tip = new T.Mesh(new T.SphereGeometry(0.09, 10, 8), poleM);
+    tip.position.y = EH + RH2 + 0.05;
+    g.add(tip);
+    const rod = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.45, 6), poleM);
+    rod.position.y = EH + RH2 + 0.25;
+    g.add(rod);
+    // 처마 가림막(빙 둘러 내린 천) + 색 줄
+    const valT = canvasTex(512, 64, (g2, w, h) => {
+      g2.fillStyle = '#fbfbf8';
+      g2.fillRect(0, 0, w, h);
+      g2.fillStyle = col;
+      g2.fillRect(0, h - 12, w, 12);
+    }, false);
+    const valM = new T.MeshToonMaterial({ map: valT, gradientMap: toonGrad(), side: T.DoubleSide, emissive: '#ffe2b8', emissiveMap: valT, emissiveIntensity: 0 });
+    valM.userData.glowK = 0.4;
+    tentGlow.push(valM);
+    for (const [x, z, ry] of [[0, -S - 0.12, 0], [-S - 0.12, 0, Math.PI / 2], [S + 0.12, 0, -Math.PI / 2]] as const) {
+      const v = new T.Mesh(new T.PlaneGeometry(S * 2 + 0.24, 0.34), valM);
+      v.position.set(x, EH - 0.15, z);
+      v.rotation.y = ry;
+      g.add(v);
+    }
+    // 앞 처마: 업무 이름 현수막
+    const banT = canvasTex(1024, 128, (g2, w, h) => {
+      g2.fillStyle = '#fbfbf8';
+      g2.fillRect(0, 0, w, h);
+      g2.fillStyle = col;
+      g2.fillRect(0, h - 16, w, 16);
+      g2.fillRect(0, 0, w, 6);
+      g2.fillStyle = '#1e2430';
+      g2.textAlign = 'center';
+      g2.textBaseline = 'middle';
+      let fs = 74;
+      g2.font = `400 ${fs}px ${DISPLAY}`;
+      while (g2.measureText(tc.label).width > w - 80 && fs > 30) g2.font = `400 ${(fs -= 4)}px ${DISPLAY}`;
+      g2.fillText(tc.label, w / 2, h / 2 - 2);
+    }, false);
+    const banM = new T.MeshBasicMaterial({ map: banT, toneMapped: false, side: T.DoubleSide });
+    signs.push(banM);
+    const ban = new T.Mesh(new T.PlaneGeometry(S * 2 + 0.24, 0.62), banM);
+    ban.position.set(0, EH - 0.29, S + 0.12);
+    g.add(ban);
+    // 안쪽: 흰 천 씌운 탁자
+    const table = new T.Mesh(new T.BoxGeometry(2.2, 0.76, 0.7), toon('#ffffff'));
+    table.position.set(0, 0.38, -S + 0.8);
+    g.add(table);
+    const skirt = new T.Mesh(new T.BoxGeometry(2.22, 0.18, 0.72), toon(col));
+    skirt.position.set(0, 0.62, -S + 0.8);
+    g.add(skirt);
+    // 바닥 깔개
+    const mat = new T.Mesh(new T.PlaneGeometry(S * 2 - 0.2, S * 2 - 0.2), toon('#e9e2d2'));
     mat.rotation.x = -Math.PI / 2;
-    mat.rotation.z = Math.PI;
-    mat.position.set(0, 0.075, dz + 0.05);
-    mat.scale.set(1, 0.7, 1);
+    mat.position.y = 0.07;
     g.add(mat);
-    // 팻말
-    const post = new T.Mesh(new T.BoxGeometry(0.1, 1.5, 0.1), toon('#7a5a3c'));
-    post.position.set(-doorW / 2 - 1.15, 0.75, dz + 0.55);
-    post.castShadow = true;
-    g.add(post);
-    const signM = new T.MeshBasicMaterial({ map: signTex(tc.label, col), toneMapped: false });
-    signs.push(signM);
-    const sign = new T.Mesh(new T.PlaneGeometry(1.5, 0.75), signM);
-    sign.position.set(-doorW / 2 - 1.15, 1.38, dz + 0.61);
-    sign.rotation.y = 0.18;
-    g.add(sign);
-    const signBack = new T.Mesh(new T.PlaneGeometry(1.5, 0.75), toon('#7a5a3c'));
-    signBack.position.copy(sign.position).add(V(0, 0, -0.02));
-    signBack.rotation.y = 0.18 + Math.PI;
-    g.add(signBack);
+    const dz = S;
     // 천막 위 이름표
     const label = new T.Sprite(new T.SpriteMaterial({ map: labelTex(tc.label, col), transparent: true, depthWrite: false, toneMapped: false }));
     label.scale.set(4.6, 1.08, 1);
-    label.position.copy(pos).setY(WH + 2.75);
+    label.position.copy(pos).setY(EH + RH2 + 1.0);
     label.renderOrder = 5;
     scene.add(label);
     // 밤 불빛
@@ -682,7 +685,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       skin: SKINS[Math.floor(r() * SKINS.length)],
       hair: HAIRS[i % HAIRS.length],
       style,
-      top: TOPS[i % TOPS.length],
+      top: tc.prop === 'ladle' ? '#ffffff' : TOPS[i % TOPS.length],
       inner: tc.prop === 'ladle' ? '#ffffff' : ['#ffffff', '#f3efe6', '#e8f1fb'][i % 3],
       pants: ['#3b4256', '#4a4f5c', '#5b4a3c', '#2f3442'][i % 4],
       tie: tc.prop === 'ladle' ? null : LINES_TONE[(i * 5) % LINES_TONE.length],
@@ -690,10 +693,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       prop: tc.prop,
       hat: tc.prop === 'ladle' ? 'chef' : null,
     });
-    if (tc.prop === 'ladle') {
-      npc.body.material = toon('#ffffff');
-    }
-    const npcPos = pos.clone().add(f.clone().multiplyScalar(dz + 1.05)).add(rr2.clone().multiplyScalar(0.95));
+    const npcPos = pos.clone().add(f.clone().multiplyScalar(dz + 0.9)).add(rr2.clone().multiplyScalar(0.95));
     npc.root.position.copy(npcPos);
     const npcYaw = Math.atan2(f.x, f.z);
     npc.root.rotation.y = npcYaw;
@@ -741,7 +741,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     const pts: THREE.Vector3[] = [];
     const lineM = new T.LineBasicMaterial({ color: '#5a4636' });
     const BCOL = ['#ffd36b', '#ff8b6b', '#8be0ff', '#b7ff8b', '#ffb3e6'];
-    const eave = (t: TentObj, side: number) => t.pos.clone().add(t.r.clone().multiplyScalar(side * (RW + 0.1))).setY(WH + 0.15);
+    const eave = (t: TentObj, side: number) => t.pos.clone().add(t.r.clone().multiplyScalar(side * (RW + 0.1))).add(t.f.clone().multiplyScalar(RW)).setY(WH - 0.05);
     for (let k = 0; k < TENTS.length - 1; k++) {
       const a = eave(TENTS[k], 1), b = eave(TENTS[k + 1], -1);
       // 천막 순서와 r 방향이 반대일 수 있어 가까운 끝끼리 이음
@@ -815,7 +815,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   [me.root, ...TENTS.map((t) => t.npc.root)].forEach((r) =>
     r.traverse((o) => {
       const m = o.material;
-      if (m && m.isMeshToonMaterial && !m.emissiveMap && m.emissive && m.emissive.getHex() === 0) {
+      if (m && m.isMeshToonMaterial && !m.emissiveMap && !m.map && m.emissive && m.emissive.getHex() === 0) {
         m.emissive.copy(m.color);
         charMats.add(m);
       }
@@ -1118,7 +1118,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       }
     HQ.LIT.value = lr;
     for (const [m, k] of NIGHT_MATS) m.emissiveIntensity = dark * k;
-    for (const m of tentGlow) m.emissiveIntensity = dark * (m.map && m.map.repeat.x > 4 ? 0.95 : 0.3);
+    for (const m of tentGlow) m.emissiveIntensity = dark * (m.userData.glowK ?? 0.5);
     for (const m of charMats) m.emissiveIntensity = dark * 0.32;
     for (const m of doorGlow) m.color.copy(C3('#2a1c12', '#ffc070', dark));
     for (const m of bulbs) m.color.copy(m.userData.base).multiplyScalar(0.35 + 0.9 * dark);
@@ -1175,7 +1175,11 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     if (Math.hypot(p[0] - CS[0], p[1] - CS[1]) > 95) return true;
     for (const c of canopyCols) if (Math.hypot(x - c.x, z - c.z) < 0.25 + RAD) return true;
     for (const t of TENTS) {
-      if (Math.hypot(x - t.pos.x, z - t.pos.z) < RW + 0.15 + RAD) return true;
+      {
+        const dx = x - t.pos.x, dz2 = z - t.pos.z;
+        const lf = dx * t.f.x + dz2 * t.f.z, lr = dx * t.r.x + dz2 * t.r.z;
+        if (Math.abs(lf) < RW + 0.1 + RAD && Math.abs(lr) < RW + 0.1 + RAD) return true;
+      }
       if (Math.hypot(x - t.npcPos.x, z - t.npcPos.z) < 0.35 + RAD) return true;
     }
     return false;

@@ -699,6 +699,7 @@ export function makeLobby(tools: LobbyTool[], popular: LobbyTool[], fresh: Lobby
   const npc: Chibi = makeChibi({ skin: '#ffdcc4', hair: '#3d2b22', style: 'bob', top: '#3a457f', inner: '#ffffff', pants: '#3b4256', tie: '#e8554e', glasses: false, prop: 'tablet' });
   const npcPos = V(DX + 0.6, 0, (DZ0 + DZ1) / 2);
   npc.root.position.copy(npcPos);
+  npc.root.position.y = 0.34; // 데스크 뒤 발판 위
   npc.root.scale.setScalar(1.2);
   npc.root.rotation.y = -Math.PI / 2;
   add(npc.root);

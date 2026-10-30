@@ -7,6 +7,7 @@ import { summaryOf, summaryText, type ToolSummary } from '../lib/summaries';
 import { matcher } from '../lib/search';
 import { hrefTool } from '../lib/route';
 import { coverColor, TAG_BAND_COLOR } from '../plaza/lobby';
+import { loadCharacters } from '../plaza/chibi';
 import { createPlaza, type Ev, type Mode, type PlazaEngine, type PlazaTent, type PlazaTool } from '../plaza/engine';
 import suitUrl from '../fonts/SUIT-Variable.woff2';
 import eduUrl from '../fonts/GangwonEduPowerExtraBoldA.woff';
@@ -255,7 +256,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         if (e.kind) setFocusKind(e.kind);
       }
     };
-    void loadFonts().then(() => {
+    void Promise.all([loadFonts(), loadCharacters()]).then(() => {
       if (dead || !host.current) return;
       try {
         eng.current = createPlaza(host.current, tents, on, { quality, visited: [...visitedRef.current], lobby: { tools: data.all, popular: data.popular, fresh: data.fresh } });
