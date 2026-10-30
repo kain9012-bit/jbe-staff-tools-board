@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { makeHQ } from './hq';
 import { animChibi, blob, makeChibi, toon, toonGrad, type Chibi } from './chibi';
+import { makeLobby, type Lobby } from './lobby';
 
 export interface PlazaTool {
   sid: string;
@@ -25,8 +26,9 @@ export interface PlazaTent {
 export type Mode = 'auto' | 'day' | 'night';
 export type Ev =
   | { type: 'ready' }
-  | { type: 'near'; tent: number | null }
-  | { type: 'talk'; tent: number | null }
+  | { type: 'near'; tent: number | 'desk' | null }
+  | { type: 'talk'; tent: number | 'desk' | null }
+  | { type: 'world'; world: 'out' | 'in' }
   | { type: 'page'; page: number; pages: number; cards: PlazaTool[] }
   | { type: 'hover'; tool: PlazaTool | null }
   | { type: 'select'; tool: PlazaTool | null; slot: number | null }
@@ -163,13 +165,13 @@ const STYLES = ['short', 'bob', 'pony', 'side', 'bun', 'curly'] as const;
 const TOPS = ['#3a457f', '#4f8f5a', '#c0584a', '#2f6fb3', '#7a5ea8', '#b7863a', '#2fa39a', '#5b6575', '#d07a3a', '#3f6e8c'];
 /** 도구 구분 표 색 — 목록 화면의 구분 표(SourceTag)와 같게 */
 const TAG_COL: Record<string, { bg: string; fg: string; line?: string }> = {
-  '교직원 제작': { bg: '#dcefff', fg: '#0a62a8' },
-  '교육청 배포': { bg: '#2f3a73', fg: '#ffffff', line: 'rgba(200,215,255,.75)' },
-  '외부 공공': { bg: '#e3f5ee', fg: '#0b6b52' },
+  '교직원 제작': { bg: '#1f7ae0', fg: '#ffffff' },
+  '교육청 배포': { bg: '#2f3a73', fg: '#ffffff', line: '#ffffff' },
+  '외부 공공': { bg: '#0f9a72', fg: '#ffffff' },
 };
 const LINES_TONE = ['#2f6fb3', '#e8554e', '#3a457f', '#4f8f5a', null, null];
 
-export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev) => void, opt: { quality: 'high' | 'low'; visited?: number[] }) {
+export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev) => void, opt: { quality: 'high' | 'low'; visited?: number[]; lobby: { tools: PlazaTool[]; popular: PlazaTool[]; fresh: PlazaTool[] } }) {
   const T = THREE;
   const high = opt.quality === 'high';
   const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: !!(window as any).__plazaShot });
@@ -365,6 +367,14 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   const NIGHT_MATS: [THREE.MeshStandardMaterial, number][] = [];
   const hqStart = scene.children.length;
   const HQ = makeHQ(T, scene, NIGHT_MATS);
+  const ENT = HQ.ENT;
+  const BLOCK_NOW = [HQ.MAIN, FRONT, ANNEX, TOWER];
+  let world: 'out' | 'in' = 'out';
+  let lobby: Lobby | null = null;
+  // 정문 앞(바깥) 한 점과 차양 기둥
+  const doorSite = [ENT.door[0] + ENT.nrm[0] * 0.4, ENT.door[1] + ENT.nrm[1] * 0.4];
+  const doorPt = W(doorSite[0], doorSite[1]);
+  const canopyCols = [-1, 1].map((s2) => W(ENT.q[0] + ENT.tan[0] * s2 * 5 + ENT.nrm[0] * 6.4, ENT.q[1] + ENT.tan[1] * s2 * 5 + ENT.nrm[1] * 6.4));
   for (const o of scene.children.slice(hqStart)) o.traverse((m) => m.isMesh && ((m.castShadow = true), (m.receiveShadow = true)));
 
   /* 나무 */
@@ -823,7 +833,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   scene.add(pin);
 
   const start = W(CS[0] - FN[0] * 4, CS[1] - FN[1] * 4);
-  const P = { pos: start.clone(), yaw: Math.atan2(-FN[0], FN[1]), speed: 0, target: null as THREE.Vector3 | null, goTalk: -1 };
+  const P = { pos: start.clone(), yaw: Math.atan2(-FN[0], FN[1]), speed: 0, target: null as THREE.Vector3 | null, goTalk: -1, goDoor: false };
   // 플레이어가 청사를 보도록: three 앞쪽(+z)이 향할 방향 = 청사 쪽(-FN) → world(-FN0, 0, FN1)
   P.yaw = Math.atan2(-FN[0], FN[1]);
 
@@ -847,6 +857,12 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     const d = cam.dist;
     out.pos.set(look.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * d, look.y + Math.sin(cam.pitch) * d, look.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * d);
     out.look.copy(look);
+    if (world === 'in' && lobby) {
+      const b = lobby.camBox;
+      out.pos.x = clamp(out.pos.x, b.x0, b.x1);
+      out.pos.z = clamp(out.pos.z, b.z0, b.z1);
+      out.pos.y = clamp(out.pos.y, 0.6, b.y1);
+    }
     return out;
   };
   // 시작 연출: 마당 뒤쪽 하늘에서 청사를 바라보며 내려옴
@@ -1045,6 +1061,10 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
 
   const holo = {
     tent: -1,
+    anchor: null as null | { npc: Chibi; npcPos: THREE.Vector3; f: THREE.Vector3; r: THREE.Vector3 },
+    list: [] as PlazaTool[],
+    color: '#3a457f',
+    front: 1.2,
     page: 0,
     cols: 3,
     rows: 2,
@@ -1063,6 +1083,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   let hourFrom = hourShown, hourTo = hourShown, hourT = 1;
   const hourOf = (m: Mode) => (m === 'day' ? 13.5 : m === 'night' ? 21.2 : kstNow().h);
   let lastClockText = '';
+  const lastSky = new T.Color('#9cc3e6');
+  let lastDark = 0;
   function applyHour(h: number) {
     const { el, az } = sunAt(h);
     const elD = (el * 180) / Math.PI;
@@ -1103,6 +1125,9 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     for (const m of pools) m.opacity = dark * m.userData.k * 0.75;
     renderer.toneMappingExposure = 1.0 + 0.15 * dark;
     HQ.drawClock(h);
+    lastSky.copy(hor);
+    lastDark = dark;
+    lobby?.setOutside(hor, dark);
     const hh = Math.floor(h) % 24, mm = Math.floor((h % 1) * 60);
     const label = elD > 8 ? '낮' : elD > -6 ? (h < 12 ? '해 뜰 무렵' : '해 질 무렵') : '밤';
     const text = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ${label}`;
@@ -1134,7 +1159,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     camera.aspect = vw / vh;
     camera.fov = vw < vh ? 62 : 50;
     camera.updateProjectionMatrix();
-    if (holo.tent >= 0 && cam.mode !== 'follow') layoutHolo(holo.tent, true);
+    if (holo.anchor && holo.on && cam.mode !== 'follow') layoutHolo(0, true);
   };
   const ro = new ResizeObserver(resize);
   ro.observe(host);
@@ -1144,8 +1169,10 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   const RAD = 0.36;
   const blocked = (x: number, z: number) => {
     const p = [x, -z];
-    if (BLOCKS.some((b) => inPoly(p, b))) return true;
+    if (world === 'in') return lobby!.blocked(x, z);
+    if (BLOCK_NOW.some((b) => inPoly(p, b))) return true;
     if (Math.hypot(p[0] - CS[0], p[1] - CS[1]) > 95) return true;
+    for (const c of canopyCols) if (Math.hypot(x - c.x, z - c.z) < 0.25 + RAD) return true;
     for (const t of TENTS) {
       if (Math.hypot(x - t.pos.x, z - t.pos.z) < RW + 0.15 + RAD) return true;
       if (Math.hypot(x - t.npcPos.x, z - t.npcPos.z) < 0.35 + RAD) return true;
@@ -1166,15 +1193,15 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   };
 
   /* 홀로그램 배치 */
-  function layoutHolo(i: number, instant = false) {
-    const t = TENTS[i];
+  function layoutHolo(_i: number, instant = false) {
+    const t = holo.anchor!;
     const portrait = vw / vh < 0.95;
     holo.cols = portrait ? 2 : 3;
     holo.rows = portrait ? 3 : 2;
     const gw = holo.cols * CW + (holo.cols - 1) * GAP, gh = holo.rows * CH + (holo.rows - 1) * GAP;
     const up = V(0, 1, 0);
     const side = portrait ? 0.15 : 0.75;
-    const H = t.npcPos.clone().add(t.f.clone().multiplyScalar(1.2)).add(t.r.clone().multiplyScalar(side + gw / 2)).setY(1.2 + gh / 2 + (portrait ? 0.35 : 0));
+    const H = t.npcPos.clone().add(t.f.clone().multiplyScalar(holo.front)).add(t.r.clone().multiplyScalar(side + gw / 2)).setY(1.2 + gh / 2 + (portrait ? 0.35 : 0));
     const vf = (camera.fov * Math.PI) / 180;
     const tv = Math.tan(vf / 2), th = tv * camera.aspect;
     // 카드 묶음이 화면 높이 절반, 너비 3/4 안에 들게 — 위 안내판·아래 대화 상자를 피해 조금 위·오른쪽에 둠
@@ -1219,10 +1246,10 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   }
   const perPage = () => holo.cols * holo.rows;
   function showPage(p: number) {
-    const t = tents[holo.tent];
-    const pages = Math.max(1, Math.ceil(t.tools.length / perPage()));
+    const all = holo.list;
+    const pages = Math.max(1, Math.ceil(all.length / perPage()));
     holo.page = ((p % pages) + pages) % pages;
-    const list = t.tools.slice(holo.page * perPage(), holo.page * perPage() + perPage());
+    const list = all.slice(holo.page * perPage(), holo.page * perPage() + perPage());
     cards.forEach((c, n) => {
       const tool = list[n];
       c.tool = tool ?? null;
@@ -1231,7 +1258,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         c.mesh.visible = false;
         return;
       }
-      drawCard(c, tool, t.color);
+      drawCard(c, tool, holo.color);
       c.mesh.visible = true;
       c.from.copy(holo.apex).setY(0.4);
       c.mesh.position.copy(c.from);
@@ -1248,42 +1275,65 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   }
 
   /* 대화 */
-  let near: number | null = null;
+  let near: number | 'desk' | null = null;
   let talking = -1;
+  const DESK = -2;
+  const anchorOf = (i: number) => (i === DESK ? lobby!.anchor : TENTS[i]);
   const startTalk = (i: number) => {
     if (talking === i) return;
-    if (talking >= 0) endTalk(true);
+    if (talking !== -1) endTalk(true);
     talking = i;
-    const t = TENTS[i];
+    const t = anchorOf(i);
     P.target = null;
     P.goTalk = -1;
-    const s = talkSpot(i);
+    const s = i === DESK ? lobby!.deskSpot.clone() : talkSpot(i);
     if (!blocked(s.x, s.z)) P.pos.copy(s);
     P.yaw = Math.atan2(t.npcPos.x - P.pos.x, t.npcPos.z - P.pos.z);
     t.npc.wave = 1.2;
     t.npc.hop = 1;
-    t.visited = true;
+    if (i >= 0) TENTS[i].visited = true;
     // 대화 첫 장면: 천막지기와 나를 함께
-    const look = t.npcPos.clone().add(t.f.clone().multiplyScalar(0.8)).add(t.r.clone().multiplyScalar(-0.35)).setY(0.95);
-    const pos = look.clone().add(t.f.clone().multiplyScalar(4.3)).add(t.r.clone().multiplyScalar(2.1)).add(V(0, 0.9, 0));
+    // 안내 데스크는 직원이 계산대 뒤에 있어 조금 높이서 봄
+    const hy = i === DESK ? 1.25 : 0.95, up = i === DESK ? 1.6 : 0.9, back = i === DESK ? 5.6 : 4.3;
+    const look = t.npcPos.clone().add(t.f.clone().multiplyScalar(0.8)).add(t.r.clone().multiplyScalar(-0.35)).setY(hy);
+    const pos = look.clone().add(t.f.clone().multiplyScalar(back)).add(t.r.clone().multiplyScalar(2.1)).add(V(0, up, 0));
     camTo('talk', pos, look);
-    emit({ type: 'talk', tent: i });
+    emit({ type: 'talk', tent: i === DESK ? 'desk' : i });
   };
-  const showTools = () => {
-    if (talking < 0) return;
+  const openHolo = (list: PlazaTool[], color: string) => {
+    if (talking === -1) return;
     holo.tent = talking;
+    holo.anchor = anchorOf(talking);
+    holo.list = list;
+    holo.color = color;
+    holo.front = talking === DESK ? 2.1 : 1.2;
     holo.on = true;
-    layoutHolo(talking);
+    layoutHolo(0);
     camTo('holo', holo.camPos, holo.camLook);
     showPage(0);
-    TENTS[talking].npc.hop = 1;
+    holo.anchor.npc.hop = 1;
   };
-  const endTalk = (silent = false) => {
-    if (talking < 0) return;
-    const t = TENTS[talking];
+  const showTools = () => talking >= 0 && openHolo(tents[talking].tools, tents[talking].color);
+  /** 안내 데스크 검색 결과 — 홀로그램 카드 + 서가에서 그 책들이 빛남 */
+  const showResults = (list: PlazaTool[]) => {
+    if (!lobby) return;
+    const ids = new Set(list.map((x) => x.sid));
+    lobby.books.forEach((b) => (b.userData.glow = ids.has(b.userData.tool.sid) ? 1 : 0));
+    if (!list.length) {
+      hideCards();
+      return;
+    }
+    openHolo(list, '#3a457f');
+  };
+  const hideCards = () => {
     holo.on = false;
     focus = -1;
     cards.forEach((c) => (c.hide = c.mesh.visible ? now : 0));
+  };
+  const endTalk = (silent = false) => {
+    if (talking === -1) return;
+    const t = anchorOf(talking);
+    hideCards();
     talking = -1;
     holo.tent = -1;
     // 천막에서 한 걸음 물러나 마당 쪽을 봄
@@ -1340,9 +1390,17 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         hoverCard = h.object.userData.card;
         cursor = 'pointer';
       }
-    } else if (cam.mode === 'follow') {
-      const h = ray.intersectObjects(hitList, true)[0];
-      if (h && h.object.userData.tent !== undefined) cursor = 'pointer';
+    } else if (cam.mode === 'follow' && world === 'in' && lobby && !focusBook) {
+      const h = ray.intersectObjects([...lobby.books, lobby.npc.root], true)[0];
+      const b = h && lobby.books.includes(h.object as THREE.Mesh) ? (h.object as THREE.Mesh) : null;
+      if (b !== hoverBook) {
+        hoverBook = b;
+        emit({ type: 'hover', tool: b ? b.userData.tool : null });
+      }
+      if (h) cursor = 'pointer';
+    } else if (cam.mode === 'follow' && world === 'out') {
+      const h = ray.intersectObjects([...hitList, ...doorHit], true)[0];
+      if (h && (h.object.userData.tent !== undefined || h.object.userData.door)) cursor = 'pointer';
     }
     cv.style.cursor = cursor;
   };
@@ -1357,15 +1415,34 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       return;
     }
     if (cam.mode !== 'follow') return;
-    const ht = ray.intersectObjects(hitList, true)[0];
-    if (ht && ht.object.userData.tent !== undefined) {
-      walkToTent(ht.object.userData.tent);
-      return;
+    if (world === 'in' && lobby) {
+      if (focusBook) return;
+      const h = ray.intersectObjects([...lobby.books, lobby.npc.root], true)[0];
+      if (h && lobby.books.includes(h.object as THREE.Mesh)) {
+        openBook(h.object as THREE.Mesh);
+        return;
+      }
+      if (h) {
+        P.target = lobby.deskSpot.clone();
+        P.goTalk = DESK;
+        return;
+      }
+    } else {
+      const ht = ray.intersectObjects([...hitList, ...doorHit], true)[0];
+      if (ht && ht.object.userData.door) {
+        goLobby();
+        return;
+      }
+      if (ht && ht.object.userData.tent !== undefined) {
+        walkToTent(ht.object.userData.tent);
+        return;
+      }
     }
-    const hg = ray.intersectObject(ground, false)[0];
+    const hg = ray.intersectObject(world === 'in' && lobby ? lobby.floor : ground, false)[0];
     if (hg) {
       P.target = hg.point.clone().setY(0);
       P.goTalk = -1;
+      P.goDoor = false;
       pin.position.copy(P.target).setY(0.1);
       pin.material.opacity = 0.9;
       pin.scale.setScalar(1);
@@ -1429,20 +1506,128 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     if (n === null || !cards[n] || !cards[n].mesh.visible || !cards[n].tool) {
       holo.sel = -1;
       cards.forEach((c) => (c.mat.uniforms.sel.value = 0));
+      focusCard(null);
+      focusBook = null;
       emit({ type: 'select', tool: null, slot: null });
       return;
     }
     holo.sel = n;
     cards.forEach((c, k) => (c.mat.uniforms.sel.value = k === n ? 1 : 0));
+    focusCard(n);
     emit({ type: 'select', tool: cards[n].tool, slot: n });
   }
   function walkToTent(i: number) {
-    if (talking >= 0) endTalk(true);
+    if (world === 'in') {
+      exitLobby(() => walkToTent(i));
+      return;
+    }
+    if (talking !== -1) endTalk(true);
     if (cam.mode === 'intro') skipIntro();
     const s = talkSpot(i);
     P.target = s;
     P.goTalk = i;
     pin.material.opacity = 0;
+  }
+  /** 책 꺼내 보기 — 화면 가운데로 끌어와 크게 */
+  let hoverBook: THREE.Mesh | null = null;
+  let focusBook: THREE.Mesh | null = null;
+  const bookPose = { pos: V(), q: new T.Quaternion(), s: 1 };
+  function openBook(b: THREE.Mesh) {
+    const d = 1.5, tv = Math.tan((camera.fov * Math.PI) / 360);
+    const dir = V();
+    camera.getWorldDirection(dir);
+    bookPose.pos.copy(camera.position).add(dir.multiplyScalar(d));
+    bookPose.q.copy(camera.quaternion);
+    bookPose.s = (0.62 * 2 * d * tv) / 0.48;
+    focusBook = b;
+    hoverBook = null;
+    emit({ type: 'hover', tool: null });
+    emit({ type: 'select', tool: b.userData.tool, slot: null });
+  }
+  /* 청사 들어가기·나오기 */
+  const doorHit: THREE.Object3D[] = [];
+  {
+    // 정문 앞을 누르면 걸어 들어가게 — 보이지 않는 판
+    const hb = new T.Mesh(new T.BoxGeometry(11, 5, 7.5), new T.MeshBasicMaterial({ visible: false }));
+    hb.position.copy(W(ENT.q[0] + ENT.nrm[0] * 3.5, ENT.q[1] + ENT.nrm[1] * 3.5, 2.5));
+    hb.rotation.y = ENT.ang;
+    hb.userData.door = true;
+    scene.add(hb);
+    doorHit.push(hb);
+  }
+  const fadeEl = document.createElement('div');
+  Object.assign(fadeEl.style, { position: 'absolute', inset: '0', background: '#05070d', opacity: '0', transition: 'opacity .35s', pointerEvents: 'none', zIndex: '5' });
+  host.appendChild(fadeEl);
+  let fading = false;
+  const movers = () => [me.root, meRing, pin, pad, beam, spk, ...cards.map((c) => c.mesh)];
+  function fadeSwap(fn: () => void, then?: () => void) {
+    if (fading) return;
+    fading = true;
+    keys.clear();
+    P.target = null;
+    fadeEl.style.opacity = '1';
+    window.setTimeout(() => {
+      fn();
+      lastNear = -2;
+      fadeEl.style.opacity = '0';
+      window.setTimeout(() => {
+        fading = false;
+        then?.();
+      }, 380);
+    }, 380);
+  }
+  function enterLobby() {
+    fadeSwap(() => {
+      if (talking !== -1) endTalk(true);
+      select(null);
+      if (!lobby) {
+        lobby = makeLobby(opt.lobby.tools, opt.lobby.popular, opt.lobby.fresh);
+        lobby.setOutside(lastSky, lastDark);
+      }
+      const L = lobby;
+      movers().forEach((o) => L.scene.add(o));
+      world = 'in';
+      P.pos.copy(L.spawn.pos);
+      P.yaw = L.spawn.yaw;
+      cam.yaw = P.yaw + Math.PI;
+      cam.pitch = 0.3;
+      cam.dist = 7.5;
+      const fp = followPose();
+      cam.pos.copy(fp.pos);
+      cam.look.copy(fp.look);
+      cam.mode = 'follow';
+      cam.t = 1;
+      emit({ type: 'world', world: 'in' });
+    });
+  }
+  function exitLobby(then?: () => void) {
+    fadeSwap(() => {
+      if (talking !== -1) endTalk(true);
+      select(null);
+      hoverBook = null;
+      movers().forEach((o) => scene.add(o));
+      world = 'out';
+      const o = [ENT.door[0] + ENT.nrm[0] * 2.4, ENT.door[1] + ENT.nrm[1] * 2.4];
+      P.pos.copy(W(o[0], o[1]));
+      P.yaw = Math.atan2(ENT.nrm[0], -ENT.nrm[1]);
+      cam.yaw = P.yaw + Math.PI;
+      cam.pitch = 0.42;
+      cam.dist = 13;
+      const fp = followPose();
+      cam.pos.copy(fp.pos);
+      cam.look.copy(fp.look);
+      cam.mode = 'follow';
+      cam.t = 1;
+      emit({ type: 'world', world: 'out' });
+    }, then);
+  }
+  function goLobby() {
+    if (world === 'in') return;
+    if (talking !== -1) endTalk(true);
+    if (cam.mode === 'intro') skipIntro();
+    P.target = doorPt.clone();
+    P.goTalk = -1;
+    P.goDoor = true;
   }
   function skipIntro() {
     if (cam.mode !== 'intro') return;
@@ -1458,6 +1643,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   let readySent = false;
   let lastNear: number | null = -2;
   let tick20 = 0;
+  let doorK = 0;
   const tmp = V();
   function frame() {
     raf = requestAnimationFrame(frame);
@@ -1501,7 +1687,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       if (d < 0.15 || d < Math.min(run, d * 4 + 1) * dt) {
         if (!blocked(P.target.x, P.target.z)) P.pos.copy(P.target);
         P.target = null;
-        if (P.goTalk >= 0) startTalk(P.goTalk);
+        if (P.goTalk !== -1) startTalk(P.goTalk);
+        else if (P.goDoor) enterLobby();
       } else {
         mx = tmp.x / d;
         mz = tmp.z / d;
@@ -1536,9 +1723,52 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       pin.scale.setScalar(1 + (0.9 - pin.material.opacity) * 0.8);
     }
 
-    // 가까운 천막지기
-    let best: number | null = null, bd = 3.6;
-    TENTS.forEach((tt, i) => {
+    // 가까운 천막지기 / 안내 데스크
+    let best: number | 'desk' | null = null, bd = 3.6;
+    if (world === 'out') {
+      // 정문: 다가가면 문이 열리고, 문 앞까지 오면 로비로
+      const dd = Math.hypot(P.pos.x - doorPt.x, P.pos.z - doorPt.z);
+      doorK += ((dd < 7 ? 1 : 0) - doorK) * Math.min(1, dt * 4);
+      ENT.setDoors(doorK);
+      if (dd < 1.0 && cam.mode === 'follow' && !fading && talking === -1) enterLobby();
+    } else if (lobby) {
+      const L = lobby;
+      L.update(dt, t, P.pos, hourShown);
+      const dd = Math.hypot(P.pos.x - L.deskSpot.x, P.pos.z - L.deskSpot.z);
+      if (dd < 2.6) best = 'desk';
+      const n = L.npc;
+      let want = -Math.PI / 2;
+      const nd = Math.hypot(P.pos.x - L.npcPos.x, P.pos.z - L.npcPos.z);
+      if (nd < 8 || talking === DESK) want = Math.atan2(P.pos.x - L.npcPos.x, P.pos.z - L.npcPos.z);
+      let dy = want - n.root.rotation.y;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      n.root.rotation.y += dy * Math.min(1, dt * 4);
+      if (nd < 8 && !n.root.userData.greeted) {
+        n.root.userData.greeted = true;
+        n.wave = 1.1;
+      }
+      if (nd > 11) n.root.userData.greeted = false;
+      animChibi(n, dt, t, 0);
+      if (L.isExit(P.pos.x, P.pos.z) && !fading && cam.mode === 'follow') exitLobby();
+      // 책: 마우스 올리면 살짝 나오고, 고르면 화면 가운데로
+      for (const b of L.books) {
+        const u = b.userData;
+        u.pull += ((b === hoverBook ? 1 : 0) - u.pull) * Math.min(1, dt * 10);
+        u.fk += ((b === focusBook ? 1 : 0) - u.fk) * Math.min(1, dt * 7);
+        if (u.pull < 0.002 && u.fk < 0.002 && !u.moved) continue;
+        u.moved = u.pull > 0.002 || u.fk > 0.002;
+        b.position.copy(u.home).add(tmp.copy(u.n).multiplyScalar(0.2 * u.pull));
+        b.quaternion.copy(u.q);
+        b.scale.setScalar(1);
+        if (u.fk > 0.002) {
+          const e5 = ease(clamp(u.fk));
+          b.position.lerp(bookPose.pos, e5);
+          b.quaternion.slerp(bookPose.q, e5);
+          b.scale.setScalar(1 + (bookPose.s - 1) * e5);
+        }
+      }
+    }
+    if (world === 'out') TENTS.forEach((tt, i) => {
       const d = Math.hypot(tt.npcPos.x - P.pos.x, tt.npcPos.z - P.pos.z);
       if (d < bd) (bd = d), (best = i);
       // 천막지기: 가까이 오면 나를 봄
@@ -1559,7 +1789,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       const ld = camera.position.distanceTo(tt.label.position);
       tt.label.material.opacity = cam.mode === 'talk' || cam.mode === 'holo' ? 0 : clamp((ld - 7) / 6) * clamp(1.5 - ld / 110, 0.45, 1);
     });
-    if (talking >= 0) best = null;
+    if (talking !== -1 || fading) best = null;
     if (best !== lastNear) {
       lastNear = best;
       near = best;
@@ -1594,6 +1824,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     camera.position.copy(cam.pos);
     camera.lookAt(cam.look);
     sky.position.copy(camera.position);
+    // 책을 꺼내 볼 때는 카메라 기준 위치를 계속 따라감(카메라는 멈춰 있음)
 
     // 홀로그램
     const beamOn = holo.on ? 1 : 0;
@@ -1653,9 +1884,9 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       }
       c.mat.uniforms.dim.value += ((focus >= 0 && focus !== n ? 1 : 0) - c.mat.uniforms.dim.value) * Math.min(1, dt * 7);
     });
-    if (talking >= 0) TENTS[talking].npc.talk = speaking ? 1 : 0;
+    if (talking !== -1) anchorOf(talking).npc.talk = speaking ? 1 : 0;
 
-    renderer.render(scene, camera);
+    renderer.render(world === 'in' && lobby ? lobby.scene : scene, camera);
     if (!readySent) {
       readySent = true;
       emit({ type: 'ready' });
@@ -1670,29 +1901,34 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     setMode,
     talk: (i: number) => startTalk(i),
     walkTo: (i: number) => walkToTent(i),
+    goLobby,
+    talkDesk: () => world === 'in' && startTalk(DESK),
+    search: (list: PlazaTool[]) => showResults(list),
     showTools,
     endTalk: () => endTalk(),
     page: (d: number) => holo.on && showPage(holo.page + d),
+    world: () => world,
     select,
     focus: (n: number | null) => focusCard(n),
     speak: (on: boolean) => (speaking = on),
     near: () => near,
     shot: () => cv.toDataURL('image/png'),
-    debug: { P, cam, TENTS, startTalk, showTools, applyHour, holo, cards, camera },
+    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook },
     destroy() {
       cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener('keydown', kd);
       window.removeEventListener('keyup', ku);
       window.removeEventListener('blur', blur);
-      scene.traverse((o) => {
+      [scene, ...(lobby ? [lobby.scene] : [])].forEach((sc2) => sc2.traverse((o) => {
         if (o.geometry) o.geometry.dispose();
         const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
         ms.forEach((m) => {
           Object.values(m).forEach((v) => v && v.isTexture && v.dispose());
           m.dispose();
         });
-      });
+      }));
+      fadeEl.remove();
       renderer.dispose();
       renderer.forceContextLoss();
       cv.remove();

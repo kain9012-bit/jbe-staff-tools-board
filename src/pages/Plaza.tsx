@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ChevronDown, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X } from 'lucide-react';
 import { allTools, splitAuthor, type Model } from '../lib/stats';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
-import { summaryOf, type ToolSummary } from '../lib/summaries';
+import { summaryOf, summaryText, type ToolSummary } from '../lib/summaries';
+import { matcher } from '../lib/search';
 import { hrefTool } from '../lib/route';
 import { createPlaza, type Ev, type Mode, type PlazaEngine, type PlazaTent, type PlazaTool } from '../plaza/engine';
 import suitUrl from '../fonts/SUIT-Variable.woff2';
@@ -34,11 +35,11 @@ const LOOK: Record<string, { color: string; prop: string; line: string }> = {
   '교육공무직': { color: '#3f6e8c', prop: 'mug', line: '교육공무직 업무에 쓰는 도구들이에요.' },
 };
 const TAG: Record<string, string> = { staff: '교직원 제작', official: '교육청 배포', external: '외부 공공' };
-/** 구분 표 색 — 목록 화면의 구분 표와 같게 */
+/** 구분 표 색 — 목록 화면의 구분 표와 같은 계열(홀로그램 위에서 보이게 진하게) */
 const TAG_CLS: Record<string, string> = {
-  staff: 'bg-[#dcefff] text-[#0a62a8]',
-  official: 'bg-[#2f3a73] text-white ring-1 ring-inset ring-white/60',
-  external: 'bg-[#e3f5ee] text-[#0b6b52]',
+  staff: 'bg-[#1f7ae0] text-white',
+  official: 'bg-[#2f3a73] text-white ring-1 ring-inset ring-white',
+  external: 'bg-[#0f9a72] text-white',
 };
 
 /** 들른 천막 — 이 브라우저에만 기억(다시 들어와도 유지) */
@@ -63,32 +64,46 @@ const LINE2 = '이 업무에 쓸 수 있는 도구들이에요. 카드를 눌러
 type Tool = PlazaTool & { url: string; board: string };
 type Tent = PlazaTent & { tools: Tool[] };
 
-function useTents(m: Model): Tent[] {
+/** 천막(업무 분류)별 도구 + 로비 서가용 전체·많이 찾는·새로 올라온 도구 */
+function usePlazaData(m: Model) {
   return useMemo(() => {
     const byRecent = [...allTools(m)].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views);
-    return KEYWORD_CHIPS.map((c) => {
+    const cache = new Map<string, Tool>();
+    const toTool = (t: (typeof byRecent)[number]): Tool => {
+      const hitT = cache.get(t.sid);
+      if (hitT) return hitT;
+      const s = summaryOf(t.sid);
+      const board = t.board ?? 'staff';
+      const a = splitAuthor(t.author);
+      const v: Tool = {
+        sid: t.sid,
+        title: t.title,
+        tag: TAG[board] ?? '교직원 제작',
+        who: board === 'staff' ? a.person + (a.org ? ` · ${a.org}` : '') : board === 'official' ? '전북특별자치도교육청' : '외부 기관',
+        what: s?.what ?? '',
+        run: s?.run ?? '',
+        url: t.url,
+        board,
+      };
+      cache.set(t.sid, v);
+      return v;
+    };
+    const tents: Tent[] = KEYWORD_CHIPS.map((c) => {
       const hit = chipMatcher(c);
-      const tools: Tool[] = byRecent
-        .filter((t) => hit(...chipFields(t)))
-        .map((t) => {
-          const s = summaryOf(t.sid);
-          const board = t.board ?? 'staff';
-          return {
-            sid: t.sid,
-            title: t.title,
-            tag: TAG[board] ?? '교직원 제작',
-            who: board === 'staff' ? splitAuthor(t.author).person + (splitAuthor(t.author).org ? ` · ${splitAuthor(t.author).org}` : '') : board === 'official' ? '전북특별자치도교육청' : '외부 기관',
-            what: s?.what ?? '',
-            run: s?.run ?? '',
-            url: t.url,
-            board,
-          };
-        });
+      const tools = byRecent.filter((t) => hit(...chipFields(t))).map(toTool);
       const look = LOOK[c.label] ?? { color: '#3a457f', prop: 'clipboard', line: '어서 오세요!' };
       return { label: c.label, color: look.color, prop: look.prop, tools };
     }).filter((t) => t.tools.length > 0);
+    const all = byRecent.map(toTool);
+    const popular = all.slice(0, 12);
+    const fresh = [...byRecent]
+      .sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid))
+      .slice(0, 12)
+      .map(toTool);
+    return { tents, all, popular, fresh };
   }, [m]);
 }
+const DESK_HELLO = '어서 오세요! 어떤 업무 도구를 찾으세요? 낱말을 넣거나 아래에서 골라 보세요.';
 
 let fontsReady: Promise<unknown> | null = null;
 const loadFonts = () =>
@@ -121,6 +136,7 @@ const HOLO_CSS = `
 .plaza-holo{background:linear-gradient(135deg,rgba(14,64,130,.9),rgba(6,28,70,.92));border:2px solid rgba(120,220,255,.75);
 box-shadow:0 0 0 1px rgba(120,220,255,.15),0 0 40px rgba(60,180,255,.35),inset 0 0 60px rgba(60,180,255,.12);backdrop-filter:blur(6px);
 animation:plazaHoloIn .45s cubic-bezier(.2,.9,.3,1.2) .28s both;overflow:hidden}
+@media (max-width:639px){.plaza-holo{overflow-y:auto;-webkit-overflow-scrolling:touch}.plaza-holo::after{display:none}}
 .plaza-holo::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
 background:repeating-linear-gradient(0deg,rgba(150,225,255,.05) 0 1px,transparent 1px 4px),linear-gradient(rgba(120,220,255,.07) 1px,transparent 1px) 0 0/26px 26px,linear-gradient(90deg,rgba(120,220,255,.07) 1px,transparent 1px) 0 0/26px 26px}
 .plaza-holo::after{content:"";position:absolute;left:0;right:0;height:60px;top:-60px;pointer-events:none;
@@ -132,14 +148,20 @@ background:linear-gradient(transparent,rgba(120,220,255,.12),transparent);animat
 `;
 
 export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
-  const tents = useTents(m);
+  const data = usePlazaData(m);
+  const tents = data.tents;
   const stage = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const eng = useRef<PlazaEngine | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [near, setNear] = useState<number | null>(null);
-  const [talk, setTalk] = useState<number | null>(null);
+  const [near, setNear] = useState<number | 'desk' | null>(null);
+  const [talk, setTalk] = useState<number | 'desk' | null>(null);
+  const [world, setWorld] = useState<'out' | 'in'>('out');
+  const [hoverTool, setHoverTool] = useState<PlazaTool | null>(null);
+  const [deskQ, setDeskQ] = useState('');
+  const [deskMsg, setDeskMsg] = useState<string | null>(null);
+  const [deskHas, setDeskHas] = useState(false);
   const [step, setStep] = useState<'hello' | 'tools'>('hello');
   const [page, setPage] = useState({ page: 0, pages: 1, cards: [] as PlazaTool[] });
   const [sel, setSel] = useState<Tool | null>(null);
@@ -151,7 +173,6 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   });
   const visitedRef = useRef(visited);
   visitedRef.current = visited;
-  const [slot, setSlot] = useState<number | null>(null);
   const [detail, setDetail] = useState<Tool | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [help, setHelp] = useState(() => !(window.matchMedia?.('(pointer: coarse)').matches ?? false));
@@ -188,9 +209,11 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         setStep('hello');
         setSel(null);
         setDetail(null);
-        if (e.tent !== null)
+        setDeskMsg(null);
+        setDeskHas(false);
+        if (typeof e.tent === 'number')
           setVisited((v) => {
-            const n = new Set(v).add(e.tent!);
+            const n = new Set(v).add(e.tent as number);
             saveVisited([...new Set([...loadVisited(), ...[...n].map((i) => tents[i]?.label).filter(Boolean)])]);
             return n;
           });
@@ -200,15 +223,18 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
       }
       else if (e.type === 'select') {
         setSel(e.tool as Tool | null);
-        setSlot(e.slot);
-        if (!e.tool) setDetail(null);
+        setDetail(e.tool as Tool | null);
       }
       else if (e.type === 'clock') setClock({ text: e.text, night: e.night });
+      else if (e.type === 'world') {
+        setWorld(e.world);
+        setHoverTool(null);
+      } else if (e.type === 'hover') setHoverTool(e.tool);
     };
     void loadFonts().then(() => {
       if (dead || !host.current) return;
       try {
-        eng.current = createPlaza(host.current, tents, on, { quality, visited: [...visitedRef.current] });
+        eng.current = createPlaza(host.current, tents, on, { quality, visited: [...visitedRef.current], lobby: { tools: data.all, popular: data.popular, fresh: data.fresh } });
         (window as unknown as { __plaza?: PlazaEngine }).__plaza = eng.current;
       } catch {
         setFailed(true);
@@ -219,11 +245,13 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
       eng.current?.destroy();
       eng.current = null;
     };
-  }, [tents, quality]);
+  }, [tents, quality, data]);
 
   // 대사 한 글자씩
-  const tent = talk !== null ? tents[talk] : null;
-  const line = tent ? (step === 'hello' ? LOOK[tent.label]?.line ?? '어서 오세요!' : LINE2) : '';
+  const tent = typeof talk === 'number' ? tents[talk] : null;
+  const isDesk = talk === 'desk';
+  const line = isDesk ? deskMsg ?? DESK_HELLO : tent ? (step === 'hello' ? LOOK[tent.label]?.line ?? '어서 오세요!' : LINE2) : '';
+  const talker = isDesk ? { label: '안내 데스크', color: '#3a457f' } : tent ? { label: `${tent.label} 천막지기`, color: tent.color } : null;
   const [typed, setTyped] = useState(0);
   useEffect(() => {
     setTyped(0);
@@ -245,7 +273,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   }, [line]);
   const typing = typed < line.length;
 
-  const doTalk = useCallback(() => near !== null && eng.current?.talk(near), [near]);
+  const doTalk = useCallback(() => (near === 'desk' ? eng.current?.talkDesk() : near !== null && eng.current?.talk(near)), [near]);
   const doShow = useCallback(() => {
     if (typing) return setTyped(line.length);
     setStep('tools');
@@ -256,13 +284,17 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
     setSel(null);
     setDetail(null);
   }, []);
-  const openDetail = useCallback(() => {
-    if (!sel || slot === null) return;
-    eng.current?.focus(slot);
-    setDetail(sel);
-  }, [sel, slot]);
+  /** 안내 데스크 찾기 — 낱말 또는 업무 분류 */
+  const runSearch = (q: string, chip?: string) => {
+    const word = (chip ?? q).trim();
+    if (!word) return;
+    const list = chip ? tents.find((t) => t.label === chip)?.tools ?? [] : data.all.filter((t) => matcher(q)(t.title, t.who, t.tag, summaryText(t.sid)));
+    eng.current?.search(list);
+    setDeskHas(list.length > 0);
+    setDeskMsg(list.length ? `‘${word}’ 도구 ${list.length}개를 찾았어요. 서가에서도 빛나는 책을 찾아보세요!` : `‘${word}’에 맞는 도구를 찾지 못했어요. 다른 낱말로 찾아볼까요?`);
+  };
   const closeDetail = useCallback(() => {
-    eng.current?.focus(null);
+    eng.current?.select(null);
     setDetail(null);
   }, []);
 
@@ -275,7 +307,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         if (talk === null && near !== null) {
           e.preventDefault();
           doTalk();
-        } else if (talk !== null && step === 'hello') {
+        } else if (typeof talk === 'number' && step === 'hello') {
           e.preventDefault();
           doShow();
         }
@@ -346,8 +378,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
       <div className={`absolute left-3 top-3 sm:left-4 sm:top-4 z-10 w-[min(300px,calc(100%-196px))] space-y-2 transition-opacity ${talk !== null ? 'pointer-events-none opacity-0' : ''}`} aria-hidden={talk !== null}>
         <div className={`rounded-2xl ${glass} px-4 py-3`}>
           <div className="flex items-center gap-2">
-            <span className="nr-title whitespace-nowrap text-[18px] sm:text-[20px] leading-none">3D 광장</span>
-            <span className="rounded-full bg-[#4fd1ff]/20 px-2 py-0.5 text-[11px] font-bold text-[#9be6ff]">시범</span>
+            <span className="nr-title whitespace-nowrap text-[18px] sm:text-[20px] leading-none">{world === 'in' ? '청사 로비' : '3D 광장'}</span>
             <span className="ml-auto text-[12px] tabular-nums text-white/70" title="들른 천막">
               <Footprints className="mr-1 inline w-3.5 h-3.5 align-[-2px]" aria-hidden="true" />
               {visited.size}/{tents.length}
@@ -358,7 +389,16 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
           </div>
           {help && (
             <ul className="mt-2 space-y-0.5 whitespace-nowrap text-[13px] leading-relaxed text-white/80">
-              <li>업무별 천막의 천막지기에게 말을 걸어 보세요.</li>
+              {world === 'in' ? (
+                <>
+                  <li>책장의 책이 업무경감 도구예요.</li>
+                  <li>· 책을 누르면 도구 설명이 열려요</li>
+                  <li>· 안내 데스크에서 도구를 찾아 드려요</li>
+                  <li>· 들어온 문으로 나가면 광장이에요</li>
+                </>
+              ) : (
+                <li>업무별 천막의 천막지기에게 말을 걸어 보세요.</li>
+              )}
               {touch ? (
                 <>
                   <li>· 땅을 누르면 그곳으로 걸어가요</li>
@@ -389,11 +429,26 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
             aria-expanded={listOpen}
             className="flex w-full items-center gap-2 px-4 py-2.5 text-[14px] font-bold"
           >
-            천막 바로 가기
+            바로 가기
             <ChevronDown className={`ml-auto w-4 h-4 transition ${listOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
           </button>
           {listOpen && (
             <ul className="max-h-[40vh] overflow-y-auto px-2 pb-2">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    eng.current?.goLobby();
+                    if (touch) setListOpen(false);
+                  }}
+                  disabled={world === 'in'}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[14px] hover:bg-white/10 focus-visible:bg-white/10 disabled:opacity-50"
+                >
+                  <Building2 className="h-4 w-4 shrink-0 text-[#9be6ff]" aria-hidden="true" />
+                  <span className="truncate">청사 로비 · 도구 서가</span>
+                  {world === 'in' && <span className="ml-auto text-[11px] text-[#9be6ff]">여기</span>}
+                </button>
+              </li>
               {tents.map((t, i) => (
                 <li key={t.label}>
                   <button
@@ -460,56 +515,79 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
             onClick={doTalk}
             className="group inline-flex items-center gap-3 rounded-full bg-white px-5 py-3 text-[15px] font-bold text-[#0d1830] shadow-[0_8px_30px_rgba(0,0,0,0.3)] ring-4 ring-[#4fd1ff]/40 hover:ring-[#4fd1ff]/70"
           >
-            <span className="h-3 w-3 rounded-full" style={{ background: tents[near].color }} aria-hidden="true" />
-            {tents[near].label} 천막지기에게 말 걸기
+            <span className="h-3 w-3 rounded-full" style={{ background: near === 'desk' ? '#3a457f' : tents[near].color }} aria-hidden="true" />
+            {near === 'desk' ? '안내 데스크에 말 걸기' : `${tents[near].label} 천막지기에게 말 걸기`}
             {!touch && <Kbd dark>Space</Kbd>}
           </button>
         </div>
       )}
 
+      {/* 책에 마우스를 올리면 이름 */}
+      {hoverTool && !detail && talk === null && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
+          <span className="inline-flex max-w-[90%] items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[14px] font-bold text-[#0d1830] shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
+            <BookOpen className="h-4 w-4 shrink-0 text-[#1c64ac]" aria-hidden="true" />
+            <span className="truncate">{hoverTool.title}</span>
+            <span className="shrink-0 font-medium text-slate-500">· 누르면 설명</span>
+          </span>
+        </div>
+      )}
+
       {/* 대화 상자 */}
-      {tent && !detail && (
+      {talker && !detail && (
         <div className="absolute inset-x-0 bottom-3 sm:bottom-5 z-20 flex justify-center px-3">
-          <div role="dialog" aria-label={`${tent.label} 천막지기`} className={`relative w-full max-w-3xl rounded-2xl ${glass} px-5 pb-4 pt-6 sm:px-6`}>
-            <span
-              className="absolute -top-3.5 left-5 rounded-full px-3.5 py-1 text-[13px] font-bold text-white shadow"
-              style={{ background: tent.color }}
-            >
-              {tent.label} 천막지기
+          <div role="dialog" aria-label={talker.label} className={`relative w-full max-w-3xl rounded-2xl ${glass} px-5 pb-4 pt-6 sm:px-6`}>
+            <span className="absolute -top-3.5 left-5 rounded-full px-3.5 py-1 text-[13px] font-bold text-white shadow" style={{ background: talker.color }}>
+              {talker.label}
             </span>
             <button type="button" onClick={doEnd} className="absolute right-3 top-3 rounded-full p-1.5 text-white/70 hover:bg-white/10 hover:text-white" aria-label="대화 끝내기">
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
-            {sel ? (
-              <div aria-live="polite">
-                <div className="flex flex-wrap items-center gap-1.5 pr-8">
-                  <span className={`rounded-md px-2 py-0.5 text-[12px] font-bold ${TAG_CLS[sel.board] ?? TAG_CLS.staff}`}>{sel.tag}</span>
-                  {sel.run && <span className="rounded-md bg-white/15 px-2 py-0.5 text-[12px] font-bold">{sel.run}</span>}
-                  <span className="text-[13px] text-white/65">{sel.who}</span>
-                </div>
-                <h2 className="mt-2 text-[18px] sm:text-[19px] font-bold leading-snug">{sel.title}</h2>
-                <p className="mt-1 text-[15px] leading-relaxed text-white/85">{sel.what || '아직 게시글 요약이 없습니다.'}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" onClick={openDetail} className="rounded-full bg-[#4fd1ff] px-4 py-2 text-[14px] font-bold text-[#06213a] hover:bg-[#7fe0ff]">
-                    자세히 보기
-                  </button>
-                  <a href={sel.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-white/30 hover:bg-white/10">
-                    사용하기 <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span className="sr-only">(새 창)</span>
-                  </a>
-                  <button type="button" onClick={() => eng.current?.select(null)} className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-2 text-[14px] font-bold text-white/80 hover:text-white">
-                    <ArrowLeft className="w-4 h-4" aria-hidden="true" /> 다른 카드
-                  </button>
-                </div>
-              </div>
-            ) : (
-            <>
             <p className="min-h-[3.2em] pr-6 text-[16px] sm:text-[17px] leading-relaxed" aria-live="polite">
               {line.slice(0, typed)}
               {typing && <span className="ml-0.5 inline-block w-2 animate-pulse">▍</span>}
             </p>
+            {isDesk && (
+              <div className="mt-2">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    runSearch(deskQ);
+                  }}
+                  className="flex gap-2"
+                >
+                  <label className="sr-only" htmlFor="plaza-desk-q">찾을 업무 낱말</label>
+                  <input
+                    id="plaza-desk-q"
+                    autoFocus={!touch}
+                    value={deskQ}
+                    onChange={(e) => setDeskQ(e.target.value)}
+                    placeholder="예: 엑셀 합치기, 품의, 급식"
+                    className="min-w-0 flex-1 rounded-full bg-white px-4 py-2 text-[15px] text-[#0d1830] outline-none ring-2 ring-transparent focus:ring-[#4fd1ff]"
+                  />
+                  <button type="submit" className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#4fd1ff] px-4 py-2 text-[14px] font-bold text-[#06213a] hover:bg-[#7fe0ff]">
+                    <Search className="h-4 w-4" aria-hidden="true" /> 찾기
+                  </button>
+                </form>
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  {tents.map((t) => (
+                    <button
+                      key={t.label}
+                      type="button"
+                      onClick={() => {
+                        setDeskQ('');
+                        runSearch('', t.label);
+                      }}
+                      className="shrink-0 rounded-full px-3 py-1 text-[13px] font-bold text-white/85 ring-1 ring-white/25 hover:bg-white/10"
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {step === 'hello' ? (
+              {!isDesk && step === 'hello' ? (
                 <>
                   <button type="button" onClick={doShow} className="inline-flex items-center gap-1.5 rounded-full bg-[#4fd1ff] px-4 py-2 text-[14px] font-bold text-[#06213a] hover:bg-[#7fe0ff]">
                     도구 보여 주세요 {!touch && <Kbd dark>Space</Kbd>}
@@ -520,7 +598,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
                 </>
               ) : (
                 <>
-                  {page.pages > 1 && (
+                  {(!isDesk || deskHas) && page.pages > 1 && (
                     <div className="inline-flex items-center gap-1 rounded-full ring-1 ring-white/25">
                       <button type="button" onClick={() => eng.current?.page(-1)} className="rounded-full p-2 hover:bg-white/10" aria-label="이전 카드">
                         <ArrowLeft className="w-4 h-4" aria-hidden="true" />
@@ -533,17 +611,15 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
                       </button>
                     </div>
                   )}
-                  {!touch && <span className="text-[12px] text-white/60">카드를 누르거나 숫자 키 1~6</span>}
+                  {!touch && (!isDesk || deskHas) && <span className="text-[12px] text-white/60">카드를 누르면 자세히 · 숫자 키 1~6</span>}
                   <button type="button" onClick={doEnd} className="ml-auto rounded-full px-4 py-2 text-[14px] font-bold text-white/80 ring-1 ring-white/25 hover:text-white">
                     대화 끝내기
                   </button>
                 </>
               )}
             </div>
-            </>
-            )}
             {/* 키보드·화면 낭독기용 카드 목록 */}
-            {step === 'tools' && (
+            {(step === 'tools' || deskHas) && (
               <ul className="sr-only">
                 {page.cards.map((c, i) => (
                   <li key={c.sid}>
@@ -579,15 +655,15 @@ const Detail: React.FC<{ tool: Tool; s?: ToolSummary; onClose: () => void }> = (
   useEffect(() => box.current?.focus(), []);
   const none = !s?.why && !s?.features?.length && !s?.steps?.length && !s?.needs?.length && !s?.cautions?.length;
   return (
-    <div className="absolute inset-0 z-30 grid place-items-center p-3 sm:p-6 pointer-events-none">
+    <div className="absolute inset-0 z-30 grid place-items-center p-2 sm:p-6 pointer-events-none">
       <div
         ref={box}
         tabIndex={-1}
         role="dialog"
         aria-label={`${tool.title} 자세히 보기`}
-        className="plaza-holo pointer-events-auto relative flex max-h-[86%] w-full max-w-[760px] flex-col rounded-[22px] text-white outline-none"
+        className="plaza-holo plaza-scroll pointer-events-auto relative block max-h-full w-full max-w-[760px] rounded-[18px] text-white outline-none sm:flex sm:max-h-[86%] sm:flex-col sm:rounded-[22px]"
       >
-        <div className="flex items-start gap-2 px-6 pt-6 sm:px-8 sm:pt-7">
+        <div className="flex items-start gap-2 px-5 pt-5 sm:px-8 sm:pt-7">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className={`rounded-md px-2 py-0.5 text-[12px] font-bold ${TAG_CLS[tool.board] ?? TAG_CLS.staff}`}>{tool.tag}</span>
@@ -601,7 +677,7 @@ const Detail: React.FC<{ tool: Tool; s?: ToolSummary; onClose: () => void }> = (
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-2 sm:px-8 plaza-scroll">
+        <div className="px-5 pb-2 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:px-8 plaza-scroll">
           {s?.why && <Sec title="만든 이유">{s.why}</Sec>}
           {!!s?.features?.length && (
             <Sec title="주요 기능">
@@ -639,7 +715,7 @@ const Detail: React.FC<{ tool: Tool; s?: ToolSummary; onClose: () => void }> = (
           )}
           {none && <p className="mt-5 text-[15px] text-white/70">아직 게시글 요약이 없습니다. 게시글에서 내용을 확인해 주세요.</p>}
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-[#4fd1ff]/25 px-6 py-4 sm:px-8">
+        <div className="flex flex-wrap items-center gap-2 border-t border-[#4fd1ff]/25 px-5 py-4 sm:px-8">
           <a href={tool.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#4fd1ff] px-5 py-2.5 text-[14px] font-bold text-[#06213a] hover:bg-[#7fe0ff]">
             사용하기 <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
             <span className="sr-only">(새 창)</span>

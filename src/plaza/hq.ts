@@ -9,6 +9,7 @@ export function makeHQ(T, scene, NIGHT_MATS) {
   const map = null;
   const BR = { logoSig: { src: logoSigUrl, w: 1528, h: 229 }, slogan2: { src: slogan2Url, w: 687, h: 319 } };
   let clockTex, clockCtx, lastClock = '';
+  let ENT = null, MAINP = null;
   const LIT = { value: 1 };
   function nightTex(T, cw0, ch0, rect0, prob, seed, cells = 4) {
     const sc = cells > 4 ? 40 / cw0 : 1, cw = Math.round(cw0 * sc), ch = Math.round(ch0 * sc), rect = rect0.map(v => Math.max(1, Math.round(v * sc)));
@@ -174,6 +175,7 @@ export function makeHQ(T, scene, NIGHT_MATS) {
 
       // 본관: 8층 (로비 2개층 5.5m + 업무 6개층 4m) — 남측 곡면은 완만한 호
       const MAIN = smoothFront([[-42.6, -17.7], [-34.1, -33.0], [7.2, -10.1], [34.8, 10.7], [43.1, 21.2], [18.6, 23.0], [11.6, 15.0], [4.0, 8.1]], 1, 4, 5.0, 22);
+      MAINP = MAIN;
       const MH = 35;
       for (let i = 0; i < MAIN.length; i++) {
         const a = MAIN[i], b = MAIN[(i + 1) % MAIN.length];
@@ -183,6 +185,49 @@ export function makeHQ(T, scene, NIGHT_MATS) {
         add(wall(a, b, 10.6, 11.3, mConc2, .35));          // 로비 위 띠
       }
       add(slab(MAIN, MH - .2, MH, mRoof));
+      // 정문 — 본관 곡면 앞, 전면동 왼쪽. 흰 평지붕 차양 + 회색 문틀 + 유리 자동문 (드론 사진 기준)
+      {
+        const a = [-34.1, -33.0], b = [34.8, 10.7];
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]), nx = (b[1] - a[1]) / L, ny = -(b[0] - a[0]) / L;
+        const c = [(a[0] + b[0]) / 2 + nx * 10, (a[1] + b[1]) / 2 + ny * 10];
+        const t = 0.47, u = 1 - t;
+        const q = [u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]];
+        const tx0 = 2 * u * (c[0] - a[0]) + 2 * t * (b[0] - c[0]), ty0 = 2 * u * (c[1] - a[1]) + 2 * t * (b[1] - c[1]);
+        const tl = Math.hypot(tx0, ty0), tan = [tx0 / tl, ty0 / tl], nrm = [tan[1], -tan[0]];
+        const ang = Math.atan2(tan[1], tan[0]);
+        const at = (along, out) => [q[0] + tan[0] * along + nrm[0] * out, q[1] + tan[1] * along + nrm[1] * out];
+        const W3 = (p, h) => new T.Vector3(p[0], h, -p[1]);
+        const put = (o, p, h) => { o.position.copy(W3(p, h)); o.rotation.y = ang; o.castShadow = true; o.receiveShadow = true; add(o); return o; };
+        const white = std('#eef0f2', { roughness: .6 }), gray = std('#b9bec5', { roughness: .55, metalness: .15 });
+        // 차양: 폭 11m, 7m 내밂, 밑면 4.6m
+        put(new T.Mesh(new T.BoxGeometry(11, .45, 7), white), at(0, 3.5), 4.85);
+        put(new T.Mesh(new T.BoxGeometry(11.1, .95, .3), white), at(0, 7.0), 4.7);
+        put(new T.Mesh(new T.BoxGeometry(11.12, .12, .32), std('#2f6fb3')), at(0, 7.0), 4.4);
+        // 차양 밑면 조명(밤에 켜짐)
+        const soffitTex = canvasTex(256, 160, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+          g.fillStyle = 'rgba(255,236,200,1)'; for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { g.beginPath(); g.arc(32 + i * 64, 30 + j * 50, 7, 0, 7); g.fill(); } }, false);
+        const soffit = new T.Mesh(new T.PlaneGeometry(10.6, 6.6), withNight(T, std('#f4f4f2', { side: T.FrontSide }), soffitTex, 1.4));
+        soffit.position.copy(W3(at(0, 3.5), 4.61)); soffit.rotation.order = 'YXZ'; soffit.rotation.y = ang; soffit.rotation.x = Math.PI / 2; add(soffit);
+        // 기둥 둘(앞 모서리)
+        for (const s of [-1, 1]) { const col = new T.Mesh(new T.CylinderGeometry(.2, .2, 4.6, 12), gray); put(col, at(s * 5.0, 6.4), 2.3); }
+        // 회색 문틀(폭 8.2, 높이 4.2) + 유리문
+        put(new T.Mesh(new T.BoxGeometry(8.4, .7, .9), gray), at(0, .45), 3.95);
+        for (const s of [-1, 1]) put(new T.Mesh(new T.BoxGeometry(.6, 3.6, .9), gray), at(s * 3.9, .45), 1.8);
+        const glass = new T.MeshStandardMaterial({ color: '#33485e', roughness: .15, metalness: .4, emissive: '#ffcf8a', emissiveIntensity: 0, transparent: true, opacity: .82 });
+        NIGHT_MATS.push([glass, 0.55]);
+        const steel = std('#d5d9de', { roughness: .3, metalness: .7 });
+        const leaf = (along) => { const g = new T.Group(); const p = new T.Mesh(new T.BoxGeometry(1.75, 3.5, .06), glass); g.add(p);
+          for (const [w, h, x, y] of [[1.8, .08, 0, 1.75], [1.8, .08, 0, -1.75], [.08, 3.5, -.87, 0], [.08, 3.5, .87, 0], [1.8, .05, 0, .2]]) { const f = new T.Mesh(new T.BoxGeometry(w, h, .08), steel); f.position.set(x, y, 0); g.add(f); }
+          g.position.copy(W3(at(along, .6), 1.75)); g.rotation.y = ang; add(g); return g; };
+        const fixedL = leaf(-2.7), fixedR = leaf(2.7), slideL = leaf(-0.9), slideR = leaf(0.9);
+        void fixedL; void fixedR;
+        // 발판·점자블록
+        put(new T.Mesh(new T.BoxGeometry(5, .04, 1.6), std('#3b3f46', { roughness: 1 })), at(0, 1.6), .06);
+        put(new T.Mesh(new T.BoxGeometry(3.2, .03, .35), std('#f2c230', { roughness: .8 })), at(0, 2.7), .07);
+        const home = (g, along) => W3(at(along, .62), 1.75);
+        ENT = { q, tan, nrm, ang, door: at(0, 0.5),
+          setDoors(k) { slideL.position.copy(home(slideL, -0.9 - 1.7 * k)); slideR.position.copy(home(slideR, 0.9 + 1.7 * k)); } };
+      }
       // 옥상 로고 간판: 사진처럼 곡면 오른쪽(게이트타워 쪽) 난간 위에 로고+기관명 글자
       if (BR.logoSig) {
         const i0 = 9, i1 = 17, a = MAIN[i0], b = MAIN[i1];   // 곡면 가운데~오른쪽, 게이트타워와 떨어진 구간
@@ -269,7 +314,7 @@ export function makeHQ(T, scene, NIGHT_MATS) {
       }
     }
   build();
-  return { LIT, drawClock(hh) {
+  return { LIT, ENT, MAIN: MAINP, drawClock(hh) {
       const s = `${String(Math.floor(hh) % 24).padStart(2, '0')}:${String(Math.floor((hh % 1) * 60)).padStart(2, '0')}`;
       if (s === lastClock) return; lastClock = s;
       const g = clockCtx; g.fillStyle = '#05080d'; g.fillRect(0, 0, 512, 170);
