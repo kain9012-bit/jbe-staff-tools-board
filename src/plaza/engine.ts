@@ -29,6 +29,7 @@ export type Ev =
   | { type: 'near'; tent: number | 'desk' | null }
   | { type: 'talk'; tent: number | 'desk' | null }
   | { type: 'world'; world: 'out' | 'in' }
+  | { type: 'focus'; rect: { x: number; y: number; w: number; h: number } | null; kind?: 'card' | 'book' }
   | { type: 'page'; page: number; pages: number; cards: PlazaTool[] }
   | { type: 'hover'; tool: PlazaTool | null }
   | { type: 'select'; tool: PlazaTool | null; slot: number | null }
@@ -876,7 +877,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   const holoU = { time: { value: 0 } };
   const cardVS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }';
   const cardFS = `
-    uniform sampler2D map; uniform float time; uniform float appear; uniform float hover; uniform float sel; uniform float dim; varying vec2 vUv;
+    uniform sampler2D map; uniform float time; uniform float appear; uniform float hover; uniform float sel; uniform float dim; uniform float gone; varying vec2 vUv;
     void main(){
       float edge = appear * 1.12;
       if (vUv.y > edge) discard;
@@ -889,7 +890,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       c.rgb += vec3(0.6, 0.95, 1.0) * rim; c.a = max(c.a, rim * 0.9);
       c.rgb *= 1.0 + hover * 0.35 + sel * 0.25;
       float fl = appear < 1.0 ? 0.75 + 0.25 * step(0.4, fract(sin(time * 61.0) * 4375.5)) : 1.0;
-      gl_FragColor = vec4(c.rgb, c.a * fl * min(1.0, appear * 1.6) * (1.0 - 0.85 * dim));
+      gl_FragColor = vec4(c.rgb, c.a * fl * min(1.0, appear * 1.6) * (1.0 - dim) * (1.0 - gone));
       #include <colorspace_fragment>
     }`;
   const cards = Array.from({ length: 6 }, (_, k) => {
@@ -900,7 +901,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     tex.colorSpace = T.SRGBColorSpace;
     tex.anisotropy = 8;
     const mat = new T.ShaderMaterial({
-      uniforms: { map: { value: tex }, time: holoU.time, appear: { value: 0 }, hover: { value: 0 }, sel: { value: 0 }, dim: { value: 0 } },
+      uniforms: { map: { value: tex }, time: holoU.time, appear: { value: 0 }, hover: { value: 0 }, sel: { value: 0 }, dim: { value: 0 }, gone: { value: 0 } },
       vertexShader: cardVS,
       fragmentShader: cardFS,
       transparent: true,
@@ -1484,29 +1485,48 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   window.addEventListener('blur', blur);
 
   let focus = -1;
-  const focusPose = { pos: V(), q: new T.Quaternion(), s: 1 };
-  /** 고른 카드를 카메라 앞 가운데로 크게 */
+  const focusPose = { pos: V(), q: new T.Quaternion(), sx: 1, sy: 1 };
+  /** 자세히 화면 자리 — 화면 가운데, 가로 최대 820px */
+  const detailRect = () => {
+    const portrait = vw / vh < 0.95;
+    const w = Math.min(vw - (portrait ? 16 : 48), 820);
+    const h = Math.min(vh - (portrait ? 16 : 56), portrait ? vh : Math.max(w * 0.72, 420));
+    return { x: (vw - w) / 2, y: (vh - h) / 2, w, h };
+  };
+  /** 화면 자리 → 카메라 앞 d 거리의 위치·크기 */
+  function poseFor(rect: { x: number; y: number; w: number; h: number }, d: number, out: { pos: THREE.Vector3; q: THREE.Quaternion }) {
+    const tv = Math.tan((camera.fov * Math.PI) / 360), th = tv * camera.aspect;
+    const ww = (rect.w / vw) * 2 * d * th, wh = (rect.h / vh) * 2 * d * tv;
+    const cx = ((rect.x + rect.w / 2) / vw - 0.5) * 2 * d * th, cy = (0.5 - (rect.y + rect.h / 2) / vh) * 2 * d * tv;
+    const dir = V(), right = V(), upv = V();
+    camera.getWorldDirection(dir);
+    right.setFromMatrixColumn(camera.matrixWorld, 0);
+    upv.setFromMatrixColumn(camera.matrixWorld, 1);
+    out.pos.copy(camera.position).add(dir.multiplyScalar(d)).add(right.multiplyScalar(cx)).add(upv.multiplyScalar(cy));
+    out.q.copy(camera.quaternion);
+    return { ww, wh };
+  }
+  /** 고른 카드를 그대로 화면 가운데로 키움 — 다 커지면 그 자리에 자세히 내용이 들어감 */
   function focusCard(n: number | null) {
     if (n === null || !cards[n] || !cards[n].mesh.visible) {
+      if (focus >= 0) emit({ type: 'focus', rect: null });
       focus = -1;
       return;
     }
-    const portrait = vw / vh < 0.95;
-    const d = 2.2, tv = Math.tan((camera.fov * Math.PI) / 360), th = tv * camera.aspect;
-    const s = Math.min((0.74 * 2 * d * tv) / CH, ((portrait ? 0.94 : 0.86) * 2 * d * th) / CW);
-    const dir = V();
-    camera.getWorldDirection(dir);
-    focusPose.pos.copy(camera.position).add(dir.multiplyScalar(d));
-    focusPose.q.copy(camera.quaternion);
-    focusPose.s = s;
+    const rect = detailRect();
+    const { ww, wh } = poseFor(rect, 2.2, focusPose);
+    focusPose.sx = ww / CW;
+    focusPose.sy = wh / CH;
     focus = n;
     hoverCard = -1;
+    emit({ type: 'focus', rect, kind: 'card' });
   }
   function select(n: number | null) {
     if (n === null || !cards[n] || !cards[n].mesh.visible || !cards[n].tool) {
       holo.sel = -1;
       cards.forEach((c) => (c.mat.uniforms.sel.value = 0));
       focusCard(null);
+      if (focusBook) emit({ type: 'focus', rect: null });
       focusBook = null;
       emit({ type: 'select', tool: null, slot: null });
       return;
@@ -1538,7 +1558,16 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     camera.getWorldDirection(dir);
     bookPose.pos.copy(camera.position).add(dir.multiplyScalar(d));
     bookPose.q.copy(camera.quaternion);
-    bookPose.s = (0.62 * 2 * d * tv) / 0.48;
+    void tv;
+    // 펼친 책 자리: 가로로 두 쪽(세로 화면은 한 쪽). 덮인 책은 오른쪽 쪽 자리로 옴
+    const portrait = vw / vh < 0.95;
+    const w = portrait ? Math.min(vw - 20, 520) : Math.min(vw - 48, 980);
+    const h = portrait ? Math.min(vh - 20, w * 1.42) : Math.min(vh - 48, w / 1.42);
+    const rect = { x: (vw - w) / 2, y: (vh - h) / 2, w, h };
+    const page = portrait ? rect : { x: rect.x + w / 2, y: rect.y, w: w / 2, h };
+    const { wh } = poseFor(page, d, bookPose);
+    bookPose.s = (wh / 0.48) * 0.97;
+    emit({ type: 'focus', rect, kind: 'book' });
     focusBook = b;
     hoverBook = null;
     emit({ type: 'hover', tool: null });
@@ -1559,6 +1588,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   Object.assign(fadeEl.style, { position: 'absolute', inset: '0', background: '#05070d', opacity: '0', transition: 'opacity .35s', pointerEvents: 'none', zIndex: '5' });
   host.appendChild(fadeEl);
   let fading = false;
+  let tvSound = false;
   const movers = () => [me.root, meRing, pin, pad, beam, spk, ...cards.map((c) => c.mesh)];
   function fadeSwap(fn: () => void, then?: () => void) {
     if (fading) return;
@@ -1587,6 +1617,12 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       const L = lobby;
       movers().forEach((o) => L.scene.add(o));
       world = 'in';
+      L.video.muted = !tvSound;
+      L.video.play().catch(() => {
+        // 소리 켠 채 자동재생이 막히면 소리 없이라도 틂
+        L.video.muted = true;
+        L.video.play().catch(() => null);
+      });
       P.pos.copy(L.spawn.pos);
       P.yaw = L.spawn.yaw;
       cam.yaw = P.yaw + Math.PI;
@@ -1605,6 +1641,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       if (talking !== -1) endTalk(true);
       select(null);
       hoverBook = null;
+      lobby?.video.pause();
       movers().forEach((o) => scene.add(o));
       world = 'out';
       const o = [ENT.door[0] + ENT.nrm[0] * 2.4, ENT.door[1] + ENT.nrm[1] * 2.4];
@@ -1750,6 +1787,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       if (nd > 11) n.root.userData.greeted = false;
       animChibi(n, dt, t, 0);
       if (L.isExit(P.pos.x, P.pos.z) && !fading && cam.mode === 'follow') exitLobby();
+      // 화면 소리: 가까울수록 크게
+      if (!L.video.muted) L.video.volume = clamp(1 - (Math.hypot(P.pos.x - L.tvPos.x, P.pos.z - L.tvPos.z) - 4) / 18, 0.08, 1);
       // 책: 마우스 올리면 살짝 나오고, 고르면 화면 가운데로
       for (const b of L.books) {
         const u = b.userData;
@@ -1760,6 +1799,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         b.position.copy(u.home).add(tmp.copy(u.n).multiplyScalar(0.2 * u.pull));
         b.quaternion.copy(u.q);
         b.scale.setScalar(1);
+        // 화면의 책(표지·쪽)이 덮으면 3D 책은 숨김
+        b.visible = !(b === focusBook && u.fk > 0.95);
         if (u.fk > 0.002) {
           const e5 = ease(clamp(u.fk));
           b.position.lerp(bookPose.pos, e5);
@@ -1827,7 +1868,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     // 책을 꺼내 볼 때는 카메라 기준 위치를 계속 따라감(카메라는 멈춰 있음)
 
     // 홀로그램
-    const beamOn = holo.on ? 1 : 0;
+    const beamOn = holo.on && focus < 0 ? 1 : 0;
     holo.beam += (beamOn - holo.beam) * Math.min(1, dt * 4);
     beamM.uniforms.op.value = holo.beam * 0.6;
     pad.material.opacity = holo.beam;
@@ -1876,13 +1917,15 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         const e4 = ease(clamp(c.fk));
         c.mesh.position.lerp(focusPose.pos, e4);
         c.mesh.quaternion.copy(c.q).slerp(focusPose.q, e4);
-        c.mesh.scale.multiplyScalar(1 + (focusPose.s - 1) * e4);
+        const s0 = c.mesh.scale.x;
+        c.mesh.scale.set(s0 + (focusPose.sx - s0) * e4, s0 + (focusPose.sy - s0) * e4, 1);
         c.mesh.renderOrder = 12;
       } else {
         c.mesh.quaternion.copy(c.q);
         c.mesh.renderOrder = 10;
       }
       c.mat.uniforms.dim.value += ((focus >= 0 && focus !== n ? 1 : 0) - c.mat.uniforms.dim.value) * Math.min(1, dt * 7);
+      c.mat.uniforms.gone.value = focus === n ? clamp((c.fk - 0.82) / 0.15) : clamp((c.fk - 0.82) / 0.15) * 0;
     });
     if (talking !== -1) anchorOf(talking).npc.talk = speaking ? 1 : 0;
 
@@ -1904,6 +1947,14 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     goLobby,
     talkDesk: () => world === 'in' && startTalk(DESK),
     search: (list: PlazaTool[]) => showResults(list),
+    /** 로비 화면 소리 켜기·끄기 — 누른 순간이라 자동재생 제한에 안 걸림 */
+    tvSound: (on: boolean) => {
+      tvSound = on;
+      if (lobby) {
+        lobby.video.muted = !on;
+        if (world === 'in') lobby.video.play().catch(() => null);
+      }
+    },
     showTools,
     endTalk: () => endTalk(),
     page: (d: number) => holo.on && showPage(holo.page + d),
@@ -1929,6 +1980,11 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         });
       }));
       fadeEl.remove();
+      if (lobby) {
+        lobby.video.pause();
+        lobby.video.removeAttribute('src');
+        lobby.video.load();
+      }
       renderer.dispose();
       renderer.forceContextLoss();
       cv.remove();

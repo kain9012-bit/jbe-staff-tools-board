@@ -8,6 +8,7 @@
  */
 import * as THREE from 'three';
 import { makeChibi, toon, type Chibi } from './chibi';
+import promoUrl from './promo.mp4';
 
 export interface LobbyTool {
   sid: string;
@@ -55,11 +56,13 @@ export function initialOf(title: string) {
 
 const COVER_BG = ['#2f6fb3', '#2e9e6a', '#c0584a', '#b7863a', '#7a5ea8', '#2fa39a', '#d65a3a', '#5b6ee1', '#3f6e8c', '#e0a92e', '#d65aa4', '#4f8f5a', '#3a457f', '#8a6f5a'];
 const TAG_BAND: Record<string, string> = { '교직원 제작': '#1f7ae0', '교육청 배포': '#2f3a73', '외부 공공': '#0f9a72' };
-const hash = (s: string) => {
+export const coverColor = (sid: string) => COVER_BG[hash(sid) % COVER_BG.length];
+export const TAG_BAND_COLOR = (tag: string) => TAG_BAND[tag] ?? '#1f7ae0';
+function hash(s: string) {
   let h = 7;
   for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return h;
-};
+}
 function wrap(g: CanvasRenderingContext2D, text: string, maxW: number, maxLines: number) {
   const out: string[] = [];
   let line = '';
@@ -526,7 +529,7 @@ export function makeLobby(tools: LobbyTool[], popular: LobbyTool[], fresh: Lobby
   }, true);
   ribTex.repeat.set(6, 1);
   const colM = std('#ffffff', { map: ribTex, roughness: 0.7 });
-  const COLS: [number, number][] = [[-7.4, 9.6], [7.4, 9.6], [12.6, -6.2], [3.5, -3.5]];
+  const COLS: [number, number][] = [[-7.4, 9.6], [7.4, 9.6], [12.6, -6.2], [-9.6, -4.6]];
   COLS.forEach(([x, z]) => {
     const c = add(new T.Mesh(new T.CylinderGeometry(0.72, 0.72, RH, 32), colM));
     c.position.set(x, RH / 2, z);
@@ -579,8 +582,42 @@ export function makeLobby(tools: LobbyTool[], popular: LobbyTool[], fresh: Lobby
   // 북쪽 벽 아래: 나무 판 + 큰 화면
   const panel = add(new T.Mesh(new T.PlaneGeometry(RX + 6, MY), std('#e6d3b3', { roughness: 0.8 })));
   panel.position.set((-RX + 6) / 2, MY / 2, -RZ + 0.02);
-  const screen = add(new T.Mesh(new T.PlaneGeometry(4.2, 2.3), std('#2a2522', { roughness: 0.4 })));
-  screen.position.set(-3, 2.3, -RZ + 0.05);
+  // 큰 화면 — 데이터 도구실 홍보영상(소리 없이 반복, 단추로 소리 켬)
+  const TVX = 1.4, TVY = 2.75, TVW = 7.2, TVH = 4.05;
+  const bezel = add(new T.Mesh(new T.BoxGeometry(TVW + 0.24, TVH + 0.24, 0.14), std('#15171c', { roughness: 0.35, metalness: 0.3 })));
+  bezel.position.set(TVX, TVY, -RZ + 0.1);
+  const video = document.createElement('video');
+  video.src = promoUrl;
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.setAttribute('playsinline', '');
+  const vtex = new T.VideoTexture(video);
+  vtex.colorSpace = T.SRGBColorSpace;
+  const screenM = new T.MeshBasicMaterial({ color: '#000000', toneMapped: false });
+  video.addEventListener('playing', () => {
+    screenM.map = vtex;
+    screenM.color.set('#ffffff');
+    screenM.needsUpdate = true;
+  });
+  const screen = add(new T.Mesh(new T.PlaneGeometry(TVW, TVH), screenM));
+  screen.position.set(TVX, TVY, -RZ + 0.18);
+  // 화면 불빛이 바닥에 비침
+  const glowC = document.createElement('canvas');
+  glowC.width = glowC.height = 64;
+  {
+    const g = glowC.getContext('2d')!;
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(120,170,255,.5)');
+    gr.addColorStop(1, 'rgba(120,170,255,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+  }
+  const glow = add(new T.Mesh(new T.PlaneGeometry(9, 5), new T.MeshBasicMaterial({ map: new T.CanvasTexture(glowC), transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: 0.6 })));
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.set(TVX, 0.02, -RZ + 2.4);
+  const tvPos = V(TVX, 0, -RZ + 1);
   // 중층 위 벽(돌판)
   const upper = add(new T.Mesh(new T.PlaneGeometry(RX * 2, RH - MY), std('#e2ddd3', { roughness: 0.85 })));
   upper.position.set(0, MY + (RH - MY) / 2, -RZ + 0.01);
@@ -733,6 +770,8 @@ export function makeLobby(tools: LobbyTool[], popular: LobbyTool[], fresh: Lobby
   }
 
   return {
+    video,
+    tvPos,
     scene,
     floor,
     books,

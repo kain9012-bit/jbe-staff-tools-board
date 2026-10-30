@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X } from 'lucide-react';
+import { Volume2, VolumeX, ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X } from 'lucide-react';
 import { allTools, splitAuthor, type Model } from '../lib/stats';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { summaryOf, summaryText, type ToolSummary } from '../lib/summaries';
 import { matcher } from '../lib/search';
 import { hrefTool } from '../lib/route';
+import { coverColor, TAG_BAND_COLOR } from '../plaza/lobby';
 import { createPlaza, type Ev, type Mode, type PlazaEngine, type PlazaTent, type PlazaTool } from '../plaza/engine';
 import suitUrl from '../fonts/SUIT-Variable.woff2';
 import eduUrl from '../fonts/GangwonEduPowerExtraBoldA.woff';
@@ -133,16 +134,29 @@ const hasWebGL = () => {
 const glass = 'bg-[rgba(12,22,48,0.78)] text-white backdrop-blur-md ring-1 ring-white/15 shadow-[0_8px_30px_rgba(0,0,0,0.25)]';
 
 const HOLO_CSS = `
-.plaza-holo{background:linear-gradient(135deg,rgba(14,64,130,.9),rgba(6,28,70,.92));border:2px solid rgba(120,220,255,.75);
-box-shadow:0 0 0 1px rgba(120,220,255,.15),0 0 40px rgba(60,180,255,.35),inset 0 0 60px rgba(60,180,255,.12);backdrop-filter:blur(6px);
-animation:plazaHoloIn .45s cubic-bezier(.2,.9,.3,1.2) .28s both;overflow:hidden}
+.plaza-holo{background:linear-gradient(135deg,rgba(14,64,130,.93),rgba(6,28,70,.95));border:2px solid rgba(120,220,255,.85);
+box-shadow:0 0 0 1px rgba(120,220,255,.12),0 0 36px rgba(60,180,255,.32);animation:plazaHoloIn .3s ease-out .22s both;overflow:hidden}
 @media (max-width:639px){.plaza-holo{overflow-y:auto;-webkit-overflow-scrolling:touch}.plaza-holo::after{display:none}}
 .plaza-holo::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
-background:repeating-linear-gradient(0deg,rgba(150,225,255,.05) 0 1px,transparent 1px 4px),linear-gradient(rgba(120,220,255,.07) 1px,transparent 1px) 0 0/26px 26px,linear-gradient(90deg,rgba(120,220,255,.07) 1px,transparent 1px) 0 0/26px 26px}
+background:repeating-linear-gradient(0deg,rgba(150,225,255,.045) 0 1px,transparent 1px 4px),linear-gradient(rgba(120,220,255,.07) 1px,transparent 1px) 0 0/26px 26px,linear-gradient(90deg,rgba(120,220,255,.07) 1px,transparent 1px) 0 0/26px 26px}
 .plaza-holo::after{content:"";position:absolute;left:0;right:0;height:60px;top:-60px;pointer-events:none;
 background:linear-gradient(transparent,rgba(120,220,255,.12),transparent);animation:plazaSweep 4.5s linear .8s infinite}
-@keyframes plazaHoloIn{from{opacity:0;transform:scale(.92);filter:brightness(2)}to{opacity:1;transform:none;filter:none}}
+.plaza-corner{position:absolute;width:var(--cl);height:var(--cl);border-color:#bff3ff;pointer-events:none;z-index:2;filter:drop-shadow(0 0 4px rgba(120,220,255,.8))}
+@keyframes plazaHoloIn{from{opacity:0;filter:brightness(1.8)}to{opacity:1;filter:none}}
 @keyframes plazaSweep{to{top:100%}}
+.pb-wrap{perspective:2200px}
+.pb-page{position:absolute;top:0;bottom:0;background:#fbf7ee;color:#1e2430;overflow:hidden}
+.pb-page.l{left:0;width:50%;border-radius:10px 0 0 10px;box-shadow:inset -26px 0 30px -22px rgba(60,40,10,.35)}
+.pb-page.r{right:0;width:50%;border-radius:0 10px 10px 0;box-shadow:inset 26px 0 30px -22px rgba(60,40,10,.35)}
+.pb-one .pb-page.r{width:100%;border-radius:10px;box-shadow:inset 18px 0 24px -20px rgba(60,40,10,.3)}
+.pb-leaf{position:absolute;top:0;bottom:0;width:50%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.45,.05,.25,1)}
+.pb-one .pb-leaf{width:100%}
+.pb-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
+.pb-face.back{transform:rotateY(180deg)}
+.pb-cover{transition:transform .95s cubic-bezier(.55,.05,.25,1),opacity .15s}
+@keyframes pbIn{from{opacity:0}to{opacity:1}}
+.pb-in{animation:pbIn .15s ease-out .42s both}
+.pb-ui{animation:pbIn .3s ease-out 1.3s both}
 .plaza-scroll{scrollbar-width:thin;scrollbar-color:rgba(120,220,255,.5) transparent}
 @media (prefers-reduced-motion:reduce){.plaza-holo,.plaza-holo::after{animation:none}}
 `;
@@ -162,6 +176,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const [deskQ, setDeskQ] = useState('');
   const [deskMsg, setDeskMsg] = useState<string | null>(null);
   const [deskHas, setDeskHas] = useState(false);
+  const [tvOn, setTvOn] = useState(false);
   const [step, setStep] = useState<'hello' | 'tools'>('hello');
   const [page, setPage] = useState({ page: 0, pages: 1, cards: [] as PlazaTool[] });
   const [sel, setSel] = useState<Tool | null>(null);
@@ -174,6 +189,8 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const visitedRef = useRef(visited);
   visitedRef.current = visited;
   const [detail, setDetail] = useState<Tool | null>(null);
+  const [rect, setRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [focusKind, setFocusKind] = useState<'card' | 'book'>('card');
   const [listOpen, setListOpen] = useState(false);
   const [help, setHelp] = useState(() => !(window.matchMedia?.('(pointer: coarse)').matches ?? false));
   const [full, setFull] = useState(false);
@@ -230,6 +247,10 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         setWorld(e.world);
         setHoverTool(null);
       } else if (e.type === 'hover') setHoverTool(e.tool);
+      else if (e.type === 'focus') {
+        setRect(e.rect);
+        if (e.kind) setFocusKind(e.kind);
+      }
     };
     void loadFonts().then(() => {
       if (dead || !host.current) return;
@@ -394,6 +415,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
                   <li>책장의 책이 업무경감 도구예요.</li>
                   <li>· 책을 누르면 도구 설명이 열려요</li>
                   <li>· 안내 데스크에서 도구를 찾아 드려요</li>
+                  <li>· 안쪽 큰 화면에서 홍보영상이 나와요</li>
                   <li>· 들어온 문으로 나가면 광장이에요</li>
                 </>
               ) : (
@@ -522,6 +544,23 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         </div>
       )}
 
+      {/* 로비 화면 소리 */}
+      {ready && world === 'in' && talk === null && !detail && (
+        <button
+          type="button"
+          onClick={() => {
+            const v = !tvOn;
+            setTvOn(v);
+            eng.current?.tvSound(v);
+          }}
+          aria-pressed={tvOn}
+          className={`absolute bottom-6 left-3 sm:left-4 z-10 inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-bold ${glass} hover:bg-[rgba(30,50,90,0.9)]`}
+        >
+          {tvOn ? <Volume2 className="h-4 w-4" aria-hidden="true" /> : <VolumeX className="h-4 w-4" aria-hidden="true" />}
+          홍보영상 소리 {tvOn ? '끄기' : '켜기'}
+        </button>
+      )}
+
       {/* 책에 마우스를 올리면 이름 */}
       {hoverTool && !detail && talk === null && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
@@ -635,8 +674,260 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
       )}
 
       {/* 자세히 보기 — 확대된 홀로그램 카드 위에 겹쳐 띄움 */}
-      {detail && <Detail tool={detail} s={summaryOf(detail.sid)} onClose={closeDetail} />}
+      {detail &&
+        (focusKind === 'book' ? (
+          <BookView key={detail.sid} tool={detail} s={summaryOf(detail.sid)} rect={rect} onClose={closeDetail} />
+        ) : (
+          <Detail tool={detail} s={summaryOf(detail.sid)} rect={rect} onClose={closeDetail} />
+        ))}
     </section>
+  );
+};
+
+/** 책 쪽 내용 — 한 쪽에 한 묶음 */
+function bookPages(tool: Tool, s?: ToolSummary) {
+  const pages: { key: string; body: React.ReactNode }[] = [];
+  const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-2.5 border-b border-[#d9cdb6] pb-1.5 text-[15px] font-bold text-[#7a5a3c]">{children}</h3>;
+  pages.push({
+    key: 'intro',
+    body: (
+      <>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${TAG_CLS[tool.board] ?? TAG_CLS.staff}`}>{tool.tag}</span>
+          {tool.run && <span className="rounded bg-[#efe6d4] px-2 py-0.5 text-[11px] font-bold text-[#6b4a33]">{tool.run}</span>}
+        </div>
+        <h2 className="nr-title mt-3 text-[22px] leading-snug text-[#1e2430]">{tool.title}</h2>
+        <p className="mt-1 text-[13px] text-[#8a7a66]">{tool.who}</p>
+        <p className="mt-4 text-[15px] leading-relaxed">{s?.what || tool.what || '아직 게시글 요약이 없습니다.'}</p>
+        {s?.why && (
+          <div className="mt-5">
+            <H>만든 이유</H>
+            <p className="text-[14px] leading-relaxed">{s.why}</p>
+          </div>
+        )}
+      </>
+    ),
+  });
+  if (s?.features?.length)
+    pages.push({
+      key: 'feat',
+      body: (
+        <>
+          <H>주요 기능</H>
+          <ul className="space-y-2 text-[14px] leading-relaxed">
+            {s.features.map((f) => (
+              <li key={f} className="flex gap-2">
+                <span className="mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#b88a58]" aria-hidden="true" />
+                {f}
+              </li>
+            ))}
+          </ul>
+        </>
+      ),
+    });
+  if (s?.steps?.length)
+    pages.push({
+      key: 'steps',
+      body: (
+        <>
+          <H>사용 순서</H>
+          <ol className="space-y-2.5 text-[14px] leading-relaxed">
+            {s.steps.map((st, i) => (
+              <li key={st} className="flex gap-2.5">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#7a5a3c] text-[12px] font-bold text-white">{i + 1}</span>
+                <span className="pt-px">{st}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      ),
+    });
+  pages.push({
+    key: 'end',
+    body: (
+      <>
+        {!!s?.needs?.length && (
+          <div className="mb-5">
+            <H>필요한 것</H>
+            <p className="text-[14px] leading-relaxed">{s.needs.join(' · ')}</p>
+          </div>
+        )}
+        {!!s?.cautions?.length && (
+          <div className="mb-5">
+            <H>유의사항</H>
+            <ul className="space-y-1 text-[14px] leading-relaxed">
+              {s.cautions.map((c) => (
+                <li key={c}>· {c}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <H>바로 쓰기</H>
+        <div className="flex flex-wrap gap-2">
+          <a href={tool.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#3a457f] px-4 py-2 text-[14px] font-bold text-white hover:opacity-90">
+            사용하기 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">(새 창)</span>
+          </a>
+          <a href={hrefTool(tool.sid)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-[14px] font-bold text-[#3a457f] ring-1 ring-[#3a457f]/40 hover:bg-[#3a457f]/5">
+            상세 화면 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">(새 창)</span>
+          </a>
+        </div>
+      </>
+    ),
+  });
+  return pages;
+}
+
+/** 서가 책 — 표지 그대로 다가와 커지고, 표지가 넘어가며 속 내용이 나옴. 쪽은 넘기기로 봄 */
+const BookView: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: number; w: number; h: number } | null; onClose: () => void }> = ({ tool, s, rect, onClose }) => {
+  const one = (rect?.w ?? 0) < (rect?.h ?? 1); // 세로 화면 — 한 쪽씩
+  const pages = useMemo(() => bookPages(tool, s), [tool, s]);
+  const per = one ? 1 : 2;
+  const spreads = Math.ceil(pages.length / per);
+  const [open, setOpen] = useState(false);
+  const [coverGone, setCoverGone] = useState(false);
+  const [sp, setSp] = useState(0);
+  const [turn, setTurn] = useState<null | { dir: 1 | -1; go: boolean }>(null);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const t = window.setTimeout(() => setOpen(true), 750);
+    // 표지가 다 넘어가면 치움 — 표지 안쪽 면에 첫 쪽을 그려 두어 바뀌는 티가 안 남
+    const t2 = window.setTimeout(() => setCoverGone(true), 1800);
+    box.current?.focus();
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(t2);
+    };
+  }, []);
+  const flip = (dir: 1 | -1) => {
+    if (turn || sp + dir < 0 || sp + dir >= spreads) return;
+    setTurn({ dir, go: false });
+    requestAnimationFrame(() => requestAnimationFrame(() => setTurn({ dir, go: true })));
+    window.setTimeout(() => {
+      setSp((v) => v + dir);
+      setTurn(null);
+    }, 720);
+  };
+  useEffect(() => {
+    const kd = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') flip(1);
+      else if (e.key === 'ArrowLeft') flip(-1);
+    };
+    window.addEventListener('keydown', kd);
+    return () => window.removeEventListener('keydown', kd);
+  });
+  const pg = (i: number) => {
+    const p = pages[i];
+    return (
+      <div className="flex h-full flex-col px-6 pb-4 pt-6 sm:px-8 sm:pt-8">
+        <div className="min-h-0 flex-1 overflow-y-auto plaza-scroll">{p ? p.body : null}</div>
+        {p && <p className="pt-2 text-center text-[11px] tabular-nums text-[#a8987f]">{i + 1}</p>}
+      </div>
+    );
+  };
+  const L = (k: number) => (one ? -1 : k * 2), Rr = (k: number) => (one ? k : k * 2 + 1);
+  // 넘기는 중: 바닥에는 다음(또는 이전) 쪽이 깔리고, 넘어가는 한 장이 위로 지나감
+  const base = turn ? (turn.dir > 0 ? { l: L(sp), r: Rr(sp + 1) } : { l: L(sp - 1), r: Rr(sp) }) : { l: L(sp), r: Rr(sp) };
+  const leaf = turn ? (turn.dir > 0 ? { front: Rr(sp), back: L(sp + 1) } : { front: L(sp), back: Rr(sp - 1) }) : null;
+  const bg = coverColor(tool.sid);
+  const W = rect?.w ?? 600, Hh = rect?.h ?? 420;
+  return (
+    <div className="absolute inset-0 z-30 bg-black/35" style={{ animation: 'pbIn .4s ease-out both' }} onClick={onClose}>
+      <div
+        ref={box}
+        tabIndex={-1}
+        role="dialog"
+        aria-label={`${tool.title} — 책`}
+        onClick={(e) => e.stopPropagation()}
+        className={`pb-wrap absolute outline-none ${one ? 'pb-one' : ''}`}
+        style={{ left: rect?.x ?? 16, top: rect?.y ?? 16, width: W, height: Hh }}
+      >
+        {/* 펼친 쪽들(표지가 넘어가면 보임) */}
+        <div className="pb-in absolute inset-0">
+          {!one && <div className="pb-page l">{base.l >= 0 && pg(base.l)}</div>}
+          <div className="pb-page r">{pg(base.r)}</div>
+          {!one && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-[#d9cdb6]" />}
+        </div>
+        {/* 넘어가는 한 장 */}
+        {leaf && (
+          <div
+            className="pb-leaf"
+            style={{
+              left: one ? 0 : turn!.dir > 0 ? '50%' : 0,
+              transformOrigin: one ? 'left center' : turn!.dir > 0 ? 'left center' : 'right center',
+              transform: turn!.go ? `rotateY(${turn!.dir > 0 ? -180 : 180}deg)` : 'rotateY(0deg)',
+            }}
+          >
+            <div className={`pb-face pb-page ${one || turn!.dir > 0 ? 'r' : 'l'}`} style={{ width: '100%' }}>
+              {pg(leaf.front)}
+            </div>
+            <div className={`pb-face back pb-page ${one || turn!.dir > 0 ? 'l' : 'r'}`} style={{ width: '100%' }}>
+              {one ? null : pg(leaf.back)}
+            </div>
+          </div>
+        )}
+        {/* 표지 — 3D 책과 같은 그림. 등(왼쪽)을 축으로 넘어감 */}
+        {!coverGone && (
+        <div
+          className="pb-in absolute top-0 bottom-0"
+          style={{ left: one ? 0 : '50%', width: one ? '100%' : '50%', opacity: one && open ? 0 : 1, transition: 'opacity .5s .35s', pointerEvents: 'none' }}
+        >
+        <div
+          className="pb-cover absolute inset-0"
+          style={{
+            transformOrigin: 'left center',
+            transformStyle: 'preserve-3d',
+            transform: open ? `rotateY(-${one ? 100 : 180}deg)` : 'rotateY(0deg)',
+          }}
+        >
+          <div className="pb-face rounded-[4px_10px_10px_4px] shadow-[0_18px_50px_rgba(0,0,0,.45)]" style={{ background: bg }}>
+            <div className="absolute inset-y-0 left-0 w-[5%] bg-black/15" />
+            <div className="absolute left-[5%] right-0 top-[4.5%] flex h-[11%] items-center px-[6%] text-white" style={{ background: TAG_BAND_COLOR(tool.tag), fontSize: Hh * 0.04 }}>
+              <b>{tool.tag}</b>
+            </div>
+            <div className="absolute rounded-full bg-white/[0.12]" style={{ width: Hh * 0.5, height: Hh * 0.5, right: -Hh * 0.08, bottom: -Hh * 0.06 }} />
+            <p className="absolute left-[10%] right-[8%] top-[21%] font-extrabold leading-[1.24] text-white" style={{ fontSize: Hh * 0.075 }}>
+              {tool.title.replace(/^[⭐★☆\s]+/, '')}
+            </p>
+            {tool.run && (
+              <p className="absolute bottom-[5%] left-[10%] text-white/80" style={{ fontSize: Hh * 0.04 }}>
+                {tool.run}
+              </p>
+            )}
+          </div>
+          {!one && (
+            <div className="pb-face back pb-page l" style={{ width: '100%' }}>
+              {pg(0)}
+            </div>
+          )}
+        </div>
+        </div>
+        )}
+        {/* 넘기기·덮기 */}
+        <div className="pb-ui absolute -bottom-12 left-0 right-0 flex items-center justify-center gap-2">
+          <button type="button" onClick={() => flip(-1)} disabled={sp === 0} className="rounded-full bg-white/90 p-2 text-[#3a457f] shadow disabled:opacity-40" aria-label="앞 쪽">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <span className="rounded-full bg-black/45 px-3 py-1 text-[13px] tabular-nums text-white">
+            {sp + 1} / {spreads}
+          </span>
+          <button type="button" onClick={() => flip(1)} disabled={sp >= spreads - 1} className="rounded-full bg-white/90 p-2 text-[#3a457f] shadow disabled:opacity-40" aria-label="다음 쪽">
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button type="button" onClick={onClose} className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-2 text-[13px] font-bold text-[#3a457f] shadow">
+            <X className="h-4 w-4" aria-hidden="true" /> 책 덮기
+          </button>
+        </div>
+        {/* 쪽 모서리 눌러 넘기기 */}
+        {open && sp < spreads - 1 && (
+          <button type="button" onClick={() => flip(1)} aria-label="다음 쪽" className="absolute bottom-0 right-0 h-16 w-16 rounded-br-[10px] bg-[linear-gradient(135deg,transparent_50%,rgba(122,90,60,.18)_50%)]" />
+        )}
+        {open && sp > 0 && !one && (
+          <button type="button" onClick={() => flip(-1)} aria-label="앞 쪽" className="absolute bottom-0 left-0 h-16 w-16 rounded-bl-[10px] bg-[linear-gradient(225deg,transparent_50%,rgba(122,90,60,.18)_50%)]" />
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -650,19 +941,33 @@ const Sec: React.FC<{ title: string; children: React.ReactNode }> = ({ title, ch
   </section>
 );
 
-const Detail: React.FC<{ tool: Tool; s?: ToolSummary; onClose: () => void }> = ({ tool, s, onClose }) => {
+const Detail: React.FC<{ tool: Tool; s?: ToolSummary; rect: { x: number; y: number; w: number; h: number } | null; onClose: () => void }> = ({ tool, s, rect, onClose }) => {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => box.current?.focus(), []);
   const none = !s?.why && !s?.features?.length && !s?.steps?.length && !s?.needs?.length && !s?.cautions?.length;
   return (
-    <div className="absolute inset-0 z-30 grid place-items-center p-2 sm:p-6 pointer-events-none">
+    <div className="pointer-events-none absolute inset-0 z-30">
       <div
         ref={box}
         tabIndex={-1}
         role="dialog"
         aria-label={`${tool.title} 자세히 보기`}
-        className="plaza-holo plaza-scroll pointer-events-auto relative block max-h-full w-full max-w-[760px] rounded-[18px] text-white outline-none sm:flex sm:max-h-[86%] sm:flex-col sm:rounded-[22px]"
+        // 확대된 카드 자리 그대로 — 카드 그림과 같은 테두리·모서리 꺾쇠
+        style={
+          {
+            left: rect?.x ?? 16,
+            top: rect?.y ?? 16,
+            width: rect?.w ?? 'calc(100% - 32px)',
+            height: rect?.h ?? 'calc(100% - 32px)',
+            borderRadius: Math.round((rect?.w ?? 760) * 0.0375),
+            '--cl': `${Math.round((rect?.w ?? 760) * 0.058)}px`,
+          } as React.CSSProperties
+        }
+        className="plaza-holo plaza-scroll pointer-events-auto absolute block text-white outline-none sm:flex sm:flex-col"
       >
+        {(['top-[2.7%] left-[1.9%] border-t-[3px] border-l-[3px]', 'top-[2.7%] right-[1.9%] border-t-[3px] border-r-[3px]', 'bottom-[2.7%] left-[1.9%] border-b-[3px] border-l-[3px]', 'bottom-[2.7%] right-[1.9%] border-b-[3px] border-r-[3px]'] as const).map((c) => (
+          <span key={c} className={`plaza-corner ${c}`} aria-hidden="true" />
+        ))}
         <div className="flex items-start gap-2 px-5 pt-5 sm:px-8 sm:pt-7">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">

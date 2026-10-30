@@ -60,7 +60,7 @@ const Skeleton = () => (
 const SERVICE = '업무경감 도구 모음';
 
 /** 3D 광장 — 웹판 시범 화면. three.js가 커서 이 화면에 들어올 때만 받음 */
-const Plaza = SERVER ? () => null : lazy(() => import('./pages/Plaza'));
+const Plaza = import.meta.env.VITE_EDITION === 'server' ? () => null : lazy(() => import('./pages/Plaza'));
 
 /** 모바일 하위 메뉴 — PC는 왼쪽 메뉴에 있으므로 좁은 화면에서만 보임 */
 const SubTabs: React.FC<{ items: LnbSub[] }> = ({ items }) => (
