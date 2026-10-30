@@ -281,7 +281,13 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   ground.receiveShadow = true;
   scene.add(ground);
   // 청사 주변 동네(건물·도로·공원) — 청사 3D 지도 자료 + OpenStreetMap
-  const SUR = makeSurround(scene, { shadows: high });
+  const SUR = makeSurround(scene, {
+    shadows: high,
+    // 가로수를 심지 않을 곳: 청사·광장·주차장·천막 마당
+    avoid: (x, y) => BLOCKS.some((b) => inPoly([x, y], b)) || inPoly([x, y], SITE.plaza) || inPoly([x, y], SITE.parking) || Math.hypot(x - CS[0], y - CS[1]) < R + 9,
+  });
+  /** 걸어 다닐 수 있는 범위(본관 중심 반지름, m) — 넣어 둔 동네 전체 */
+  const WALK_R = 620;
   const flat = (poly: number[][], mat: THREE.Material, y: number, uvSize = 0) => {
     const s = new T.Shape();
     s.moveTo(poly[0][0], poly[0][1]);
@@ -875,6 +881,18 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     const d = cam.dist;
     out.pos.set(look.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * d, look.y + Math.sin(cam.pitch) * d, look.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * d);
     out.look.copy(look);
+    // 광장: 카메라와 나 사이에 건물이 있으면 건물 앞까지 당겨 옴
+    if (world === 'out') {
+      const dx = out.pos.x - look.x, dy = out.pos.y - look.y, dz = out.pos.z - look.z;
+      for (let i = 2; i <= 18; i++) {
+        const k = i / 18;
+        if (SUR.solidAt(look.x + dx * k, -(look.z + dz * k), look.y + dy * k)) {
+          const kk = Math.max(0.12, k - 0.08);
+          out.pos.set(look.x + dx * kk, look.y + dy * kk, look.z + dz * kk);
+          break;
+        }
+      }
+    }
     if (world === 'in' && lobby) {
       const b = lobby.camBox;
       out.pos.x = clamp(out.pos.x, b.x0, b.x1);
@@ -1103,13 +1121,22 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   let lastClockText = '';
   const lastSky = new T.Color('#9cc3e6');
   let lastDark = 0;
+  // 해: 그림자가 내 둘레에 생기게 해 위치를 나를 따라 옮김(20m 칸 단위로 — 그림자 떨림 방지)
+  const sunDir = V(0, 1, 0), sunAt0 = V();
+  const placeSun = () => {
+    const c = typeof P !== 'undefined' && P ? P.pos : SC;
+    sunAt0.set(Math.round(c.x / 20) * 20, 0, Math.round(c.z / 20) * 20);
+    if (Math.hypot(sunAt0.x - SC.x, sunAt0.z - SC.z) < 60) sunAt0.copy(SC);
+    sun.target.position.copy(sunAt0);
+    sun.position.copy(sunAt0).add(sunDir.clone().multiplyScalar(160));
+  };
   function applyHour(h: number) {
     const { el, az } = sunAt(h);
     const elD = (el * 180) / Math.PI;
     const day = sstep(-6, 8, elD), warm = sstep(18, 2, elD) * sstep(-7, 1, elD), night = 1 - day;
     const d = V(Math.sin(az) * Math.cos(el), Math.max(Math.sin(el), 0.08), -Math.cos(az) * Math.cos(el)).normalize();
-    sun.position.copy(SC).add(d.clone().multiplyScalar(160));
-    sun.target.position.copy(SC);
+    sunDir.copy(d);
+    placeSun();
     sun.intensity = 2.5 * sstep(-2, 12, elD);
     sun.color.copy(C3('#ffffff', '#ffa45c', warm));
     hemi.intensity = 0.42 + 1.3 * day;
@@ -1192,7 +1219,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     if (world === 'in') return lobby!.blocked(x, z);
     if (BLOCK_NOW.some((b) => inPoly(p, b))) return true;
     if (SUR.inBuilding(p[0], p[1], RAD)) return true;
-    if (Math.hypot(p[0] - CS[0], p[1] - CS[1]) > 95) return true;
+    if (Math.hypot(p[0], p[1]) > WALK_R) return true;
     for (const c of canopyCols) if (Math.hypot(x - c.x, z - c.z) < 0.25 + RAD) return true;
     for (const t of TENTS) {
       {
@@ -1731,6 +1758,25 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     P.goTalk = -1;
     P.goDoor = true;
   }
+  /** 광장(천막 마당)으로 돌아가기 — 멀리 나갔을 때 */
+  function goHome() {
+    if (world === 'in') return;
+    if (talking !== -1) endTalk(true);
+    if (cam.mode === 'intro') skipIntro();
+    fadeSwap(() => {
+      P.pos.copy(start);
+      P.target = null;
+      P.yaw = Math.atan2(-FN[0], FN[1]);
+      cam.yaw = P.yaw + Math.PI;
+      cam.pitch = 0.42;
+      cam.dist = Math.min(cam.dist, 16);
+      const fp = followPose();
+      cam.pos.copy(fp.pos);
+      cam.look.copy(fp.look);
+      cam.mode = 'follow';
+      cam.t = 1;
+    });
+  }
   function skipIntro() {
     if (cam.mode !== 'intro') return;
     const fp = followPose();
@@ -1817,6 +1863,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     P.speed += (sp - P.speed) * Math.min(1, dt * 10);
     me.root.position.copy(P.pos);
     me.root.rotation.y = P.yaw;
+    if (high && world === 'out') placeSun();
     animChibi(me, dt, t, P.speed);
     {
       const hideTags = cam.mode === 'talk' || cam.mode === 'holo' || focus >= 0 || !!focusBook;
@@ -2062,6 +2109,9 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     talk: (i: number) => startTalk(i),
     walkTo: (i: number) => walkToTent(i),
     goLobby,
+    goHome,
+    /** 광장 중심(천막 마당)에서 떨어진 거리(m) */
+    away: () => (world === 'out' ? Math.hypot(P.pos.x - start.x, P.pos.z - start.z) : 0),
     talkDesk: () => world === 'in' && startTalk(DESK),
     search: (list: PlazaTool[]) => showResults(list),
     /** 로비 화면 소리 켜기·끄기 — 누른 순간이라 자동재생 제한에 안 걸림 */

@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import data from './surround.json';
+import { toon } from './chibi';
 
 type Rec = [string, number, string, string, string, number[]];
 const D = data as unknown as { b: Rec[]; r: [string, number[]][]; a: [string, number[]][] };
@@ -119,7 +120,10 @@ function windowTex(lit: boolean) {
   return t;
 }
 
-export function makeSurround(scene: THREE.Scene, opt: { shadows: boolean }) {
+/** 가로수를 심을 길(큰길·동네길) */
+const TREE_ROADS = new Set(['secondary', 'tertiary', 'unclassified', 'residential', 'living_street']);
+
+export function makeSurround(scene: THREE.Scene, opt: { shadows: boolean; avoid: (x: number, y: number) => boolean }) {
   const group = new THREE.Group();
   group.name = 'surround';
   scene.add(group);
@@ -178,6 +182,7 @@ export function makeSurround(scene: THREE.Scene, opt: { shadows: boolean }) {
 
   /* 건물 */
   const polys: [number, number][][] = [];
+  const heights: number[] = [];
   const nightMats: THREE.MeshLambertMaterial[] = [];
   {
     const P: number[] = [], C: number[] = [], U: number[] = [], N: number[] = [];
@@ -189,6 +194,7 @@ export function makeSurround(scene: THREE.Scene, opt: { shadows: boolean }) {
       if (area(p) < 0) p = p.reverse(); // 시계 반대로 맞춤 → 바깥 법선
       polys.push(p);
       const h = Math.max(3, hgt);
+      heights.push(h);
       wallC.set(wall);
       roofC.set(roof);
       // 벽
@@ -254,27 +260,91 @@ export function makeSurround(scene: THREE.Scene, opt: { shadows: boolean }) {
     put(Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad, (c) => c.roads.push(i));
   });
 
+  const inBuilding = (x: number, y: number, pad = 0) => {
+    const c = grid.get(cellOf(x, y));
+    if (!c) return false;
+    for (const i of c.polys) {
+      const p = polys[i];
+      if (inPoly(x, y, p)) return true;
+      if (pad > 0) for (let k = 0; k < p.length; k++) if (segDist(x, y, p[k], p[(k + 1) % p.length]) < pad) return true;
+    }
+    return false;
+  };
+  const onRoad = (x: number, y: number, pad = 0) => {
+    const c = grid.get(cellOf(x, y));
+    if (!c) return false;
+    for (const i of c.roads) {
+      const r = roadLines[i];
+      for (let k = 0; k + 1 < r.line.length; k++) if (segDist(x, y, r.line[k], r.line[k + 1]) < r.w / 2 + pad) return true;
+    }
+    return false;
+  };
+
+  /* 가로수: 큰길·동네길 양쪽에 11m 간격 */
+  {
+    const spots: [number, number][] = [];
+    const taken = new Set<string>();
+    const near = (x: number, y: number) => {
+      const i = Math.floor(x / 6), j = Math.floor(y / 6);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (taken.has(`${i + a}_${j + b}`)) return true;
+      return false;
+    };
+    for (const [k, f] of D.r) {
+      if (!TREE_ROADS.has(k) || spots.length > 2600) continue;
+      const w = ROAD_W[k], line = pts(f), off = w / 2 + 2.6;
+      let carry = 5;
+      for (let i = 0; i + 1 < line.length; i++) {
+        const [ax, ay] = line[i], [bx, by] = line[i + 1];
+        const len = Math.hypot(bx - ax, by - ay);
+        if (len < 0.1) continue;
+        const ux = (bx - ax) / len, uy = (by - ay) / len;
+        for (let d = carry; d < len; d += 11) {
+          for (const sd of [1, -1]) {
+            const x = ax + ux * d - uy * off * sd, y = ay + uy * d + ux * off * sd;
+            if (opt.avoid(x, y) || near(x, y) || inBuilding(x, y, 2) || onRoad(x, y, 0.8)) continue;
+            spots.push([x, y]);
+            taken.add(`${Math.floor(x / 6)}_${Math.floor(y / 6)}`);
+          }
+          carry = d + 11 - len;
+        }
+      }
+    }
+    let seed = 41;
+    const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.24, 2.4, 6), toon('#7a5a3c'), spots.length);
+    const crownCols = ['#5f9a4a', '#4f8a43', '#76a85a'];
+    const crowns = crownCols.map((c) => new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.6, 0), new THREE.MeshLambertMaterial({ color: c, flatShading: true }), spots.length));
+    const cnt = [0, 0, 0];
+    const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+    spots.forEach(([x, y], i) => {
+      const k = 0.85 + r() * 0.4;
+      mtx.compose(pos.set(x, 1.2 * k, -y), q.identity(), sc.set(k, k, k));
+      trunk.setMatrixAt(i, mtx);
+      const ci = Math.floor(r() * 3);
+      q.setFromEuler(new THREE.Euler(r(), r() * 6, r()));
+      mtx.compose(pos.set(x, 2.4 * k + 1.2 * k, -y), q, sc.set(k, k * 1.25, k));
+      crowns[ci].setMatrixAt(cnt[ci]++, mtx);
+    });
+    crowns.forEach((c, i) => {
+      c.count = cnt[i];
+      c.castShadow = opt.shadows;
+      group.add(c);
+    });
+    trunk.castShadow = opt.shadows;
+    group.add(trunk);
+  }
+
   return {
     group,
     /** site 좌표(x=동, y=북)가 건물 안인가(pad: 여유 m) */
-    inBuilding(x: number, y: number, pad = 0) {
-      const c = grid.get(cellOf(x, y));
-      if (!c) return false;
-      for (const i of c.polys) {
-        const p = polys[i];
-        if (inPoly(x, y, p)) return true;
-        if (pad > 0) for (let k = 0; k < p.length; k++) if (segDist(x, y, p[k], p[(k + 1) % p.length]) < pad) return true;
-      }
-      return false;
-    },
+    inBuilding,
     /** 길 위인가(pad: 길 가장자리 여유 m) */
-    onRoad(x: number, y: number, pad = 0) {
+    onRoad,
+    /** 높이 h(m)의 점이 건물 속인가 — 카메라가 건물에 가리는지 볼 때 */
+    solidAt(x: number, y: number, h: number) {
       const c = grid.get(cellOf(x, y));
       if (!c) return false;
-      for (const i of c.roads) {
-        const r = roadLines[i];
-        for (let k = 0; k + 1 < r.line.length; k++) if (segDist(x, y, r.line[k], r.line[k + 1]) < r.w / 2 + pad) return true;
-      }
+      for (const i of c.polys) if (h < heights[i] + 0.5 && inPoly(x, y, polys[i])) return true;
       return false;
     },
     /** 밤: 창에 불 */

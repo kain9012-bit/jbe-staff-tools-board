@@ -42,7 +42,7 @@ export const netReady = () => Boolean(RELAY || LOCAL);
 
 const SEND_MS = 500; // 걸을 때 초당 2번
 const EMOTES: Emote[] = ['hi', 'like', 'clap', 'glad'];
-const num = (v: unknown, lim = 400) => (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < lim ? v : null);
+const num = (v: unknown, lim = 1500) => (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < lim ? v : null);
 const okId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 40;
 const okW = (v: unknown): World | null => (v === 'in' || v === 'out' ? v : null);
 type Msg = Record<string, unknown>;
@@ -61,15 +61,37 @@ const relayOpen: Open = (onMsg, onOpen, onDrop) => {
   let wait = 1000;
   let ping = 0;
   let retry = 0;
+  let heard = 0; // 서버에서 마지막으로 무언가 받은 때
+  const drop = () => {
+    window.clearInterval(ping);
+    ws = null;
+    if (dead) return;
+    onDrop();
+    retry = window.setTimeout(connect, wait);
+    wait = Math.min(20000, wait * 2);
+  };
   const connect = () => {
     if (dead) return;
-    ws = new WebSocket(`${RELAY}/plaza`);
-    ws.onopen = () => {
+    const s = new WebSocket(`${RELAY}/plaza`);
+    ws = s;
+    s.onopen = () => {
       wait = 1000;
+      heard = Date.now();
       onOpen();
-      ping = window.setInterval(() => ws?.readyState === 1 && ws.send('ping'), 25000);
+      // 20초마다 ping. 90초 넘게 아무 답이 없으면(휴대폰 잠금 뒤 등) 끊긴 것으로 보고 다시 연결
+      ping = window.setInterval(() => {
+        if (s.readyState !== 1) return;
+        if (Date.now() - heard > 90000) {
+          s.onclose = null;
+          s.close();
+          drop();
+          return;
+        }
+        s.send('ping');
+      }, 20000);
     };
-    ws.onmessage = (e) => {
+    s.onmessage = (e) => {
+      heard = Date.now();
       if (typeof e.data !== 'string' || e.data === 'pong') return;
       try {
         onMsg(JSON.parse(e.data));
@@ -77,15 +99,18 @@ const relayOpen: Open = (onMsg, onOpen, onDrop) => {
         /* 잘못된 글 */
       }
     };
-    ws.onclose = () => {
-      window.clearInterval(ping);
-      ws = null;
-      if (dead) return;
-      onDrop();
-      retry = window.setTimeout(connect, wait);
-      wait = Math.min(20000, wait * 2);
-    };
+    s.onclose = drop;
   };
+  // 화면이 다시 보이면(휴대폰 잠금 해제 등) 연결 상태를 바로 확인
+  const onVis = () => {
+    if (document.visibilityState !== 'visible' || dead) return;
+    if (!ws || ws.readyState > 1) {
+      window.clearTimeout(retry);
+      wait = 1000;
+      if (!ws) connect();
+    } else if (ws.readyState === 1) ws.send('ping');
+  };
+  document.addEventListener('visibilitychange', onVis);
   connect();
   return {
     send: (m) => {
@@ -93,6 +118,7 @@ const relayOpen: Open = (onMsg, onOpen, onDrop) => {
     },
     stop: () => {
       dead = true;
+      document.removeEventListener('visibilitychange', onVis);
       window.clearInterval(ping);
       window.clearTimeout(retry);
       ws?.close(1000);

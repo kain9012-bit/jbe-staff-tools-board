@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Volume2, VolumeX, ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X, Pencil, Shuffle, Users, Check } from 'lucide-react';
+import { Volume2, VolumeX, ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X, Pencil, Shuffle, Users, Check, Home } from 'lucide-react';
 import { allTools, splitAuthor, type Model } from '../lib/stats';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { summaryOf, summaryText, type ToolSummary } from '../lib/summaries';
@@ -232,6 +232,12 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const [peersOpen, setPeersOpen] = useState(false);
   const [nameEdit, setNameEdit] = useState<string | null>(null);
   const [nameErr, setNameErr] = useState('');
+  // 광장에서 멀리 나갔는가(동네 구경) → 돌아가기 단추
+  const [far, setFar] = useState(false);
+  useEffect(() => {
+    const id = window.setInterval(() => setFar((eng.current?.away() ?? 0) > 90), 1000);
+    return () => window.clearInterval(id);
+  }, []);
   const [quality] = useState<'high' | 'low'>(() =>
     window.matchMedia?.('(pointer: coarse)').matches || (navigator.hardwareConcurrency ?? 8) <= 4 ? 'low' : 'high',
   );
@@ -638,6 +644,20 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
                   {world === 'in' && <span className="ml-auto text-[11px] text-[#9be6ff]">여기</span>}
                 </button>
               </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    eng.current?.goHome();
+                    if (touch) setListOpen(false);
+                  }}
+                  disabled={world === 'in'}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[14px] hover:bg-white/10 focus-visible:bg-white/10 disabled:opacity-50"
+                >
+                  <Home className="h-4 w-4 shrink-0 text-[#9be6ff]" aria-hidden="true" />
+                  <span className="truncate">천막 마당(광장 가운데)</span>
+                </button>
+              </li>
               {tents.map((t, i) => (
                 <li key={t.label}>
                   <button
@@ -727,6 +747,18 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
             </button>
           ))}
         </div>
+      )}
+
+      {/* 동네에 멀리 나갔을 때: 광장으로 돌아가기 */}
+      {ready && world === 'out' && far && talk === null && !detail && (
+        <button
+          type="button"
+          onClick={() => eng.current?.goHome()}
+          className={`absolute bottom-6 left-3 sm:left-4 z-10 inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-bold ${glass} hover:bg-[rgba(30,50,90,0.9)]`}
+        >
+          <Home className="h-4 w-4" aria-hidden="true" />
+          광장으로 돌아가기
+        </button>
       )}
 
       {/* 로비 화면 소리 */}

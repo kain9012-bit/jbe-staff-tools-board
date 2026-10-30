@@ -20,6 +20,8 @@ const MAX_MSG = 600; // 한 번에 받는 글자 수
 const RATE = 8; // 한 사람이 1초에 보낼 수 있는 최대 개수(넘으면 버림)
 const EMOTES = new Set(['hi', 'like', 'clap', 'glad']);
 const WORLDS = new Set(['out', 'in']);
+const IDLE_MS = 80000; // 이만큼 아무 소식(ping 포함)이 없으면 끊긴 연결로 보고 정리
+const SWEEP_MS = 30000; // 정리 주기
 
 /** 들어올 수 있는 화면 주소 */
 function allowedOrigin(origin, env) {
@@ -44,7 +46,7 @@ export default {
   },
 };
 
-const num = (v, lim = 400) => (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < lim ? Math.round(v * 100) / 100 : null);
+const num = (v, lim = 1500) => (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < lim ? Math.round(v * 100) / 100 : null);
 const cleanName = (s) =>
   typeof s === 'string'
     ? [...s.replace(/[\p{C}\u200b-\u200f\u2028-\u202e\u2060-\u206f]/gu, '').replace(/\s+/g, ' ').trim()].slice(0, 10).join('')
@@ -71,7 +73,9 @@ export class PlazaRoom {
     const [client, server] = Object.values(pair);
     const id = crypto.randomUUID().slice(0, 12);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ i: id, n: '', l: null, w: '', x: 0, z: 0, y: 0, s: 0, win: 0, cnt: 0 });
+    server.serializeAttachment({ i: id, n: '', l: null, w: '', x: 0, z: 0, y: 0, s: 0, win: 0, cnt: 0, seen: Date.now() });
+    // 끊긴 연결(휴대폰 잠금·망 끊김 등으로 닫힘 신호가 안 온 것) 정리 예약
+    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
     const peers = [];
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === server) continue;
@@ -105,6 +109,7 @@ export class PlazaRoom {
     if (!a) return;
     // 1초에 RATE개 넘으면 버림
     const now = Date.now();
+    a.seen = now;
     if (now - a.win > 1000) (a.win = now), (a.cnt = 0);
     if (++a.cnt > RATE) return ws.serializeAttachment(a);
     let m;
@@ -147,6 +152,25 @@ export class PlazaRoom {
       ws.serializeAttachment(a);
       if (ready() && EMOTES.has(m.k)) this.cast(ws, { t: 'e', i: a.i, k: m.k }, a.w);
     } else ws.serializeAttachment(a);
+  }
+
+  /** 정리: 마지막 소식이 IDLE_MS보다 오래된 연결을 닫고 모두에게 나감을 알림 */
+  async alarm() {
+    const now = Date.now();
+    const list = this.ctx.getWebSockets();
+    for (const ws of list) {
+      const a = ws.deserializeAttachment();
+      const ping = this.ctx.getWebSocketAutoResponseTimestamp(ws);
+      const last = Math.max(a?.seen || 0, ping ? ping.getTime() : 0);
+      if (now - last <= IDLE_MS) continue;
+      try {
+        ws.close(4000, 'idle');
+      } catch {
+        /* 이미 닫힘 */
+      }
+      if (a && a.n) this.cast(ws, { t: 'bye', i: a.i });
+    }
+    if (this.ctx.getWebSockets().length) await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
   }
 
   async webSocketClose(ws, code) {
