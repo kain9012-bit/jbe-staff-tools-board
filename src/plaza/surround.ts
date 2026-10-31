@@ -327,11 +327,17 @@ export function makeSurround(scene: THREE.Scene, opt: { shadows: boolean; low?: 
     put(Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad, (c) => c.roads.push(i));
   });
 
-  const waterPolys = D.a.filter(([k]) => k === 'water' || k === 'pond').map(([, f]) => pts(f));
+  const waterPolys = D.a
+    .filter(([k]) => k === 'water' || k === 'pond')
+    .map(([, f]) => {
+      const p = pts(f);
+      const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
+      return { p, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+    });
   const deckLines = (D.deck ?? []).map(pts);
   /** 물 위인가(데크 위는 아님) */
   const inWater = (x: number, y: number) => {
-    if (!waterPolys.some((p) => inPoly(x, y, p))) return false;
+    if (!waterPolys.some((w) => x >= w.x0 && x <= w.x1 && y >= w.y0 && y <= w.y1 && inPoly(x, y, w.p))) return false;
     if (deckLines.some((l) => l.some((_, k) => k + 1 < l.length && segDist(x, y, l[k], l[k + 1]) < 1.0))) return false;
     // 물 위를 지나는 산책로(징검다리·데크)는 걸을 수 있음
     const c = grid.get(cellOf(x, y));

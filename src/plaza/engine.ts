@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { makeHQ } from './hq';
 import { animChibi, blob, makeChibi, toon, toonGrad, type Chibi } from './chibi';
 import { makeSurround } from './surround';
+import { findPath } from './path';
 import { makeFame, ledTopTex, type FameData } from './fame';
 import { bubble, disposeSprite, lookOpt, makeCrowd, nameTag, playEmote, type Emote, type Look } from './crowd';
 import { makeLobby, type Lobby } from './lobby';
@@ -875,10 +876,40 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   const pin = new T.Mesh(new T.RingGeometry(0.25, 0.38, 24), new T.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false }));
   pin.rotation.x = -Math.PI / 2;
   scene.add(pin);
+  // 갈 길: 바닥에 1m 간격 동그라미(곧게 가면 표시 안 함)
+  const PATH_MAX = 500;
+  const pathM = new T.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+  const pathLine = new T.InstancedMesh(new T.CircleGeometry(0.16, 12).rotateX(-Math.PI / 2), pathM, PATH_MAX);
+  pathLine.count = 0;
+  pathLine.renderOrder = 4;
+  pathLine.frustumCulled = false;
+  scene.add(pathLine);
+  const showPath = (pts: THREE.Vector3[]) => {
+    pathLine.count = 0;
+    if (pts.length < 2) {
+      pathM.opacity = 0;
+      return;
+    }
+    const m4 = new T.Matrix4();
+    let prev = P.pos.clone(), carry = 0.9, n = 0;
+    for (const q of pts) {
+      const seg = Math.hypot(q.x - prev.x, q.z - prev.z);
+      for (let d = carry; d < seg && n < PATH_MAX; d += 1.0) {
+        const t = d / seg;
+        m4.makeTranslation(prev.x + (q.x - prev.x) * t, 0.11, prev.z + (q.z - prev.z) * t);
+        pathLine.setMatrixAt(n++, m4);
+      }
+      carry = Math.max(0, carry - seg) || (1.0 - ((seg - carry) % 1.0));
+      prev = q;
+    }
+    pathLine.count = n;
+    pathLine.instanceMatrix.needsUpdate = true;
+    pathM.opacity = 0.9;
+  };
 
   // 시작 자리: 천막 마당 안, 청사 반대편 — 청사 쪽을 보면 명예의 전당·천막·청사가 한눈에
   const start = W(CS[0] + FN[0] * 14, CS[1] + FN[1] * 14);
-  const P = { pos: start.clone(), yaw: Math.atan2(-FN[0], FN[1]), speed: 0, target: null as THREE.Vector3 | null, goTalk: -1, goDoor: false };
+  const P = { pos: start.clone(), yaw: Math.atan2(-FN[0], FN[1]), speed: 0, target: null as THREE.Vector3 | null, goTalk: -1, goDoor: false, path: [] as THREE.Vector3[] };
   // 플레이어가 청사를 보도록: three 앞쪽(+z)이 향할 방향 = 청사 쪽(-FN) → world(-FN0, 0, FN1)
   P.yaw = Math.atan2(-FN[0], FN[1]);
 
@@ -1253,6 +1284,21 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     }
     return false;
   };
+  /** 클릭한 곳까지 길찾기(장애물 돌아서). 갈 길을 바닥에 점선으로 잠깐 보여 줌 */
+  const goTo = (v: THREE.Vector3) => {
+    const r = findPath(blocked, P.pos.x, P.pos.z, v.x, v.z);
+    if (!r) {
+      // 못 찾으면 예전처럼 곧장(막히면 옆으로 비켜 가기)
+      P.target = v.clone().setY(0);
+      P.path = [];
+      showPath([]);
+      return P.target;
+    }
+    P.path = r.pts.map(([x, z]) => V(x, 0, z));
+    P.target = P.path[P.path.length - 1].clone();
+    showPath(P.path);
+    return P.target;
+  };
   const moveBy = (dx: number, dz: number) => {
     const nx = P.pos.x + dx, nz = P.pos.z + dz;
     if (!blocked(nx, nz)) P.pos.set(nx, 0, nz);
@@ -1523,7 +1569,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
         return;
       }
       if (h) {
-        P.target = lobby.deskSpot.clone();
+        goTo(lobby.deskSpot);
         P.goTalk = DESK;
         return;
       }
@@ -1544,10 +1590,10 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     }
     const hg = ray.intersectObject(world === 'in' && lobby ? lobby.floor : ground, false)[0];
     if (hg) {
-      P.target = hg.point.clone().setY(0);
+      const tgt = goTo(hg.point.clone().setY(0));
       P.goTalk = -1;
       P.goDoor = false;
-      pin.position.copy(P.target).setY(0.1);
+      pin.position.copy(tgt).setY(0.1);
       pin.material.opacity = 0.9;
       pin.scale.setScalar(1);
     }
@@ -1660,7 +1706,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     if (talking !== -1) endTalk(true);
     if (cam.mode === 'intro') skipIntro();
     const s = talkSpot(i);
-    P.target = s;
+    goTo(s);
     P.goTalk = i;
     pin.material.opacity = 0;
   }
@@ -1705,7 +1751,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   host.appendChild(fadeEl);
   let fading = false;
   let tvSound = false;
-  const movers = () => [me.root, meRing, pin, pad, beam, spk, ...cards.map((c) => c.mesh)];
+  const movers = () => [me.root, meRing, pin, pathLine, pad, beam, spk, ...cards.map((c) => c.mesh)];
   function fadeSwap(fn: () => void, then?: () => void) {
     if (fading) return;
     fading = true;
@@ -1780,7 +1826,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     if (world === 'in') return;
     if (talking !== -1) endTalk(true);
     if (cam.mode === 'intro') skipIntro();
-    P.target = doorPt.clone();
+    goTo(doorPt);
     P.goTalk = -1;
     P.goDoor = true;
   }
@@ -1846,7 +1892,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       if (keys.has('s') || keys.has('arrowdown')) (mx -= fwd.x), (mz -= fwd.z);
       if (keys.has('d') || keys.has('arrowright')) (mx += rt.x), (mz += rt.z);
       if (keys.has('a') || keys.has('arrowleft')) (mx -= rt.x), (mz -= rt.z);
-      if (mx || mz) P.target = null;
+      if (mx || mz) (P.target = null), (P.path = []), (pathM.opacity = 0);
     }
     const run = keys.has('shift') ? 7.2 : 4.6;
     let sp = 0;
@@ -1856,9 +1902,19 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       mz /= l;
       sp = run;
     } else if (P.target && cam.mode === 'follow') {
-      tmp.copy(P.target).sub(P.pos).setY(0);
-      const d = tmp.length();
-      if (d < 0.15 || d < Math.min(run, d * 4 + 1) * dt) {
+      // 길찾기 중간 점: 가까워지면 다음 점으로(멈추지 않고 이어 걸음)
+      const reach = Math.max(0.6, run * dt * 1.2);
+      while (P.path.length > 1 && Math.hypot(P.path[0].x - P.pos.x, P.path[0].z - P.pos.z) < reach) P.path.shift();
+      const aim = P.path.length > 1 ? P.path[0] : P.target;
+      tmp.copy(aim).sub(P.pos).setY(0);
+      const dAim = tmp.length();
+      const d = dAim;
+      // 중간 점: 속도를 줄이지 않고 그쪽으로
+      if (aim !== P.target && dAim > 0.001) {
+        mx = tmp.x / dAim;
+        mz = tmp.z / dAim;
+        sp = run;
+      } else if (d < 0.15 || d < Math.min(run, d * 4 + 1) * dt) {
         if (!blocked(P.target.x, P.target.z)) P.pos.copy(P.target);
         P.target = null;
         if (P.goTalk !== -1) startTalk(P.goTalk);
@@ -1911,6 +1967,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     }
     meRing.position.copy(P.pos).setY(0.08);
     meRing.material.opacity = 0.55 + 0.25 * Math.sin(t * 4);
+    // 갈 길 점선: 걷는 동안 천천히 흐려지고, 도착하면 사라짐
+    if (pathM.opacity > 0) pathM.opacity = P.target ? Math.max(0.25, pathM.opacity - dt * 0.25) : 0;
     if (pin.material.opacity > 0) {
       pin.material.opacity = Math.max(0, pin.material.opacity - dt * 0.9);
       pin.scale.setScalar(1 + (0.9 - pin.material.opacity) * 0.8);
@@ -2164,7 +2222,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     speak: (on: boolean) => (speaking = on),
     near: () => near,
     shot: () => cv.toDataURL('image/png'),
-    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook, crowd, SUR, HQ },
+    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook, crowd, SUR, HQ, goTo, blocked },
     destroy() {
       cancelAnimationFrame(raf);
       crowd.clear();
