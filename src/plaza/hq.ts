@@ -9,6 +9,7 @@ export function makeHQ(T, scene, NIGHT_MATS) {
   const map = null;
   const BR = { logoSig: { src: logoSigUrl, w: 1528, h: 229 }, slogan2: { src: slogan2Url, w: 687, h: 319 } };
   let clockTex, clockCtx, lastClock = '';
+  let LEDM = null; // 게이트타워 전광판(광장에서 내용 바꿔 띄움)
   let ENT = null, MAINP = null;
   const LIT = { value: 1 };
   function nightTex(T, cw0, ch0, rect0, prob, seed, cells = 4) {
@@ -289,7 +290,7 @@ export function makeHQ(T, scene, NIGHT_MATS) {
         wing.add(box(36, .7, 20, std('#d9dcdf', { roughness: .6 }), 0, 0, 0));
         for (let i = 0; i < 12; i++) wing.add(box(36, .35, .5, mMetal, 0, -.5, -9.4 + i * 1.7));
         g.add(wing);
-        const led = new T.Mesh(new T.PlaneGeometry(14, 9), new T.MeshBasicMaterial({ map: BR.slogan2 ? sloganLed(1400, 900) : ledTex(1400, 900, 190, 74, '전북특별자치도교육청') })); led.position.set(1.5, GH - 8, GD / 2 + .9); g.add(led);
+        const led = new T.Mesh(new T.PlaneGeometry(14, 9), new T.MeshBasicMaterial({ map: BR.slogan2 ? sloganLed(1400, 900) : ledTex(1400, 900, 190, 74, '전북특별자치도교육청') })); led.position.set(1.5, GH - 8, GD / 2 + .9); g.add(led); LEDM = led;
         g.add(box(15.2, 10.2, .8, mDark, 1.5, GH - 8, GD / 2 + .4));
         clockTex = canvasTex(512, 170, () => {}, false); clockCtx = clockTex.userData.g;
         const ck = new T.Mesh(new T.PlaneGeometry(5.4, 1.8), new T.MeshBasicMaterial({ map: clockTex })); ck.position.set(1.5, GH - 1.6, GD / 2 + .9); g.add(ck);
@@ -314,7 +315,7 @@ export function makeHQ(T, scene, NIGHT_MATS) {
       }
     }
   build();
-  return { LIT, ENT, MAIN: MAINP, drawClock(hh) {
+  return { LIT, ENT, MAIN: MAINP, get LED() { return LEDM; }, drawClock(hh) {
       const s = `${String(Math.floor(hh) % 24).padStart(2, '0')}:${String(Math.floor((hh % 1) * 60)).padStart(2, '0')}`;
       if (s === lastClock) return; lastClock = s;
       const g = clockCtx; g.fillStyle = '#05080d'; g.fillRect(0, 0, 512, 170);

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Volume2, VolumeX, ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X, Pencil, Shuffle, Users, Check, Home } from 'lucide-react';
+import { Volume2, VolumeX, ArrowLeft, ArrowRight, BookOpen, Building2, ChevronDown, Search, ExternalLink, Footprints, LayoutGrid, Maximize2, Minimize2, Moon, Sun, Clock3, X, Pencil, Shuffle, Users, Check, Home, Trophy } from 'lucide-react';
 import { allTools, splitAuthor, type Model } from '../lib/stats';
 import { KEYWORD_CHIPS, chipFields, chipMatcher } from '../lib/keywords';
 import { summaryOf, summaryText, type ToolSummary } from '../lib/summaries';
@@ -92,6 +92,13 @@ type Tool = PlazaTool & { url: string; board: string };
 type Tent = PlazaTent & { tools: Tool[] };
 
 /** 천막(업무 분류)별 도구 + 로비 서가용 전체·많이 찾는·새로 올라온 도구 */
+type FameMaker = { person: string; org: string; r7: number; week: number; views: number; tools: { tool: Tool; r7: number; week: number; views: number }[] };
+type FamePeriod = 'r7' | 'week' | 'views';
+const FAME_PERIOD: { k: FamePeriod; label: string }[] = [
+  { k: 'r7', label: '최근 7일' },
+  { k: 'week', label: '이번 주' },
+  { k: 'views', label: '누적' },
+];
 function usePlazaData(m: Model) {
   return useMemo(() => {
     const byRecent = [...allTools(m)].sort((a, b) => b.recent30 - a.recent30 || b.views - a.views);
@@ -123,11 +130,25 @@ function usePlazaData(m: Model) {
     }).filter((t) => t.tools.length > 0);
     const all = byRecent.map(toTool);
     const popular = all.slice(0, 12);
+    // 명예의 전당: 최근 7일 인기 도구(전체 도구), 인기 제작자(교직원 제작 — 사이트 「인기 제작자」와 같은 셈)
+    const top = [...allTools(m)]
+      .filter((t) => t.recent7 > 0)
+      .sort((a, b) => b.recent7 - a.recent7 || b.views - a.views)
+      .slice(0, 5)
+      .map((t) => ({ tool: toTool(t), n: t.recent7 }));
+    const makers: FameMaker[] = m.makers.map((mk) => ({
+      person: mk.person || mk.name,
+      org: mk.org,
+      r7: mk.recent7,
+      week: mk.thisWeek,
+      views: mk.views,
+      tools: mk.tools.map((t) => ({ tool: toTool(t), r7: t.recent7, week: t.thisWeek, views: t.views })),
+    }));
     const fresh = [...byRecent]
       .sort((a, b) => b.created.localeCompare(a.created) || b.sid.localeCompare(a.sid))
       .slice(0, 12)
       .map(toTool);
-    return { tents, all, popular, fresh };
+    return { tents, all, popular, fresh, top, makers };
   }, [m]);
 }
 const DESK_HELLO = '어서 오세요! 어떤 업무 도구를 찾으세요? 낱말을 넣거나 아래에서 골라 보세요.';
@@ -195,7 +216,8 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const eng = useRef<PlazaEngine | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [near, setNear] = useState<number | 'desk' | null>(null);
+  const [near, setNear] = useState<number | 'desk' | 'fame' | null>(null);
+  const [fame, setFame] = useState(false);
   const [talk, setTalk] = useState<number | 'desk' | null>(null);
   const [world, setWorld] = useState<'out' | 'in'>('out');
   const [hoverTool, setHoverTool] = useState<PlazaTool | null>(null);
@@ -290,6 +312,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         setWorld(e.world);
         setHoverTool(null);
       } else if (e.type === 'hover') setHoverTool(e.tool);
+      else if (e.type === 'fame') setFame(true);
       else if (e.type === 'focus') {
         setRect(e.rect);
         setFrom(e.from ?? null);
@@ -299,7 +322,10 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
     void Promise.all([loadFonts(), loadCharacters()]).then(() => {
       if (dead || !host.current) return;
       try {
-        const e = createPlaza(host.current, tents, on, { quality, visited: [...visitedRef.current], lobby: { tools: data.all, popular: data.popular, fresh: data.fresh }, me: meRef.current });
+        const e = createPlaza(host.current, tents, on, { quality, visited: [...visitedRef.current], lobby: { tools: data.all, popular: data.popular, fresh: data.fresh }, me: meRef.current, fame: {
+          top: data.top.map((x) => ({ title: x.tool.title, who: x.tool.who, n: x.n })),
+          makers: [...data.makers].sort((a, b) => b.r7 - a.r7 || b.views - a.views).filter((x) => x.r7 > 0).slice(0, 10).map((x) => ({ person: x.person, org: x.org, n: x.r7 })),
+        } });
         eng.current = e;
         (window as unknown as { __plaza?: PlazaEngine }).__plaza = e;
         // 함께 접속(설정이 있을 때만)
@@ -398,7 +424,19 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   }, [line]);
   const typing = typed < line.length;
 
-  const doTalk = useCallback(() => (near === 'desk' ? eng.current?.talkDesk() : near !== null && eng.current?.talk(near)), [near]);
+  const doTalk = useCallback(() => (near === 'fame' ? setFame(true) : near === 'desk' ? eng.current?.talkDesk() : near !== null && eng.current?.talk(near)), [near]);
+  /** 명예의 전당에서 도구 자세히 — 화면 가운데에 띄움 */
+  const openFromFame = (t: Tool) => {
+    const el = stage.current;
+    const vw = el?.clientWidth ?? window.innerWidth, vh = el?.clientHeight ?? window.innerHeight;
+    const portrait = vw / vh < 0.95;
+    const w = Math.min(vw - (portrait ? 16 : 48), 820);
+    const h = Math.min(vh - (portrait ? 16 : 56), portrait ? vh : Math.max(w * 0.72, 420));
+    setFocusKind('card');
+    setFrom(null);
+    setRect({ x: (vw - w) / 2, y: (vh - h) / 2, w, h });
+    setDetail(t);
+  };
   const doShow = useCallback(() => {
     if (typing) return setTyped(line.length);
     setStep('tools');
@@ -427,6 +465,11 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   useEffect(() => {
     const kd = (e: KeyboardEvent) => {
       const tg = e.target as HTMLElement;
+      // 명예의 전당 창: 안의 단추에 초점이 있어도 Esc로 닫힘
+      if (e.key === 'Escape' && fame && !detail && tg?.tagName !== 'INPUT') {
+        setFame(false);
+        return;
+      }
       if (tg && (tg.tagName === 'BUTTON' || tg.tagName === 'A' || tg.tagName === 'INPUT')) return;
       if (e.key === ' ' || e.key === 'Enter') {
         if (talk === null && near !== null) {
@@ -438,6 +481,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         }
       } else if (e.key === 'Escape') {
         if (detail) window.dispatchEvent(new Event(focusKind === 'book' ? CLOSE_BOOK : CLOSE_CARD));
+        else if (fame) setFame(false);
         else if (detail) closeDetail();
         else if (sel) eng.current?.select(null);
         else if (talk !== null) doEnd();
@@ -445,7 +489,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
     };
     window.addEventListener('keydown', kd);
     return () => window.removeEventListener('keydown', kd);
-  }, [talk, near, step, sel, detail, focusKind, doTalk, doShow, doEnd, closeDetail]);
+  }, [talk, near, step, sel, detail, focusKind, fame, doTalk, doShow, doEnd, closeDetail]);
 
   const setDn = (md: Mode) => {
     setMode(md);
@@ -717,15 +761,19 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
       </div>
 
       {/* 아래: 말 걸기 */}
-      {ready && talk === null && near !== null && (
+      {ready && talk === null && near !== null && !fame && (
         <div className="absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
           <button
             type="button"
             onClick={doTalk}
             className="group inline-flex items-center gap-3 rounded-full bg-white px-5 py-3 text-[15px] font-bold text-[#0d1830] shadow-[0_8px_30px_rgba(0,0,0,0.3)] ring-4 ring-[#4fd1ff]/40 hover:ring-[#4fd1ff]/70"
           >
-            <span className="h-3 w-3 rounded-full" style={{ background: near === 'desk' ? '#3a457f' : tents[near].color }} aria-hidden="true" />
-            {near === 'desk' ? '안내 데스크에 말 걸기' : `${tents[near].label} 천막지기에게 말 걸기`}
+            {near === 'fame' ? (
+              <Trophy className="h-4 w-4 text-[#d9a93a]" aria-hidden="true" />
+            ) : (
+              <span className="h-3 w-3 rounded-full" style={{ background: near === 'desk' ? '#3a457f' : tents[near].color }} aria-hidden="true" />
+            )}
+            {near === 'fame' ? '명예의 전당 보기' : near === 'desk' ? '안내 데스크에 말 걸기' : `${tents[near].label} 천막지기에게 말 걸기`}
             {!touch && <Kbd dark>Space</Kbd>}
           </button>
         </div>
@@ -889,6 +937,9 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
           </div>
         </div>
       )}
+
+      {/* 명예의 전당 */}
+      {fame && !detail && <FamePanel top={data.top} makers={data.makers} onTool={openFromFame} onClose={() => setFame(false)} />}
 
       {/* 자세히 보기 — 확대된 홀로그램 카드 위에 겹쳐 띄움 */}
       {detail &&
@@ -1149,6 +1200,119 @@ const CardFace: React.FC<{ tool: Tool; r: Rect }> = ({ tool, r }) => {
         <span style={{ position: 'absolute', right: px(56), bottom: px(38), fontSize: px(28), lineHeight: px(36) }} className="font-extrabold">
           눌러서 보기 ▸
         </span>
+      </div>
+    </div>
+  );
+};
+
+/** 명예의 전당 — 최근 7일 인기 도구 TOP 5 + 인기 제작자 전체 순위(사이트와 같은 셈) */
+const FamePanel: React.FC<{
+  top: { tool: Tool; n: number }[];
+  makers: FameMaker[];
+  onTool: (t: Tool) => void;
+  onClose: () => void;
+}> = ({ top, makers, onTool, onClose }) => {
+  const [tab, setTab] = useState<'tools' | 'makers'>('tools');
+  const [per, setPer] = useState<FamePeriod>('r7');
+  const [open, setOpen] = useState<string | null>(null);
+  const list = useMemo(() => [...makers].filter((x) => x[per] > 0).sort((a, b) => b[per] - a[per] || a.person.localeCompare(b.person, 'ko')), [makers, per]);
+  const medal = (i: number) => (i === 0 ? 'bg-[#f2c14e] text-[#1a1406]' : i === 1 ? 'bg-[#cfd6de] text-[#1a1d22]' : i === 2 ? 'bg-[#d99a5b] text-[#1f1206]' : 'bg-white/12 text-white/80');
+  const nf = (v: number) => v.toLocaleString('ko-KR');
+  return (
+    <div className="absolute inset-0 z-30 grid place-items-center bg-black/35 p-2 sm:p-6" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label="명예의 전당"
+        onClick={(e) => e.stopPropagation()}
+        className="plaza-scroll flex max-h-full w-full max-w-[680px] flex-col overflow-hidden rounded-2xl bg-[rgba(13,24,48,0.94)] text-white shadow-2xl ring-2 ring-[#d9a93a]/60"
+      >
+        <div className="flex items-center gap-2 px-5 pt-4">
+          <Trophy className="h-5 w-5 text-[#f2c14e]" aria-hidden="true" />
+          <h2 className="nr-title text-[20px] sm:text-[22px] text-[#f2c14e]">명예의 전당</h2>
+          <button type="button" onClick={onClose} className="ml-auto rounded-full p-2 text-white/70 hover:bg-white/10 hover:text-white" aria-label="닫기">
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div role="tablist" className="mx-5 mt-2 flex gap-1 rounded-full bg-white/8 p-1 text-[14px] font-bold">
+          {(
+            [
+              ['tools', '인기 도구'],
+              ['makers', '인기 제작자'],
+            ] as const
+          ).map(([k, l]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`flex-1 rounded-full px-3 py-1.5 transition ${tab === k ? 'bg-white text-[#0d1830]' : 'text-white/75 hover:text-white'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {tab === 'tools' ? (
+          <div className="plaza-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-3">
+            <p className="text-[13px] text-white/60">최근 7일 동안 가장 많이 본 도구예요. 누르면 자세히 볼 수 있어요.</p>
+            <ol className="mt-2 space-y-1.5">
+              {top.map((x, i) => (
+                <li key={x.tool.sid}>
+                  <button type="button" onClick={() => onTool(x.tool)} className="flex w-full items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5 text-left hover:bg-white/10 focus-visible:bg-white/10">
+                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[15px] font-black ${medal(i)}`}>{i + 1}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-bold">{x.tool.title}</span>
+                      <span className="block truncate text-[12px] text-white/60">{x.tool.who}</span>
+                    </span>
+                    <span className="shrink-0 text-[14px] font-bold tabular-nums text-[#bff3ff]">{nf(x.n)}회</span>
+                  </button>
+                </li>
+              ))}
+              {!top.length && <li className="text-[14px] text-white/60">아직 최근 7일 집계가 없어요.</li>}
+            </ol>
+          </div>
+        ) : (
+          <div className="plaza-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-3">
+            <div className="flex items-center gap-2">
+              <p className="min-w-0 flex-1 text-[13px] text-white/60">만든 도구의 조회수 합계 순이에요.</p>
+              <div role="radiogroup" aria-label="기간" className="flex shrink-0 rounded-full bg-white/8 p-0.5 text-[12px] font-bold">
+                {FAME_PERIOD.map((x) => (
+                  <button key={x.k} type="button" role="radio" aria-checked={per === x.k} onClick={() => setPer(x.k)} className={`whitespace-nowrap rounded-full px-2.5 py-1 ${per === x.k ? 'bg-white text-[#0d1830]' : 'text-white/75 hover:text-white'}`}>
+                    {x.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <ol className="mt-2 space-y-1">
+              {list.map((x, i) => {
+                const key = x.person + '|' + x.org;
+                const isOpen = open === key;
+                return (
+                  <li key={key} className="rounded-xl bg-white/5">
+                    <button type="button" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : key)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-white/10 focus-visible:bg-white/10">
+                      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-black ${medal(i)}`}>{i + 1}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="text-[15px] font-bold">{x.person}</span>
+                        {x.org && <span className="ml-1.5 text-[12px] text-white/60">{x.org}</span>}
+                        <span className="ml-1.5 text-[12px] text-white/45">도구 {x.tools.length}개</span>
+                      </span>
+                      <span className="shrink-0 text-[14px] font-bold tabular-nums text-[#bff3ff]">{nf(x[per])}회</span>
+                      <ChevronDown className={`h-4 w-4 shrink-0 text-white/60 transition ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </button>
+                    {isOpen && (
+                      <ul className="space-y-0.5 px-3 pb-2">
+                        {[...x.tools]
+                          .sort((a, b) => b[per] - a[per])
+                          .map((t) => (
+                            <li key={t.tool.sid}>
+                              <button type="button" onClick={() => onTool(t.tool)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[14px] hover:bg-white/10">
+                                <span className="min-w-0 flex-1 truncate">{t.tool.title}</span>
+                                <span className="shrink-0 text-[12px] tabular-nums text-white/60">{nf(t[per])}회</span>
+                              </button>
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+              {!list.length && <li className="text-[14px] text-white/60">이 기간에는 집계가 없어요.</li>}
+            </ol>
+          </div>
+        )}
       </div>
     </div>
   );

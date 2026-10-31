@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { makeHQ } from './hq';
 import { animChibi, blob, makeChibi, toon, toonGrad, type Chibi } from './chibi';
 import { makeSurround } from './surround';
+import { makeFame, ledTopTex, type FameData } from './fame';
 import { bubble, disposeSprite, lookOpt, makeCrowd, nameTag, playEmote, type Emote, type Look } from './crowd';
 import { makeLobby, type Lobby } from './lobby';
 
@@ -28,7 +29,8 @@ export interface PlazaTent {
 export type Mode = 'auto' | 'day' | 'night';
 export type Ev =
   | { type: 'ready' }
-  | { type: 'near'; tent: number | 'desk' | null }
+  | { type: 'near'; tent: number | 'desk' | 'fame' | null }
+  | { type: 'fame' }
   | { type: 'talk'; tent: number | 'desk' | null }
   | { type: 'world'; world: 'out' | 'in' }
   | { type: 'focus'; rect: { x: number; y: number; w: number; h: number } | null; kind?: 'card' | 'book'; from?: { x: number; y: number; w: number; h: number } }
@@ -174,7 +176,7 @@ const TAG_COL: Record<string, { bg: string; fg: string; line?: string }> = {
 };
 const LINES_TONE = ['#2f6fb3', '#e8554e', '#3a457f', '#4f8f5a', null, null];
 
-export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev) => void, opt: { quality: 'high' | 'low'; visited?: number[]; lobby: { tools: PlazaTool[]; popular: PlazaTool[]; fresh: PlazaTool[] }; me?: { name: string; look: Look } }) {
+export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev) => void, opt: { quality: 'high' | 'low'; visited?: number[]; lobby: { tools: PlazaTool[]; popular: PlazaTool[]; fresh: PlazaTool[] }; me?: { name: string; look: Look }; fame?: FameData }) {
   const T = THREE;
   const high = opt.quality === 'high';
   const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: !!(window as any).__plazaShot });
@@ -819,6 +821,23 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     });
   }
 
+  /* 명예의 전당: 천막 마당 한가운데 — 앞이 시작 자리(청사 반대편)를 봄 */
+  const FAME = opt.fame ? makeFame(opt.fame, high) : null;
+  if (FAME) {
+    FAME.group.position.copy(W(CS[0], CS[1], 0.05));
+    FAME.group.rotation.y = Math.atan2(FN[0], -FN[1]);
+    scene.add(FAME.group);
+    hitList.push(...FAME.hit);
+  }
+  const isFame = (o: THREE.Object3D | null) => {
+    for (; o; o = o.parent) if (o.userData.fame) return true;
+    return false;
+  };
+  // 청사 전광판: 슬로건 ↔ 최근 7일 인기 도구 TOP 5 번갈아
+  const ledMat = (HQ.LED as THREE.Mesh | null)?.material as THREE.MeshBasicMaterial | undefined;
+  const ledSlogan = ledMat?.map ?? null;
+  const ledTop = opt.fame && ledMat ? ledTopTex(opt.fame) : null;
+
   /* 나(플레이어) */
   let me = makeChibi(lookOpt(opt.me?.look ?? { sk: 0, h: 0, st: 0, tp: 0, pn: 0, gl: 0, ht: 1, cp: 0 }));
   scene.add(me.root);
@@ -857,7 +876,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   pin.rotation.x = -Math.PI / 2;
   scene.add(pin);
 
-  const start = W(CS[0] - FN[0] * 4, CS[1] - FN[1] * 4);
+  // 시작 자리: 천막 마당 안, 청사 반대편 — 청사 쪽을 보면 명예의 전당·천막·청사가 한눈에
+  const start = W(CS[0] + FN[0] * 14, CS[1] + FN[1] * 14);
   const P = { pos: start.clone(), yaw: Math.atan2(-FN[0], FN[1]), speed: 0, target: null as THREE.Vector3 | null, goTalk: -1, goDoor: false };
   // 플레이어가 청사를 보도록: three 앞쪽(+z)이 향할 방향 = 청사 쪽(-FN) → world(-FN0, 0, FN1)
   P.yaw = Math.atan2(-FN[0], FN[1]);
@@ -865,7 +885,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   /* 카메라 */
   const narrow = host.clientWidth < host.clientHeight;
   // 세로 화면은 좌우가 좁아 청사 쪽을 보면 천막이 안 보임 → 마당 안쪽(천막들)을 보며 시작
-  if (narrow) P.yaw = Math.atan2(FN[0], -FN[1]);
+  // (세로 화면도 같은 쪽 — 명예의 전당이 정면)
   const cam = {
     yaw: P.yaw + Math.PI, // 카메라는 플레이어 뒤
     pitch: narrow ? 0.5 : 0.42,
@@ -1220,6 +1240,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     if (world === 'in') return lobby!.blocked(x, z);
     if (BLOCK_NOW.some((b) => inPoly(p, b))) return true;
     if (SUR.inBuilding(p[0], p[1], RAD) || SUR.inWater(p[0], p[1])) return true;
+    if (FAME && Math.hypot(p[0] - CS[0], p[1] - CS[1]) < 4.75 + RAD) return true; // 명예의 전당 단
     if (Math.hypot(p[0], p[1]) > WALK_R) return true;
     for (const c of canopyCols) if (Math.hypot(x - c.x, z - c.z) < 0.25 + RAD) return true;
     for (const t of TENTS) {
@@ -1328,7 +1349,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   }
 
   /* 대화 */
-  let near: number | 'desk' | null = null;
+  let near: number | 'desk' | 'fame' | null = null;
   let talking = -1;
   const DESK = -2;
   const anchorOf = (i: number) => (i === DESK ? lobby!.anchor : TENTS[i]);
@@ -1477,7 +1498,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       if (h) cursor = 'pointer';
     } else if (cam.mode === 'follow' && world === 'out') {
       const h = ray.intersectObjects([...hitList, ...doorHit], true)[0];
-      if (h && (h.object.userData.tent !== undefined || h.object.userData.door)) cursor = 'pointer';
+      if (h && (h.object.userData.tent !== undefined || h.object.userData.door || isFame(h.object))) cursor = 'pointer';
     }
     cv.style.cursor = cursor;
   };
@@ -1510,6 +1531,10 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       const ht = ray.intersectObjects([...hitList, ...doorHit], true)[0];
       if (ht && ht.object.userData.door) {
         goLobby();
+        return;
+      }
+      if (ht && isFame(ht.object)) {
+        emit({ type: 'fame' });
         return;
       }
       if (ht && ht.object.userData.tent !== undefined) {
@@ -1790,7 +1815,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   let now = 0;
   let raf = 0;
   let readySent = false;
-  let lastNear: number | null = -2;
+  let lastNear: number | 'desk' | 'fame' | null = -2;
   let tick20 = 0;
   let doorK = 0;
   const tmp = V();
@@ -1866,6 +1891,11 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     me.root.rotation.y = P.yaw;
     if (high && world === 'out') placeSun();
     animChibi(me, dt, t, P.speed);
+    FAME?.update(t, lastDarkK);
+    if (ledMat && ledTop && ledSlogan) {
+      const want = Math.floor(t / 9) % 2 ? ledTop : ledSlogan;
+      if (ledMat.map !== want) ledMat.map = want;
+    }
     {
       const hideTags = cam.mode === 'talk' || cam.mode === 'holo' || focus >= 0 || !!focusBook;
       myTag.visible = !hideTags && cam.mode !== 'intro';
@@ -1887,7 +1917,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     }
 
     // 가까운 천막지기 / 안내 데스크
-    let best: number | 'desk' | null = null, bd = 3.6;
+    let best: number | 'desk' | 'fame' | null = null, bd = 3.6;
     if (world === 'out') {
       // 정문: 다가가면 문이 열리고, 문 앞까지 오면 로비로
       const dd = Math.hypot(P.pos.x - doorPt.x, P.pos.z - doorPt.z);
@@ -1954,6 +1984,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       const ld = camera.position.distanceTo(tt.label.position);
       tt.label.material.opacity = cam.mode === 'talk' || cam.mode === 'holo' ? 0 : clamp((ld - 7) / 6) * clamp(1.5 - ld / 110, 0.45, 1);
     });
+    // 명예의 전당: 단 둘레에 오면
+    if (world === 'out' && FAME && best === null && Math.hypot(P.pos.x - FAME.group.position.x, P.pos.z - FAME.group.position.z) < 7.4) best = 'fame';
     if (talking !== -1 || fading) best = null;
     if (best !== lastNear) {
       lastNear = best;
@@ -2132,7 +2164,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     speak: (on: boolean) => (speaking = on),
     near: () => near,
     shot: () => cv.toDataURL('image/png'),
-    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook, crowd, SUR },
+    debug: { P, cam, TENTS, ENT, startTalk, showTools, applyHour, holo, cards, camera, enterLobby, exitLobby, get lobby() { return lobby; }, openBook, crowd, SUR, HQ },
     destroy() {
       cancelAnimationFrame(raf);
       crowd.clear();
