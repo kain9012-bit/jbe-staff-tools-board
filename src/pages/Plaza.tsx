@@ -134,7 +134,7 @@ function usePlazaData(m: Model) {
     const top = [...allTools(m)]
       .filter((t) => t.recent7 > 0)
       .sort((a, b) => b.recent7 - a.recent7 || b.views - a.views)
-      .slice(0, 5)
+      .slice(0, 10) // 창은 10위까지, 전광판은 앞 5개, 시상대는 앞 3개
       .map((t) => ({ tool: toTool(t), n: t.recent7 }));
     const makers: FameMaker[] = m.makers.map((mk) => ({
       person: mk.person || mk.name,

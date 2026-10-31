@@ -228,9 +228,10 @@ function trophy(col: string, dark: string) {
   cup.position.y = 0.62;
   g.add(cup);
   for (const s of [-1, 1]) {
-    const h = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 8, 20, Math.PI * 1.2), gold);
-    h.position.set(s * 0.38, 1.0, 0);
-    h.rotation.z = s > 0 ? -Math.PI * 0.6 : Math.PI * 1.6;
+    // 손잡이: 반원 고리. 오른쪽은 오른쪽 반, 왼쪽은 왼쪽 반이 바깥을 향하게(좌우 대칭)
+    const h = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 8, 20, Math.PI), gold);
+    h.position.set(s * 0.36, 1.0, 0);
+    h.rotation.z = s > 0 ? -Math.PI / 2 : Math.PI / 2;
     g.add(h);
   }
   const plate = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.02), new THREE.MeshStandardMaterial({ color: dark, metalness: 0.6, roughness: 0.4 }));
