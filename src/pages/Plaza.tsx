@@ -216,7 +216,8 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   const eng = useRef<PlazaEngine | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [near, setNear] = useState<number | 'desk' | 'fame' | null>(null);
+  const [near, setNear] = useState<number | 'desk' | 'fame' | 'chief' | null>(null);
+  const [chiefQ, setChiefQ] = useState<string | null>(null);
   const [fame, setFame] = useState(false);
   const [talk, setTalk] = useState<number | 'desk' | null>(null);
   const [world, setWorld] = useState<'out' | 'in'>('out');
@@ -313,6 +314,7 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
         setHoverTool(null);
       } else if (e.type === 'hover') setHoverTool(e.tool);
       else if (e.type === 'fame') setFame(true);
+      else if (e.type === 'chief') setChiefQ(e.quote);
       else if (e.type === 'focus') {
         setRect(e.rect);
         setFrom(e.from ?? null);
@@ -424,7 +426,13 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
   }, [line]);
   const typing = typed < line.length;
 
-  const doTalk = useCallback(() => (near === 'fame' ? setFame(true) : near === 'desk' ? eng.current?.talkDesk() : near !== null && eng.current?.talk(near)), [near]);
+  const doTalk = useCallback(() => (near === 'fame' ? setFame(true) : near === 'chief' ? eng.current?.greetChief() : near === 'desk' ? eng.current?.talkDesk() : near !== null && eng.current?.talk(near)), [near]);
+  // 교육감 인사말 한 구절 — 몇 초 뒤 사라짐
+  useEffect(() => {
+    if (!chiefQ) return;
+    const id = window.setTimeout(() => setChiefQ(null), 5200);
+    return () => window.clearTimeout(id);
+  }, [chiefQ]);
   /** 명예의 전당에서 도구 자세히 — 화면 가운데에 띄움 */
   const openFromFame = (t: Tool) => {
     const el = stage.current;
@@ -770,12 +778,24 @@ export const Plaza: React.FC<{ m: Model }> = ({ m }) => {
           >
             {near === 'fame' ? (
               <Trophy className="h-4 w-4 text-[#d9a93a]" aria-hidden="true" />
+            ) : near === 'chief' ? (
+              <span className="text-[16px] leading-none" aria-hidden="true">🙇</span>
             ) : (
               <span className="h-3 w-3 rounded-full" style={{ background: near === 'desk' ? '#3a457f' : tents[near].color }} aria-hidden="true" />
             )}
-            {near === 'fame' ? '명예의 전당 보기' : near === 'desk' ? '안내 데스크에 말 걸기' : `${tents[near].label} 천막지기에게 말 걸기`}
+            {near === 'fame' ? '명예의 전당 보기' : near === 'chief' ? '천호성 교육감에게 인사하기' : near === 'desk' ? '안내 데스크에 말 걸기' : `${tents[near].label} 천막지기에게 말 걸기`}
             {!touch && <Kbd dark>Space</Kbd>}
           </button>
+        </div>
+      )}
+
+      {/* 교육감 인사말 — 열린교육감실 「인사말」에서 옮긴 구절 */}
+      {ready && chiefQ && (
+        <div className="pointer-events-none absolute inset-x-0 top-20 z-10 flex justify-center px-4" role="status" aria-live="polite">
+          <div className={`rounded-2xl px-5 py-3 text-center text-white ${glass}`}>
+            <p className="text-[17px] font-extrabold">“{chiefQ}”</p>
+            <p className="mt-1 text-[12px] text-white/70">천호성 교육감 · 열린교육감실 인사말에서</p>
+          </div>
         </div>
       )}
 

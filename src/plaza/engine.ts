@@ -6,11 +6,11 @@
  */
 import * as THREE from 'three';
 import { makeHQ } from './hq';
-import { animChibi, blob, makeChibi, toon, toonGrad, type Chibi } from './chibi';
+import { animChibi, blob, makeChibi, makeChief, toon, toonGrad, type Chibi } from './chibi';
 import { makeSurround } from './surround';
 import { findPath } from './path';
 import { makeFame, ledTopTex, type FameData } from './fame';
-import { bubble, disposeSprite, lookOpt, makeCrowd, nameTag, playEmote, type Emote, type Look } from './crowd';
+import { bubble, disposeSprite, lookOpt, makeCrowd, nameTag, playEmote, textSprite, type Emote, type Look } from './crowd';
 import { makeLobby, type Lobby } from './lobby';
 
 export interface PlazaTool {
@@ -30,8 +30,9 @@ export interface PlazaTent {
 export type Mode = 'auto' | 'day' | 'night';
 export type Ev =
   | { type: 'ready' }
-  | { type: 'near'; tent: number | 'desk' | 'fame' | null }
+  | { type: 'near'; tent: number | 'desk' | 'fame' | 'chief' | null }
   | { type: 'fame' }
+  | { type: 'chief'; quote: string }
   | { type: 'talk'; tent: number | 'desk' | null }
   | { type: 'world'; world: 'out' | 'in' }
   | { type: 'focus'; rect: { x: number; y: number; w: number; h: number } | null; kind?: 'card' | 'book'; from?: { x: number; y: number; w: number; h: number } }
@@ -855,6 +856,44 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     });
   let lastDarkK = 0;
   [me.root, ...TENTS.map((t) => t.npc.root)].forEach(lift);
+  /* 교육감: 청사에서 천막 마당으로 들어오는 길목 옆에서 맞이함 — 말 걸면 인사하고 인사말 한 구절 */
+  const CHIEF_QUOTES = ['모두가 빛나게, 다함께 새롭게', '살아가는 힘을 키우는 전북교육', '교육은 속도가 아니라 방향입니다'];
+  const chief = (() => {
+    const c = makeChief();
+    if (!c) return null;
+    const along = R - 8, side = 2.8;
+    const p = [CS[0] - FN[0] * along - FN[1] * side, CS[1] - FN[1] * along + FN[0] * side];
+    const pos = W(p[0], p[1]);
+    c.root.position.copy(pos);
+    const yaw = Math.atan2(W(CS[0], CS[1]).x - pos.x, W(CS[0], CS[1]).z - pos.z);
+    c.root.rotation.y = yaw;
+    const tag = nameTag('천호성 교육감');
+    tag.position.y = 1.64;
+    c.root.add(tag);
+    c.root.traverse((o) => (o.userData.chief = true));
+    scene.add(c.root);
+    lift(c.root);
+    return { c, pos, yaw, bub: null as THREE.Sprite | null, bubT: 0, q: 0, seq: [] as [number, string][] };
+  })();
+  const isChief = (o: THREE.Object3D | null) => {
+    for (; o; o = o.parent) if (o.userData.chief) return true;
+    return false;
+  };
+  const greetChief = () => {
+    if (!chief || world !== 'out') return;
+    const q = CHIEF_QUOTES[chief.q++ % CHIEF_QUOTES.length];
+    chief.c.once = 'bow';
+    chief.seq = [[1.25, 'wave']];
+    disposeSprite(chief.bub);
+    chief.bub = textSprite(q, { bg: '#ffffff', fg: '#0d1830', tail: true, h: 0.4, font: 44 });
+    chief.bub.position.y = 1.98;
+    chief.c.root.add(chief.bub);
+    chief.bubT = 5;
+    // 나도 꾸벅 — 다른 사람에게도 보이는 인사
+    playEmote(me, 'hi');
+    P.yaw = Math.atan2(chief.pos.x - P.pos.x, chief.pos.z - P.pos.z);
+    emit({ type: 'chief', quote: q });
+  };
   // 내 이름표·말풍선
   let myTag = nameTag(opt.me?.name ?? '나', true);
   myTag.position.y = 1.78;
@@ -1217,6 +1256,11 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     for (const m of tentGlow) m.emissiveIntensity = dark * (m.userData.glowK ?? 0.5);
     lastDarkK = dark;
     for (const m of charMats) m.emissiveIntensity = dark * 0.32;
+    // 교육감 얼굴(사진 결): 밤에는 제 빛을 조금 낮춤
+    chief?.c.root.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshLambertMaterial | undefined;
+      if (m?.userData?.photo) m.emissiveIntensity = 0.72 - 0.28 * dark;
+    });
     SUR.setDark(dark);
     for (const m of doorGlow) m.color.copy(C3('#2a1c12', '#ffc070', dark));
     for (const m of bulbs) m.color.copy(m.userData.base).multiplyScalar(0.35 + 0.9 * dark);
@@ -1282,6 +1326,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       }
       if (Math.hypot(x - t.npcPos.x, z - t.npcPos.z) < 0.35 + RAD) return true;
     }
+    if (chief && Math.hypot(x - chief.pos.x, z - chief.pos.z) < 0.4 + RAD) return true;
     return false;
   };
   /** 클릭한 곳까지 길찾기(장애물 돌아서). 갈 길을 바닥에 점선으로 잠깐 보여 줌 */
@@ -1395,7 +1440,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   }
 
   /* 대화 */
-  let near: number | 'desk' | 'fame' | null = null;
+  let near: number | 'desk' | 'fame' | 'chief' | null = null;
   let talking = -1;
   const DESK = -2;
   const anchorOf = (i: number) => (i === DESK ? lobby!.anchor : TENTS[i]);
@@ -1545,6 +1590,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     } else if (cam.mode === 'follow' && world === 'out') {
       const h = ray.intersectObjects([...hitList, ...doorHit], true)[0];
       if (h && (h.object.userData.tent !== undefined || h.object.userData.door || isFame(h.object))) cursor = 'pointer';
+      else if (chief && ray.intersectObject(chief.c.root, true)[0]) cursor = 'pointer';
     }
     cv.style.cursor = cursor;
   };
@@ -1585,6 +1631,18 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       }
       if (ht && ht.object.userData.tent !== undefined) {
         walkToTent(ht.object.userData.tent);
+        return;
+      }
+      if (chief && ray.intersectObject(chief.c.root, true)[0]) {
+        if (Math.hypot(chief.pos.x - P.pos.x, chief.pos.z - P.pos.z) < 3.2) greetChief();
+        else {
+          const tgt = goTo(chief.pos.clone().add(V(Math.sin(chief.c.root.rotation.y), 0, Math.cos(chief.c.root.rotation.y)).multiplyScalar(1.7)));
+          P.goTalk = -1;
+          P.goDoor = false;
+          pin.position.copy(tgt).setY(0.1);
+          pin.material.opacity = 0.9;
+          pin.scale.setScalar(1);
+        }
         return;
       }
     }
@@ -1861,7 +1919,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   let now = 0;
   let raf = 0;
   let readySent = false;
-  let lastNear: number | 'desk' | 'fame' | null = -2;
+  let lastNear: number | 'desk' | 'fame' | 'chief' | null = -2;
   let tick20 = 0;
   let doorK = 0;
   const tmp = V();
@@ -1975,7 +2033,7 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     }
 
     // 가까운 천막지기 / 안내 데스크
-    let best: number | 'desk' | 'fame' | null = null, bd = 3.6;
+    let best: number | 'desk' | 'fame' | 'chief' | null = null, bd = 3.6;
     if (world === 'out') {
       // 정문: 다가가면 문이 열리고, 문 앞까지 오면 로비로
       const dd = Math.hypot(P.pos.x - doorPt.x, P.pos.z - doorPt.z);
@@ -2042,6 +2100,37 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       const ld = camera.position.distanceTo(tt.label.position);
       tt.label.material.opacity = cam.mode === 'talk' || cam.mode === 'holo' ? 0 : clamp((ld - 7) / 6) * clamp(1.5 - ld / 110, 0.45, 1);
     });
+    // 교육감: 가까이 오면 나를 보고 손 인사, 말 걸면 꾸벅
+    if (world === 'out' && chief) {
+      const ch = chief, d = Math.hypot(ch.pos.x - P.pos.x, ch.pos.z - P.pos.z);
+      if (d < 3.2 && d < bd) (bd = d), (best = 'chief');
+      let want = ch.yaw;
+      if (d < 9 || ch.bubT > 0) want = Math.atan2(P.pos.x - ch.pos.x, P.pos.z - ch.pos.z);
+      let dy = want - ch.c.root.rotation.y;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      ch.c.root.rotation.y += dy * Math.min(1, dt * 3);
+      if (d < 9 && !ch.c.root.userData.greeted) {
+        ch.c.root.userData.greeted = true;
+        ch.c.wave = 1.1;
+      }
+      if (d > 14) ch.c.root.userData.greeted = false;
+      for (const s2 of ch.seq) s2[0] -= dt;
+      while (ch.seq.length && ch.seq[0][0] <= 0) {
+        const k = ch.seq.shift()![1];
+        if (k === 'wave') ch.c.wave = 1.1;
+        else ch.c.once = k;
+      }
+      ch.c.talk = ch.bubT > 1.5 ? 1 : 0;
+      if (ch.bubT > 0) {
+        ch.bubT -= dt;
+        if (ch.bub) (ch.bub.material as THREE.SpriteMaterial).opacity = clamp(ch.bubT / 0.4);
+        if (ch.bubT <= 0) {
+          disposeSprite(ch.bub);
+          ch.bub = null;
+        }
+      }
+      animChibi(ch.c, dt, t, 0);
+    }
     // 명예의 전당: 단 둘레에 오면
     if (world === 'out' && FAME && best === null && Math.hypot(P.pos.x - FAME.group.position.x, P.pos.z - FAME.group.position.z) < 7.4) best = 'fame';
     if (talking !== -1 || fading) best = null;
@@ -2204,6 +2293,8 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     /** 광장 중심(천막 마당)에서 떨어진 거리(m) */
     away: () => (world === 'out' ? Math.hypot(P.pos.x - start.x, P.pos.z - start.z) : 0),
     talkDesk: () => world === 'in' && startTalk(DESK),
+    /** 교육감에게 인사 */
+    greetChief,
     search: (list: PlazaTool[]) => showResults(list),
     /** 로비 화면 소리 켜기·끄기 — 누른 순간이라 자동재생 제한에 안 걸림 */
     tvSound: (on: boolean) => {

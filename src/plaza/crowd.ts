@@ -83,7 +83,7 @@ function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: num
   g.arcTo(x, y, x + w, y, r);
   g.closePath();
 }
-function textSprite(text: string, o: { bg: string; fg: string; ring?: string; tail?: boolean; h: number; font: number }) {
+export function textSprite(text: string, o: { bg: string; fg: string; ring?: string; tail?: boolean; h: number; font: number }) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d')!;
   const font = `800 ${o.font}px ${FONT}`;
