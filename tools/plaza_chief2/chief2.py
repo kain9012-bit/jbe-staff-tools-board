@@ -25,6 +25,111 @@ tx = mat.node_tree.nodes.new('ShaderNodeTexImage'); tx.image = bpy.data.images.l
 mat.node_tree.links.new(tx.outputs['Color'], bs.inputs['Base Color'])
 body.data.materials.clear(); body.data.materials.append(mat)
 
+# ── 손: 3D 형상 빚기에서 주먹(뭉친 덩어리)으로 나온 손을 지우고, 손바닥·손가락 4개·엄지를 편 손으로 새로 붙임 ──
+import bmesh, numpy as np
+HAND_SCALE = float(os.environ.get('CHIEF_HAND', '1.55'))
+img = tx.image; IW, IH = img.size; PX = np.array(img.pixels[:], dtype=np.float32).reshape(IH, IW, 4)
+def tex_at(u, v):
+    x = min(IW - 1, max(0, int(u * IW))); y = min(IH - 1, max(0, int(v * IH))); return PX[y, x, :3]
+uvl = body.data.uv_layers.active.data
+vuv = {}
+for lp in body.data.loops: vuv.setdefault(lp.vertex_index, uvl[lp.index].uv.copy())
+HANDS_NEW = {}
+def skin_info(side):
+    jf, jh = T(RP['joints']['forearm.' + side]), T(RP['joints']['hand.' + side])
+    a = (jh - jf).normalized(); skin = []
+    for v in body.data.vertices:
+        d = v.co - jh; p = d.dot(a); r = (d - a * p).length
+        if p > -0.06 and r < 0.075 and d.length < 0.11:
+            c = tex_at(*vuv[v.index])
+            if c[0] > 0.33 and c[0] - c[2] > 0.08 and c[1] > 0.2: skin.append((v.index, p, c))
+    cols = np.array([c[2] for c in skin]); med = np.median(cols, 0)
+    best = min(skin, key=lambda c: float(np.sum((c[2] - med) ** 2)))
+    return jh, a, min(c[1] for c in skin) + 0.004, vuv[best[0]]
+INFO = {s: skin_info(s) for s in 'LR'}
+# 1) 옛 주먹을 소매 끝에서 평면으로 잘라냄(위치 기준) → 잘린 테두리를 한 평면으로 고르고 막음
+bm = bmesh.new(); bm.from_mesh(body.data); bm.verts.ensure_lookup_table()
+cut = set()
+for jh, a, pcut, _ in INFO.values():
+    for v in bm.verts:
+        d = v.co - jh; p = d.dot(a)
+        if d.length < 0.14 and p > pcut and (d - a * p).length < 0.085: cut.add(v.index)
+bmesh.ops.delete(bm, geom=[bm.verts[i] for i in cut], context='VERTS')
+bm.verts.ensure_lookup_table()
+# 잘리고 남은 주먹 조각(떠 있는 작은 덩어리) 지움
+seen = set(); junk = []
+for v0 in bm.verts:
+    if v0 in seen: continue
+    comp = []; stack = [v0]; seen.add(v0)
+    while stack:
+        v = stack.pop(); comp.append(v)
+        for e in v.link_edges:
+            o = e.other_vert(v)
+            if o not in seen: seen.add(o); stack.append(o)
+    if len(comp) < 300 and any((comp[0].co - jh).length < 0.25 for jh, _, _, _ in INFO.values()): junk += comp
+bmesh.ops.delete(bm, geom=junk, context='VERTS'); print('junk verts', len(junk))
+bm.edges.ensure_lookup_table(); bnd = [e for e in bm.edges if e.is_boundary]
+RING = {}
+for v in {v for e in bnd for v in e.verts}:
+    for s_, (jh, a, pcut, _) in INFO.items():
+        d = v.co - jh
+        if d.length < 0.15: v.co = v.co - a * (d.dot(a) - pcut); RING.setdefault(s_, []).append(v)
+uvL = bm.loops.layers.uv.active
+res = bmesh.ops.holes_fill(bm, edges=bnd, sides=0)
+dark = None
+for s_, vs in RING.items():
+    cand = [(float(np.sum(tex_at(*l[uvL].uv))), l[uvL].uv.copy()) for v in vs for l in v.link_loops]
+    dark = min(cand, key=lambda c: c[0])[1]
+for f in res['faces']:
+    for l in f.loops: l[uvL].uv = dark
+WR = {s_: (sum((v.co for v in vs), Vector()) / len(vs), sum(((v.co - sum((w.co for w in vs), Vector()) / len(vs)).length for v in vs)) / len(vs)) for s_, vs in RING.items()}
+print('cut', len(cut), 'ring', {k: (len(v), round(WR[k][1], 4)) for k, v in RING.items()}, 'caps', len(res['faces']))
+bm.to_mesh(body.data); bm.free()
+# 2) 편 손: 손바닥·손가락 4개·엄지를 이어 붙여 매끈하게 녹여 만듦, 소매 끝 한가운데에서 나옴
+def build_hand(side):
+    jh, a, pcut, u = INFO[side]; W, rr = WR[side]
+    inward = Vector((-1, 0, 0)) if side == 'L' else Vector((1, 0, 0))
+    n = (inward - a * inward.dot(a)).normalized()          # 손바닥이 몸쪽
+    f = a.cross(n).normalized()
+    if f.y > 0: f = -f                                       # 엄지가 앞쪽(모델은 -Y를 봄)
+    M = Matrix((f, n, a)).transposed()
+    k = HAND_SCALE; parts = []
+    def ell(c, rad):
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, radius=1, location=(0, 0, 0))
+        o = bpy.context.active_object; o.scale = Vector(rad) * k; o.location = Vector(c) * k; parts.append(o)
+    def cap(p0, p1, r, rk=None):
+        p0, p1 = Vector(p0) * k, Vector(p1) * k; d = p1 - p0; r = r * k if rk is None else rk
+        bpy.ops.mesh.primitive_cylinder_add(radius=r, depth=d.length, vertices=16, location=(p0 + p1) / 2)
+        o = bpy.context.active_object; o.rotation_mode = 'QUATERNION'; o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized()); parts.append(o)
+        for q in (p0, p1):
+            bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=r, location=q); parts.append(bpy.context.active_object)
+    cap((0, 0, -0.03), (0, 0.001, 0.012), 0, rk=min(rr * 0.8, 0.0165 * k))   # 손목(소매 구멍 크기에 맞춰 안으로 깊이)
+    ell((0, 0.0015, 0.031), (0.0285, 0.0132, 0.029))                         # 손바닥
+    for x, L, ang in ((0.0182, 0.029, 3.5), (0.0061, 0.033, 1), (-0.0061, 0.031, -1), (-0.0182, 0.024, -3.5)):
+        s0 = Vector((x, 0.002, 0.05)); dvec = Vector((math.sin(math.radians(ang)), math.sin(math.radians(11)), 1)).normalized()
+        cap(s0, s0 + dvec * L, 0.0074)                                        # 손가락(가지런히, 손바닥 쪽으로 조금 굽힘)
+    t0 = Vector((0.02, 0.007, 0.017)); cap(t0, t0 + Vector((0.6, 0.45, 0.66)).normalized() * 0.028, 0.0088)   # 엄지
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in parts: o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]; bpy.ops.object.transform_apply(location=True, rotation=True, scale=True); bpy.ops.object.join()
+    h = parts[0]; h.name = 'Hand' + side
+    rm = h.modifiers.new('rm', 'REMESH'); rm.mode = 'VOXEL'; rm.voxel_size = 0.0016 * k
+    sm = h.modifiers.new('sm', 'SMOOTH'); sm.factor = 0.8; sm.iterations = 6
+    dc = h.modifiers.new('dc', 'DECIMATE'); dc.ratio = 0.35
+    for m in ('rm', 'sm', 'dc'): bpy.ops.object.modifier_apply(modifier=m)
+    for v in h.data.vertices: v.co = W + M @ v.co
+    for p in h.data.polygons: p.use_smooth = True
+    h.data.uv_layers.new(name=body.data.uv_layers.active.name)
+    for l in h.data.uv_layers[0].data: l.uv = u
+    h.data.materials.clear(); h.data.materials.append(mat)
+    vg = h.vertex_groups.new(name='HANDMARK_' + side); vg.add(list(range(len(h.data.vertices))), 1.0, 'REPLACE')
+    print('hand', side, 'wrist', tuple(round(x, 3) for x in W), 'faces', len(h.data.polygons))
+    return h
+for s in 'LR': HANDS_NEW[s] = build_hand(s)
+bpy.ops.object.select_all(action='DESELECT')
+for h in HANDS_NEW.values(): h.select_set(True)
+body.select_set(True); bpy.context.view_layer.objects.active = body; bpy.ops.object.join()
+
 # ── ⑥ 안경: 그림 속 테 모양대로 얇은 금속 테(무테 + 다리) ──
 gm = bpy.data.materials.new('Glasses'); gm.use_nodes = True; gm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.5, 0.38, 0.18, 1)
 le, re = Vector(RP['left_eye']), Vector(RP['right_eye'])
@@ -78,6 +183,15 @@ try:
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
 except Exception as e:
     print('auto weights failed', e); bpy.ops.object.parent_set(type='ARMATURE_ENVELOPE')
+# 새 손은 손뼈에 통째로(손가락이 팔 따라 휘지 않게)
+for s in 'LR':
+    gi = {body.vertex_groups['HANDMARK_' + s].index}; ids = [v.index for v in body.data.vertices if any(g.group in gi for g in v.groups)]
+    for g in list(body.vertex_groups):
+        if g.name != 'hand.' + s: g.remove(ids)
+    body.vertex_groups['hand.' + s].add(ids, 1.0, 'REPLACE')
+    print('hand verts pinned', s, len(ids))
+for s in 'LR':
+    body.vertex_groups.remove(body.vertex_groups['HANDMARK_' + s])
 # 안경은 머리뼈에(자리 유지)
 bpy.ops.object.select_all(action='DESELECT'); glasses.select_set(True); rig.select_set(True); bpy.context.view_layer.objects.active = rig
 bpy.ops.object.mode_set(mode='POSE'); arm.bones.active = arm.bones['head']
