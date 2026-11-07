@@ -22,15 +22,23 @@ for k in ('left_eye', 'right_eye'): cv2.fillPoly(eyem, [cv2.convexHull(np.array(
 eyem = cv2.dilate(eyem, np.ones((7, 7), np.uint8))
 bm = np.zeros_like(band)
 for k in ('left_eyebrow', 'right_eyebrow'): cv2.polylines(bm, [np.array(Lp[k], np.int32)], False, 255, 9)
-ed = cv2.dilate(cv2.Canny(g, 25, 70), np.ones((3, 3), np.uint8))
+ed = cv2.dilate(cv2.Canny(cv2.GaussianBlur(g, (3, 3), 0), int(os.environ.get('CL', 25)), int(os.environ.get('CH', 70))), np.ones((int(os.environ.get('DIL', 3)),) * 2, np.uint8))
 rim = ((ed > 0) & (band > 0) & (eyem == 0) & (bm == 0)).astype(np.uint8) * 255
-ph2 = cv2.inpaint(ph, rim, 6, cv2.INPAINT_TELEA); cv2.imwrite(OUTN + '_noglass.jpg', ph2)
+ph2 = cv2.inpaint(ph, rim, 6, cv2.INPAINT_TELEA)
+_sm = cv2.bilateralFilter(ph2, 9, 30, 9); _m = cv2.GaussianBlur(cv2.dilate(rim, np.ones((9, 9), np.uint8)).astype(np.float32) / 255, (0, 0), 3)[..., None]
+ph2 = (ph2 * (1 - _m) + _sm * _m).astype(np.uint8); cv2.imwrite(OUTN + '_noglass.jpg', ph2)
 # 그림 좌표로 사진을 휨(특징점 TPS: 그림→사진 역방향 사상)
 gy, gx = np.mgrid[0:H, 0:W].astype(np.float32)
 x0, x1 = int(pd[:, 0].min() - 80), int(pd[:, 0].max() + 80); y0, y1 = int(pd[:, 1].min() - 120), int(pd[:, 1].max() + 40)
-rbf = RBFInterpolator(pd, pp, kernel='thin_plate_spline', smoothing=1.0)
 q = np.stack([gx[y0:y1, x0:x1].ravel(), gy[y0:y1, x0:x1].ravel()], 1)
-mp = rbf(q).astype(np.float32).reshape(y1 - y0, x1 - x0, 2)
+if os.environ.get('SIM'):
+    # 표정 살리기: 눈·눈썹·코만으로 닮음 변환(입·눈 모양은 사진 그대로)
+    def pts(L): return np.array([p for k in ('left_eye', 'right_eye', 'nose_bridge', 'left_eyebrow', 'right_eyebrow') for p in L[k]], np.float32)
+    M, _ = cv2.estimateAffinePartial2D(pts(Ld), pts(Lp), method=cv2.LMEDS)
+    mp = (np.c_[q, np.ones(len(q))] @ M.T).astype(np.float32).reshape(y1 - y0, x1 - x0, 2)
+else:
+    rbf = RBFInterpolator(pd, pp, kernel='thin_plate_spline', smoothing=1.0)
+    mp = rbf(q).astype(np.float32).reshape(y1 - y0, x1 - x0, 2)
 warp = cv2.remap(ph2, mp[..., 0], mp[..., 1], cv2.INTER_CUBIC, borderMode=cv2.BORDER_REFLECT)
 # 얼굴 안쪽 가림막(턱선 + 눈썹 위 이마 조금)
 chin = np.array(Ld['chin']); browd = np.array(Ld['left_eyebrow'] + Ld['right_eyebrow']).astype(np.float32)

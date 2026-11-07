@@ -83,7 +83,7 @@ bpy.ops.object.select_all(action='DESELECT'); glasses.select_set(True); rig.sele
 bpy.ops.object.mode_set(mode='POSE'); arm.bones.active = arm.bones['head']
 bpy.ops.object.parent_set(type='BONE', keep_transform=True); bpy.ops.object.mode_set(mode='OBJECT')
 
-# ── ⑨ 몸짓 7가지: idle·walk·wave·talk·bow·clap·cheer ──
+# ── ⑨ 몸짓: idle·walk·wave·talk·bow(손 모아 꾸벅)·point(가리키며 안내)·clap·cheer(V자 만세) ──
 rig.animation_data_create()
 REST = {b.name: b.matrix_local.to_quaternion() for b in arm.bones}
 def q_world(name, axis, deg):
@@ -102,28 +102,52 @@ def action(name, keys, loop=True):
     tr = rig.animation_data.nla_tracks.new(); tr.name = name; st = tr.strips.new(name, int(keys[0][0]), act); st.name = name
     rig.animation_data.action = None
 X, Y, Z = (1, 0, 0), (0, 1, 0), (0, 0, 1)
-DOWN = {'upper_arm.L': [(Y, 8)], 'upper_arm.R': [(Y, -8)]}
-action('idle', [(0, {**DOWN, 'chest': [(X, 0)]}), (30, {**DOWN, 'chest': [(X, 2)], 'head': [(X, -2)]}), (60, {**DOWN, 'chest': [(X, 0)]})])
+# 축 약속(모델은 -Y를 봄): 팔 Y+ = 오른팔 바깥으로 들기(왼팔은 Y-), 팔 X- = 앞으로 들기, 몸·고개 X+ = 앞으로 숙이기, 고개 Z- = 오른쪽 보기
+DOWN = {'upper_arm.L': [(Y, -6)], 'upper_arm.R': [(Y, 6)], 'forearm.L': [(X, -8)], 'forearm.R': [(X, -8)]}
+def mix(*ds):
+    o = {}
+    for d in ds:
+        for k, v in d.items(): o[k] = (o.get(k, []) + list(v)) if k != '_lift' else v
+    return o
+# 1 서기: 숨쉬기 + 살짝 흔들림 + 고개 둘러보기
+action('idle', [(0, mix(DOWN, {'chest': [(X, 0)], 'head': [(Z, 0)]})), (40, mix(DOWN, {'chest': [(X, 2.5)], 'spine': [(Z, 1.5)], 'head': [(X, -2), (Z, 6)]})),
+                (80, mix(DOWN, {'chest': [(X, 0)], 'head': [(Z, 0)]})), (120, mix(DOWN, {'chest': [(X, 2.5)], 'spine': [(Z, -1.5)], 'head': [(X, -2), (Z, -6)]})), (160, mix(DOWN, {'chest': [(X, 0)], 'head': [(Z, 0)]}))])
+# 2 걷기
 wk = []
-for f, s in ((0, 1), (10, 0), (20, -1), (30, 0), (40, 1)):
-    wk.append((f, {'thigh.L': [(X, 28 * s)], 'thigh.R': [(X, -28 * s)], 'shin.L': [(X, -18 * max(0, -s))], 'shin.R': [(X, -18 * max(0, s))],
-                   'upper_arm.L': [(Y, 8), (X, -22 * s)], 'upper_arm.R': [(Y, -8), (X, 22 * s)], 'chest': [(Z, 4 * s)], '_lift': (0, 0, 0.0) if s else (0, 0.02, 0)}))
+for f, s_ in ((0, 1), (8, 0), (16, -1), (24, 0), (32, 1)):
+    wk.append((f, {'thigh.L': [(X, -30 * s_)], 'thigh.R': [(X, 30 * s_)], 'shin.L': [(X, 25 * max(0, s_))], 'shin.R': [(X, 25 * max(0, -s_))],
+                   'upper_arm.L': [(Y, -6), (X, 24 * s_)], 'upper_arm.R': [(Y, 6), (X, -24 * s_)], 'forearm.L': [(X, -15)], 'forearm.R': [(X, -15)],
+                   'spine': [(Z, -3 * s_)], 'chest': [(X, 4)], 'head': [(Z, 2 * s_)], '_lift': (0, 0.015 if s_ == 0 else 0, 0)}))
 action('walk', wk)
-WAVE_UP = {'upper_arm.L': [(Y, 8)], 'upper_arm.R': [(Y, 70), (X, -15)], 'forearm.R': [(Y, 75)]}
-wv = [(0, DOWN)]
-for i, f in enumerate(range(8, 41, 8)):
-    wv.append((f, {**WAVE_UP, 'hand.R': [(Y, 25 if i % 2 else -25)], 'forearm.R': [(Y, 75 + (12 if i % 2 else -12))], 'head': [(Y, -6)]}))
-wv.append((50, DOWN)); action('wave', wv)
-action('talk', [(0, {**DOWN, 'head': [(X, 0)]}), (8, {**DOWN, 'head': [(X, -7)], 'forearm.L': [(X, -25)]}), (16, {**DOWN, 'head': [(X, 3)], 'forearm.R': [(X, -25)]}), (24, {**DOWN, 'head': [(X, 0)]})])
-BOW = {**DOWN, 'spine': [(X, 14)], 'chest': [(X, 16)], 'head': [(X, 10)], 'upper_arm.L': [(Y, 4), (X, 10)], 'upper_arm.R': [(Y, -4), (X, 10)]}
-action('bow', [(0, DOWN), (10, BOW), (24, BOW), (36, DOWN)])
-cl = []
-for f in range(0, 31, 4):
-    k = (f // 4) % 2
-    cl.append((f, {'upper_arm.L': [(X, -50), (Z, 18 - 6 * k)], 'upper_arm.R': [(X, -50), (Z, -18 + 6 * k)], 'forearm.L': [(Z, 55 + 14 * k)], 'forearm.R': [(Z, -55 - 14 * k)], 'head': [(X, 4)]}))
-action('clap', cl)
-UP = {'upper_arm.L': [(Y, -150)], 'upper_arm.R': [(Y, 150)], 'forearm.L': [(Y, -10)], 'forearm.R': [(Y, 10)], 'head': [(X, 8)]}
-action('cheer', [(0, DOWN), (8, {**UP, '_lift': (0, 0.03, 0)}), (16, UP), (24, {**UP, '_lift': (0, 0.03, 0)}), (34, DOWN)])
+# 3 손 흔들기: 오른팔을 머리 옆까지 들고 손을 좌우로
+UPR = {'upper_arm.R': [(Y, 128), (X, -12)], 'forearm.R': [(Y, 12)], 'chest': [(Z, -4)], 'head': [(Z, 4), (Y, 4)], 'upper_arm.L': [(Y, -6)]}
+wv = [(0, DOWN), (8, mix(UPR, {'hand.R': [(Y, 0)]}))]
+for i, f in enumerate(range(14, 51, 6)):
+    k = 1 if i % 2 else -1
+    wv.append((f, mix(UPR, {'forearm.R': [(Y, 16 * k)], 'hand.R': [(Y, 22 * k)]})))
+wv.append((60, DOWN)); action('wave', wv)
+# 4 말하기: 고개 끄덕 + 한 손 펴서 설명
+action('talk', [(0, DOWN), (8, mix(DOWN, {'head': [(X, 6)], 'upper_arm.R': [(X, -22), (Y, 10)], 'forearm.R': [(X, -45)], 'hand.R': [(Z, 20)]})),
+                (16, mix(DOWN, {'head': [(X, -3)], 'upper_arm.R': [(X, -28), (Y, 14)], 'forearm.R': [(X, -50)], 'hand.R': [(Z, 30)]})),
+                (24, mix(DOWN, {'head': [(X, 5)], 'upper_arm.R': [(X, -22), (Y, 10)], 'forearm.R': [(X, -45)], 'hand.R': [(Z, 20)]})), (32, DOWN)])
+# 5 꾸벅: 두 손을 배 앞에 모으고 허리 숙여 인사
+HANDS = {'upper_arm.L': [(X, -16), (Y, 44)], 'upper_arm.R': [(X, -16), (Y, -44)], 'forearm.L': [(X, -66), (Z, -66)], 'forearm.R': [(X, -66), (Z, 66)]}
+BOW = mix(HANDS, {'spine': [(X, 12)], 'chest': [(X, 16)], 'head': [(X, 12)]})
+action('bow', [(0, DOWN), (8, HANDS), (18, BOW), (32, BOW), (42, HANDS), (50, DOWN)])
+# 6 가리키며 안내: 오른팔 쭉 뻗어 앞오른쪽을 가리키고, 고개도 그쪽, 왼손은 펴서 보조
+PT = {'upper_arm.R': [(Y, 70), (X, -45)], 'forearm.R': [(X, -8)], 'hand.R': [(X, -10)], 'chest': [(Z, -10)], 'head': [(Z, -16), (X, -3)],
+      'upper_arm.L': [(Y, -10), (X, -12)], 'forearm.L': [(X, -35), (Z, -15)]}
+action('point', [(0, DOWN), (12, PT), (40, mix(PT, {'hand.R': [(X, 6)]})), (52, DOWN)])
+# 7 박수: 가슴 앞에서 손뼉
+cl = [(0, DOWN)]
+CLAP = {'upper_arm.L': [(X, -40), (Y, 42)], 'upper_arm.R': [(X, -40), (Y, -42)], 'head': [(X, -4)], 'chest': [(X, -3)]}
+for i, f in enumerate(range(6, 43, 4)):
+    k = i % 2
+    cl.append((f, mix(CLAP, {'forearm.L': [(X, -55), (Z, -48 - 22 * k)], 'forearm.R': [(X, -55), (Z, 48 + 22 * k)]})))
+cl.append((52, DOWN)); action('clap', cl)
+# 8 V자 만세: 두 팔을 크게 벌려 위로, 살짝 뛰며 고개 젖힘
+VUP = {'upper_arm.L': [(Y, -122)], 'upper_arm.R': [(Y, 122)], 'forearm.L': [(Y, -14)], 'forearm.R': [(Y, 14)], 'head': [(X, -9)], 'chest': [(X, -6)]}
+action('cheer', [(0, DOWN), (8, mix(VUP, {'_lift': (0, 0.05, 0)})), (14, VUP), (22, mix(VUP, {'_lift': (0, 0.05, 0)})), (30, VUP), (42, DOWN)])
 bpy.context.scene.render.fps = 30
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_animations=True, export_animation_mode='NLA_TRACKS', export_image_format='JPEG', export_jpeg_quality=86, export_apply=False)

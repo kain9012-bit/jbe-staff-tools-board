@@ -7,6 +7,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import chibiUrl from './chibi.glb?url';
 import chiefUrl from './chief.glb?url';
+import chiefLaughUrl from './chief_laugh.jpg?url';
+import chiefSmileUrl from './chief_smile.jpg?url';
 
 export interface ChibiOpt {
   skin: string;
@@ -220,6 +222,8 @@ export interface Chibi {
   /** 한 번만 하는 몸짓(인사·박수·만세 — 교육감 캐릭터) */
   once?: string | null;
   onceA?: THREE.AnimationAction | null;
+  /** 표정(교육감): 기본·눈웃음·크게 웃기 — 얼굴 결 텍스처를 바꿔 끼움 */
+  face?: (k: 'base' | 'smile' | 'laugh') => void;
 }
 
 const HAIR_OF: Record<string, string> = { short: 'short', bob: 'bob', pony: 'pony', bun: 'bun', curly: 'curly', side: 'side' };
@@ -292,7 +296,7 @@ export function makeChibi(o: ChibiOpt): Chibi {
   return { root, model, mixer, act, faceMap, armR, foreR, hold: !!o.prop, armBase: armR ? armR.quaternion.clone() : new THREE.Quaternion(), foreBase: foreR ? foreR.quaternion.clone() : new THREE.Quaternion(), phase: 0, blinkT: 1 + Math.random() * 3, wave: 0, talk: 0, hop: 0, waving: false };
 }
 
-/* ── 교육감 캐릭터(chief.glb) — 사진 → 그림 → TripoSG 전신 형상 → 깎기·색·안경·사진 결 → 뼈 19개·몸짓 7가지(idle·walk·wave·talk·bow·clap·cheer)
+/* ── 교육감 캐릭터(chief.glb) — 사진 → 그림 → TripoSG 전신 형상 → 깎기·색·안경·사진 결 → 뼈 19개·몸짓(idle·walk·wave·talk·bow·point·clap·cheer)·표정 3가지
    만드는 과정: tools/plaza_chief2/ ── */
 let CHIEF: { scene: THREE.Group; clips: THREE.AnimationClip[] } | null = null;
 export const hasChief = () => !!CHIEF;
@@ -318,6 +322,33 @@ export function makeChief(): Chibi | null {
   });
   root.add(model);
   root.add(blob(0.46));
+  // 표정: 같은 UV에 얼굴만 다른 사진 결(눈웃음·크게 웃기) — 처음 쓸 때 불러 둠
+  let photoMat: THREE.MeshLambertMaterial | null = null;
+  model.traverse((m: any) => {
+    if (m.isMesh && m.material?.userData?.photo) photoMat = m.material;
+  });
+  const faces: Record<string, THREE.Texture | null> = { base: (photoMat as THREE.MeshLambertMaterial | null)?.map ?? null };
+  const load = (k: string, url: string) => {
+    if (faces[k] !== undefined) return;
+    faces[k] = null;
+    new THREE.TextureLoader().load(url, (t) => {
+      t.flipY = false;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      faces[k] = t;
+    });
+  };
+  load('smile', chiefSmileUrl);
+  load('laugh', chiefLaughUrl);
+  let curFace = 'base';
+  const face = (k: 'base' | 'smile' | 'laugh') => {
+    const t = faces[k] ?? faces.base;
+    if (!photoMat || !t || curFace === k) return;
+    curFace = k;
+    photoMat.map = t;
+    photoMat.emissiveMap = t;
+    photoMat.needsUpdate = true;
+  };
   const mixer = new THREE.AnimationMixer(model);
   const act: Record<string, THREE.AnimationAction> = {};
   for (const c of CHIEF.clips) {
@@ -328,14 +359,14 @@ export function makeChief(): Chibi | null {
     act[c.name] = a;
   }
   act.idle?.setEffectiveWeight(1);
-  for (const k of ['wave', 'bow', 'clap', 'cheer']) {
+  for (const k of ['wave', 'bow', 'clap', 'cheer', 'point']) {
     const a = act[k];
     if (!a) continue;
     a.setLoop(THREE.LoopOnce, 1);
     a.clampWhenFinished = false;
     a.stop();
   }
-  return { root, model, mixer, act, faceMap: null, armR: null, foreR: null, hold: false, armBase: new THREE.Quaternion(), foreBase: new THREE.Quaternion(), phase: 0, blinkT: 9, wave: 0, talk: 0, hop: 0, waving: false, once: null, onceA: null };
+  return { root, model, mixer, act, faceMap: null, armR: null, foreR: null, hold: false, armBase: new THREE.Quaternion(), foreBase: new THREE.Quaternion(), phase: 0, blinkT: 9, wave: 0, talk: 0, hop: 0, waving: false, once: null, onceA: null, face };
 }
 
 let BLOB: THREE.Texture | null = null;
@@ -384,7 +415,7 @@ export function animChibi(c: Chibi, dt: number, _t: number, speed: number) {
   A.walk?.setEffectiveWeight(walk);
   if (A.walk) A.walk.timeScale = 0.6 + speed / 4.6;
   A.idle?.setEffectiveWeight(Math.max(0.05, (1 - walk) * (waveW || onceW ? 0.1 : 1) * (talkW ? 0.4 : 1)));
-  for (const k of ['bow', 'clap', 'cheer']) A[k]?.setEffectiveWeight(c.onceA === A[k] ? 1.5 : 0);
+  for (const k of ['bow', 'clap', 'cheer', 'point']) A[k]?.setEffectiveWeight(c.onceA === A[k] ? 1.5 : 0);
   A.talk?.setEffectiveWeight(talkW * (1 - walk));
   A.wave?.setEffectiveWeight(waveW * 1.5);
   // 믹서는 값이 바뀔 때만 뼈를 덮어쓰므로, 지난 장면의 보정을 먼저 걷어 냄(안 하면 팔이 계속 돎)

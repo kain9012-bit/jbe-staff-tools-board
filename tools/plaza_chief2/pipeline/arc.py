@@ -29,6 +29,7 @@ def load(path):
         a = im[..., 3:4] / 255.0; im = (im[..., :3] * a + 255 * (1 - a)).astype(np.uint8)
     return cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 def real_set():
+    if os.path.exists('real9_clean.npy'): return np.load('real9_clean.npy')  # 만들 때 쓴 사진·같은 게시물 사진 뺀 9장
     if os.path.exists('real9.npy'): return np.load('real9.npy')
     sel = json.load(open('/tmp/claude-0/ch/work/sel.json'))
     E = []

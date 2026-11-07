@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const W = 300, H = 400;
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true }); r.setSize(W, H);
+r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.setClearColor(0x000000, 0); document.body.appendChild(r.domElement);
+const sc = new THREE.Scene();
+sc.add(new THREE.HemisphereLight(0xeaf2ff, 0x8a8170, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.3); sun.position.set(3, 6, 4); sc.add(sun);
+const d = new Uint8Array([90, 170, 255]); const grad = new THREE.DataTexture(d, 3, 1, THREE.RedFormat); grad.minFilter = grad.magFilter = THREE.NearestFilter; grad.needsUpdate = true;
+const g = await new GLTFLoader().loadAsync('./chief.glb');
+const m = g.scene;
+m.traverse(o => { if (!o.isMesh) return; const mt = o.material; if (mt.map) { const map = mt.map; map.colorSpace = THREE.SRGBColorSpace;
+  o.material = new THREE.MeshLambertMaterial({ map, emissiveMap: map, emissive: 0xffffff, emissiveIntensity: 0.72, color: new THREE.Color(0.34, 0.34, 0.34), toneMapped: false }); }
+  else o.material = new THREE.MeshToonMaterial({ color: mt.color, gradientMap: grad }); });
+sc.add(m);
+const mx = new THREE.AnimationMixer(m);
+const cam = new THREE.PerspectiveCamera(22, W / H, 0.1, 100); cam.position.set(0, 1.0, 5.2); cam.lookAt(0, 0.82, 0);
+window.pose = (name, t) => { mx.stopAllAction(); const c = g.animations.find(c => c.name === name); if (c) { const a = mx.clipAction(c); a.reset().play(); mx.setTime(t); } };
+window.shot = (deg) => { m.rotation.y = deg * Math.PI / 180; r.render(sc, cam); return r.domElement.toDataURL('image/png'); };
+window.__done = true;
+</script></body></html>

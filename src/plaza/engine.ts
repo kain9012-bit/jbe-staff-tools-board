@@ -873,8 +873,20 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     c.root.traverse((o) => (o.userData.chief = true));
     scene.add(c.root);
     lift(c.root);
-    return { c, pos, yaw, bub: null as THREE.Sprite | null, bubT: 0, q: 0, seq: [] as [number, string][] };
+    // 길목을 따라 오가는 방향(마당 쪽 길과 나란히)
+    const tan = V(-FN[1], 0, -FN[0]).normalize();
+    return { c, home: pos.clone(), pos, yaw, tan, bub: null as THREE.Sprite | null, bubT: 0, q: 0, seq: [] as [number, string][],
+      target: null as THREE.Vector3 | null, restT: 3, busyT: 0, pointYaw: null as number | null, moving: false };
   })();
+  const CS_W = W(CS[0], CS[1]);
+  /** 교육감 몸짓 하나(표정 함께) — wave·bow·clap·cheer·point */
+  const chiefDo = (k: string) => {
+    if (!chief) return;
+    if (k === 'wave') chief.c.wave = 1.1;
+    else chief.c.once = k;
+    chief.target = null;
+    chief.busyT = Math.max(chief.busyT, k === 'point' ? 2.2 : 1.8);
+  };
   const isChief = (o: THREE.Object3D | null) => {
     for (; o; o = o.parent) if (o.userData.chief) return true;
     return false;
@@ -882,13 +894,10 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
   const greetChief = () => {
     if (!chief || world !== 'out') return;
     const q = CHIEF_QUOTES[chief.q++ % CHIEF_QUOTES.length];
-    chief.c.once = 'bow';
-    chief.seq = [[1.25, 'wave']];
-    disposeSprite(chief.bub);
-    chief.bub = textSprite(q, { bg: '#ffffff', fg: '#0d1830', tail: true, h: 0.4, font: 44 });
-    chief.bub.position.y = 1.98;
-    chief.c.root.add(chief.bub);
-    chief.bubT = 5;
+    // 손 모아 꾸벅 → 인사말(말하기) → 팔 뻗어 천막 마당 안내 → 손 흔들기
+    chiefDo('bow');
+    chief.seq = [[1.6, 'say:' + q], [4.6, 'point'], [7.0, 'wave']];
+    chief.busyT = 8.2;
     // 나도 꾸벅 — 다른 사람에게도 보이는 인사
     playEmote(me, 'hi');
     P.yaw = Math.atan2(chief.pos.x - P.pos.x, chief.pos.z - P.pos.z);
@@ -2100,27 +2109,67 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
       const ld = camera.position.distanceTo(tt.label.position);
       tt.label.material.opacity = cam.mode === 'talk' || cam.mode === 'holo' ? 0 : clamp((ld - 7) / 6) * clamp(1.5 - ld / 110, 0.45, 1);
     });
-    // 교육감: 가까이 오면 나를 보고 손 인사, 말 걸면 꾸벅
+    // 교육감: 평소엔 길목을 천천히 오가며 둘러보고, 다가오면 손 인사, 말 걸면 꾸벅→인사말→안내, 내 몸짓엔 따라 반응
     if (world === 'out' && chief) {
       const ch = chief, d = Math.hypot(ch.pos.x - P.pos.x, ch.pos.z - P.pos.z);
       if (d < 3.2 && d < bd) (bd = d), (best = 'chief');
-      let want = ch.yaw;
-      if (d < 9 || ch.bubT > 0) want = Math.atan2(P.pos.x - ch.pos.x, P.pos.z - ch.pos.z);
-      let dy = want - ch.c.root.rotation.y;
-      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-      ch.c.root.rotation.y += dy * Math.min(1, dt * 3);
-      if (d < 9 && !ch.c.root.userData.greeted) {
-        ch.c.root.userData.greeted = true;
-        ch.c.wave = 1.1;
-      }
-      if (d > 14) ch.c.root.userData.greeted = false;
+      ch.busyT = Math.max(0, ch.busyT - dt);
+      // 정해 둔 순서
       for (const s2 of ch.seq) s2[0] -= dt;
       while (ch.seq.length && ch.seq[0][0] <= 0) {
         const k = ch.seq.shift()![1];
-        if (k === 'wave') ch.c.wave = 1.1;
-        else ch.c.once = k;
+        if (k.startsWith('say:')) {
+          const q = k.slice(4);
+          disposeSprite(ch.bub);
+          ch.bub = textSprite(q, { bg: '#ffffff', fg: '#0d1830', tail: true, h: 0.4, font: 44 });
+          ch.bub.position.y = 1.98;
+          ch.c.root.add(ch.bub);
+          ch.bubT = 4.6;
+        } else if (k === 'point') {
+          // 오른팔이 몸 오른쪽 앞(약 55°)을 가리키므로, 마당 한가운데가 그쪽에 오게 돌아섬
+          ch.pointYaw = Math.atan2(CS_W.x - ch.pos.x, CS_W.z - ch.pos.z) + 0.96;
+          chiefDo('point');
+        } else chiefDo(k);
       }
-      ch.c.talk = ch.bubT > 1.5 ? 1 : 0;
+      if (ch.c.onceA === null && !ch.c.waving && ch.c.once == null) ch.pointYaw = null;
+      // 오가기(사람이 가까이 없고 할 일이 없을 때)
+      let speed = 0;
+      if (d < 9 || ch.busyT > 0 || ch.seq.length) ch.target = null;
+      else if (!ch.target) {
+        ch.restT -= dt;
+        if (ch.restT <= 0) {
+          const off = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 1.8);
+          const tg = ch.home.clone().addScaledVector(ch.tan, off);
+          if (!blocked(tg.x, tg.z)) ch.target = tg;
+          ch.restT = 5 + Math.random() * 6;
+        }
+      } else {
+        const dx = ch.target.x - ch.pos.x, dz = ch.target.z - ch.pos.z, L = Math.hypot(dx, dz);
+        if (L < 0.08) ch.target = null;
+        else {
+          const st = Math.min(L, dt * 0.85);
+          ch.pos.x += (dx / L) * st;
+          ch.pos.z += (dz / L) * st;
+          ch.c.root.position.x = ch.pos.x;
+          ch.c.root.position.z = ch.pos.z;
+          speed = 3;
+        }
+      }
+      // 바라볼 곳
+      let want = ch.yaw;
+      if (ch.pointYaw !== null) want = ch.pointYaw;
+      else if (ch.target) want = Math.atan2(ch.target.x - ch.pos.x, ch.target.z - ch.pos.z);
+      else if (d < 9 || ch.bubT > 0 || ch.busyT > 0) want = Math.atan2(P.pos.x - ch.pos.x, P.pos.z - ch.pos.z);
+      let dy = want - ch.c.root.rotation.y;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      ch.c.root.rotation.y += dy * Math.min(1, dt * 3.5);
+      // 다가오면 손 인사(한 번)
+      if (d < 9 && !ch.c.root.userData.greeted && ch.busyT <= 0) {
+        ch.c.root.userData.greeted = true;
+        chiefDo('wave');
+      }
+      if (d > 14) ch.c.root.userData.greeted = false;
+      ch.c.talk = ch.bubT > 1.2 ? 1 : 0;
       if (ch.bubT > 0) {
         ch.bubT -= dt;
         if (ch.bub) (ch.bub.material as THREE.SpriteMaterial).opacity = clamp(ch.bubT / 0.4);
@@ -2129,7 +2178,10 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
           ch.bub = null;
         }
       }
-      animChibi(ch.c, dt, t, 0);
+      animChibi(ch.c, dt, t, speed);
+      // 표정: 박수·만세는 크게 웃기, 꾸벅·손 인사·말하기는 눈웃음
+      const on = ch.c.onceA ? ch.c.onceA.getClip().name : ch.c.waving ? 'wave' : ch.c.talk ? 'talk' : '';
+      ch.c.face?.(on === 'clap' || on === 'cheer' ? 'laugh' : on === 'bow' || on === 'wave' || on === 'talk' ? 'smile' : 'base');
     }
     // 명예의 전당: 단 둘레에 오면
     if (world === 'out' && FAME && best === null && Math.hypot(P.pos.x - FAME.group.position.x, P.pos.z - FAME.group.position.z) < 7.4) best = 'fame';
@@ -2259,6 +2311,9 @@ export function createPlaza(host: HTMLElement, tents: PlazaTent[], emit: (e: Ev)
     /** 내 몸짓 + 말풍선 */
     emote: (k: Emote) => {
       playEmote(me, k);
+      // 교육감 가까이에서 몸짓하면 따라 반응(인사엔 손 인사, 박수엔 박수, 좋아요·반가워요엔 만세)
+      if (chief && world === 'out' && chief.busyT <= 0 && Math.hypot(chief.pos.x - P.pos.x, chief.pos.z - P.pos.z) < 9)
+        chief.seq.push([0.5, k === 'hi' ? 'wave' : k === 'clap' ? 'clap' : 'cheer']);
       disposeSprite(myBub);
       myBub = bubble(k);
       myBub.position.y = 2.12;
