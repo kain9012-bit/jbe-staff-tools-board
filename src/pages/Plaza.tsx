@@ -15,7 +15,7 @@ import suitUrl from '../fonts/SUIT-Variable.woff2';
 import eduUrl from '../fonts/GangwonEduPowerExtraBoldA.woff';
 
 /**
- * 3D 광장 — 업무별 둘러보기(업무 분류 16개)를 청사 앞 잔디마당의 천막으로 보여 주는 시범 화면.
+ * 3D 광장 — 업무별 둘러보기(업무 분류 20개)를 청사 앞 잔디마당의 천막으로 보여 주는 시범 화면.
  * 천막 = 업무 분류, 천막지기에게 말을 걸면 그 업무의 도구가 홀로그램 카드로 뜸.
  * 웹판(Vercel)에만 있음. 서버판(도커)에는 없음
  */
@@ -38,6 +38,10 @@ const LOOK: Record<string, { color: string; prop: string; line: string }> = {
   '급식': { color: '#f08a24', prop: 'ladle', line: '급식 천막에 오신 걸 환영해요! 급식 업무 도구를 보여 드릴게요.' },
   '행사·시험': { color: '#d65aa4', prop: 'megaphone', line: '행사와 시험 준비를 돕는 도구들이에요.' },
   '교육공무직': { color: '#3f6e8c', prop: 'mug', line: '교육공무직 업무에 쓰는 도구들이에요.' },
+  '메신저': { color: '#f2b51d', prop: 'tablet', line: '메신저 쪽지 보내고, 받은 파일 챙기는 일을 돕는 도구들이에요.' },
+  '신청·취합·설문': { color: '#7cb342', prop: 'clipboard', line: '신청받고, 모으고, 설문하는 일을 덜어 주는 도구들이에요.' },
+  '감사·청렴': { color: '#546e7a', prop: 'magnifier', line: '감사 지적사례와 청렴 기준을 찾아보는 도구들이에요.' },
+  '학교폭력·생활지도': { color: '#e0607e', prop: 'book', line: '학교폭력 사안 처리와 생활지도를 돕는 도구들이에요.' },
 };
 const TAG: Record<string, string> = { staff: '교직원 제작', official: '교육청 배포', external: '외부 공공' };
 /** 구분 표 색 — 목록 화면의 구분 표와 같은 계열(홀로그램 위에서 보이게 진하게) */

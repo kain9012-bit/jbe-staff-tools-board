@@ -11,7 +11,7 @@ export interface KeywordChip {
   words: string[];
 }
 
-// 업무 분류 16개 — 시트 「도구정보」 탭·게시판 공지·확장과 같은 이름
+// 업무 분류 20개 — 시트 「도구정보」 탭·게시판 공지·확장과 같은 이름
 // words는 시트에 분류가 없는 도구만 낱말로 임시 분류할 때 씀
 export const KEYWORD_CHIPS: KeywordChip[] = [
   { label: '공문·문서', words: ['공문', '문서', '한글', 'hwp', 'pdf', '용량', '서식', '기록물', '보도자료', '수신자', '수신그룹'] },
@@ -30,6 +30,10 @@ export const KEYWORD_CHIPS: KeywordChip[] = [
   { label: '급식', words: ['급식', '식단'] },
   { label: '행사·시험', words: ['시험', '수능', '행사'] },
   { label: '교육공무직', words: ['교육공무직'] },
+  { label: '메신저', words: ['메신저', '쪽지', '카카오톡', '카톡'] },
+  { label: '신청·취합·설문', words: ['취합', '수합', '설문', '신청서'] },
+  { label: '감사·청렴', words: ['감사공개', '감사 지적', '감사예방', '청렴', '청탁금지'] },
+  { label: '학교폭력·생활지도', words: ['학교폭력', '학폭', '생활지도'] },
 ];
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '');
